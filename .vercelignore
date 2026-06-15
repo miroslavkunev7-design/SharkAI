@@ -1,0 +1,11 @@
+release/
+generated/
+uploads/
+*.db
+*.db-journal
+.test-results.json
+.env
+.env.local
+.env.production.local
+agent-tools/
+terminals/

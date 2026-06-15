@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import { Download, Monitor, CheckCircle2, ArrowRight } from 'lucide-react';
-import fs from 'fs';
-import path from 'path';
+import { getInstallerInfo } from '@/lib/installer';
+import { getSiteUrl } from '@/lib/site-url';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -10,22 +10,39 @@ export const metadata: Metadata = {
   description:
     'Shark AI / Шарк АИ — безплатно изтегляне за Windows. Autonomous AI platform: chat, screenshot to code, 15 agents, ZIP export. Download SharkAI installer.',
   keywords: ['SharkAI', 'Shark AI', 'Шарк АИ', 'шарк аи', 'изтегли', 'download', 'Windows', 'AI software', 'безплатно'],
+  alternates: { canonical: '/download' },
+  openGraph: {
+    title: 'SharkAI — Шарк АИ | Download',
+    description: 'Free Windows download — Shark AI autonomous platform',
+    type: 'website',
+  },
 };
 
-function getInstaller() {
-  const releaseDir = path.join(process.cwd(), 'release');
-  if (!fs.existsSync(releaseDir)) return null;
-  const name = fs.readdirSync(releaseDir).find((f) => f.endsWith('.exe') && /setup/i.test(f));
-  if (!name) return null;
-  const size = fs.statSync(path.join(releaseDir, name)).size;
-  return { name, size };
-}
-
 export default function DownloadPage() {
-  const installer = getInstaller();
+  const installer = getInstallerInfo();
+  const siteUrl = getSiteUrl();
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: 'SharkAI',
+    alternateName: ['Shark AI', 'Шарк АИ', 'шарк аи'],
+    applicationCategory: 'DeveloperApplication',
+    operatingSystem: 'Windows 10, Windows 11',
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
+    downloadUrl: installer
+      ? (installer.url.startsWith('http') ? installer.url : `${siteUrl}${installer.url}`)
+      : `${siteUrl}/download`,
+    url: `${siteUrl}/download`,
+    description: 'Autonomous AI platform — open chat, screenshot to code, 15 agents, ZIP export.',
+  };
 
   return (
     <div className="min-h-screen bg-shark-black circuit-bg">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
         <Logo size="lg" variant="full" className="mx-auto mb-8 max-w-xs" />
 
@@ -36,17 +53,19 @@ export default function DownloadPage() {
 
         <p className="text-lg text-white/60 mb-10 max-w-xl mx-auto leading-relaxed">
           Shark AI autonomous platform for Windows. Open chat for anything,
-          screenshot to code, 15 multi-agents, ZIP export — local & free.
+          screenshot to code, 15 multi-agents, ZIP export — local &amp; free.
         </p>
 
         {installer ? (
           <a
-            href="/api/download/installer"
+            href={installer.url}
             className="btn-primary inline-flex items-center gap-3 text-lg py-4 px-8 mb-6"
           >
             <Download className="w-6 h-6" />
             Download for Windows
-            <span className="text-sm opacity-80">({Math.round(installer.size / 1_000_000)} MB)</span>
+            {installer.size && (
+              <span className="text-sm opacity-80">({Math.round(installer.size / 1_000_000)} MB)</span>
+            )}
           </a>
         ) : (
           <div className="glass rounded-2xl p-6 mb-6 border border-yellow-500/20">

@@ -96,9 +96,10 @@ export default function TestsPage() {
     { key: 'Assets', ids: ['files-logo'] },
     { key: 'Config', ids: ['files-agents'] },
     { key: 'API', ids: ['api-status'] },
-    { key: 'Chat', ids: ['api-chat-casual', 'api-chat-instant', 'api-chat-context', 'api-chat-open'] },
+    { key: 'Chat', ids: ['api-chat-casual', 'api-chat-instant', 'api-chat-context', 'api-chat-doing', 'api-chat-open'] },
     { key: 'Upload', ids: ['api-upload'] },
-    { key: 'Build', ids: ['build-screenshot', 'build-api-gen', 'build-db-gen', 'preview-html'] },
+    { key: 'Build', ids: ['build-screenshot', 'build-api-gen', 'build-db-gen', 'build-prompt-software', 'build-ai-security', 'preview-html'] },
+    { key: 'SEO', ids: ['seo-sitemap'] },
     { key: 'Desktop', ids: ['installer-file'] },
     { key: 'Download', ids: ['download-route'] },
   ];

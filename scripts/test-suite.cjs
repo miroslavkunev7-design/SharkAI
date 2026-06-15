@@ -22,6 +22,19 @@ async function fetchJson(url, opts) {
   return data;
 }
 
+async function waitForBuild(projectId, minFiles = 10) {
+  for (let i = 0; i < 45; i++) {
+    await wait(1000);
+    const st = await fetchJson(`${BASE}/api/projects/${projectId}`);
+    if (st.project.status === 'COMPLETED') {
+      if ((st.fileCount || 0) < minFiles) throw new Error(`Only ${st.fileCount} files`);
+      return st;
+    }
+    if (st.project.status === 'FAILED') throw new Error('FAILED');
+  }
+  throw new Error('Timeout');
+}
+
 const TESTS = [
   {
     id: 'files-logo',
@@ -113,6 +126,22 @@ const TESTS = [
         if (d.tier !== 'instant') throw new Error(`Expected instant, got ${d.tier}`);
         if (/лекар|30 мин|сън/i.test(d.content)) throw new Error('Wrong health reply');
         if (!/добре|мерси|ти/i.test(d.content)) throw new Error(`Bad reply: ${d.content.slice(0, 80)}`);
+      },
+    },
+    {
+      id: 'api-chat-doing',
+      name: 'Chat: „какво правиш!" — casual',
+      category: 'Chat',
+      timeout: 3000,
+      async run() {
+        const d = await fetchJson(`${BASE}/api/chat`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'какво правиш !', history: [] }),
+        });
+        if (d.tier !== 'instant') throw new Error(`Expected instant, got ${d.tier}`);
+        if (/лекар|30 мин|сън/i.test(d.content)) throw new Error('Wrong health reply');
+        if (!/говоря|чат|готов|talking|chat/i.test(d.content)) throw new Error(`Bad: ${d.content.slice(0, 80)}`);
       },
     },
     {
@@ -232,6 +261,54 @@ const TESTS = [
         if (st.project.status === 'FAILED') throw new Error('FAILED');
       }
       throw new Error('Timeout');
+    },
+  },
+  {
+    id: 'build-prompt-software',
+    name: 'Prompt to Software feature',
+    category: 'Build',
+    timeout: 60000,
+    async run() {
+      const { project } = await fetchJson(`${BASE}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Test Prompt App',
+          description: 'Landing page for coffee shop',
+          featureId: 'prompt-software',
+        }),
+      });
+      await waitForBuild(project.id, 15);
+    },
+  },
+  {
+    id: 'build-ai-security',
+    name: 'AI Security Audit feature',
+    category: 'Build',
+    timeout: 60000,
+    async run() {
+      const { project } = await fetchJson(`${BASE}/api/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Test Security',
+          description: 'Security audit pack',
+          featureId: 'ai-security',
+        }),
+      });
+      await waitForBuild(project.id, 12);
+    },
+  },
+  {
+    id: 'seo-sitemap',
+    name: 'GET /sitemap.xml',
+    category: 'SEO',
+    async run() {
+      const res = await fetch(`${BASE}/sitemap.xml`);
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const xml = await res.text();
+      if (!xml.includes('/download')) throw new Error('Missing /download in sitemap');
+      if (!xml.includes('localhost') && !xml.includes('sharkai')) throw new Error('Invalid sitemap');
     },
   },
   {
