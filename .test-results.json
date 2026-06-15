@@ -1,0 +1,122 @@
+{
+  "ranAt": "2026-06-14T20:20:52.566Z",
+  "base": "http://localhost:3847",
+  "total": 14,
+  "passed": 14,
+  "failed": 0,
+  "passRate": 100,
+  "results": [
+    {
+      "id": "files-logo",
+      "name": "Logo & icon files exist",
+      "category": "Assets",
+      "status": "passed",
+      "duration": 1,
+      "at": "2026-06-14T20:20:41.164Z"
+    },
+    {
+      "id": "files-agents",
+      "name": "18 features + 15 agents defined",
+      "category": "Config",
+      "status": "passed",
+      "duration": 1,
+      "at": "2026-06-14T20:20:41.167Z"
+    },
+    {
+      "id": "api-status",
+      "name": "GET /api/status",
+      "category": "API",
+      "status": "passed",
+      "duration": 203,
+      "at": "2026-06-14T20:20:41.370Z"
+    },
+    {
+      "id": "api-chat-casual",
+      "name": "Chat: „как си?\" отговор",
+      "category": "Chat",
+      "status": "passed",
+      "duration": 108,
+      "at": "2026-06-14T20:20:41.478Z"
+    },
+    {
+      "id": "api-chat-instant",
+      "name": "Chat: мигновен „здравей\"",
+      "category": "Chat",
+      "status": "passed",
+      "duration": 70,
+      "at": "2026-06-14T20:20:41.548Z"
+    },
+    {
+      "id": "api-chat-context",
+      "name": "Chat: „добре а ти?\" — не health",
+      "category": "Chat",
+      "status": "passed",
+      "duration": 86,
+      "at": "2026-06-14T20:20:41.635Z"
+    },
+    {
+      "id": "api-chat-open",
+      "name": "Chat: отворен въпрос (космос)",
+      "category": "Chat",
+      "status": "passed",
+      "duration": 83,
+      "at": "2026-06-14T20:20:41.718Z"
+    },
+    {
+      "id": "api-upload",
+      "name": "Upload screenshot",
+      "category": "Upload",
+      "status": "passed",
+      "duration": 130,
+      "at": "2026-06-14T20:20:41.848Z"
+    },
+    {
+      "id": "build-screenshot",
+      "name": "Screenshot → 30+ files + ZIP",
+      "category": "Build",
+      "status": "passed",
+      "duration": 3764,
+      "at": "2026-06-14T20:20:45.612Z"
+    },
+    {
+      "id": "build-api-gen",
+      "name": "API Generator feature",
+      "category": "Build",
+      "status": "passed",
+      "duration": 1510,
+      "at": "2026-06-14T20:20:47.123Z"
+    },
+    {
+      "id": "build-db-gen",
+      "name": "Database Generator feature",
+      "category": "Build",
+      "status": "passed",
+      "duration": 1482,
+      "at": "2026-06-14T20:20:48.606Z"
+    },
+    {
+      "id": "preview-html",
+      "name": "Project preview returns HTML",
+      "category": "Build",
+      "status": "passed",
+      "duration": 774,
+      "at": "2026-06-14T20:20:49.382Z"
+    },
+    {
+      "id": "installer-file",
+      "name": "Windows installer (.exe) exists",
+      "category": "Desktop",
+      "status": "passed",
+      "duration": 1,
+      "at": "2026-06-14T20:20:49.384Z"
+    },
+    {
+      "id": "download-route",
+      "name": "GET /api/download/installer",
+      "category": "Download",
+      "status": "passed",
+      "duration": 3180,
+      "at": "2026-06-14T20:20:52.565Z"
+    }
+  ]
+}

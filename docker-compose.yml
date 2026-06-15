@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sharkai
+      POSTGRES_PASSWORD: sharkai_secret
+      POSTGRES_DB: sharkai
+    ports:
+      - '5432:5432'
+    volumes:
+      - sharkai_pg:/var/lib/postgresql/data
+
+  sharkai:
+    build: .
+    ports:
+      - '3847:3847'
+    environment:
+      DATABASE_URL: postgresql://sharkai:sharkai_secret@postgres:5432/sharkai
+      JWT_SECRET: sharkai-production-secret
+    depends_on:
+      - postgres
+
+volumes:
+  sharkai_pg:

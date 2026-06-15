@@ -1,0 +1,124 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Plan {
+  FREE
+  PRO
+  ULTRA
+}
+
+enum ProjectStatus {
+  ANALYZING
+  BUILDING
+  RUNNING
+  TESTING
+  FIXING
+  DEPLOYING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  name          String?
+  role          Role      @default(USER)
+  plan          Plan      @default(FREE)
+  tokensUsed    Int       @default(0)
+  tokensLimit   Int       @default(10000)
+  stripeId      String?
+  paypalId      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  projects      Project[]
+  subscriptions Subscription[]
+  chatMessages  ChatMessage[]
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  imagePath String?
+  createdAt DateTime @default(now())
+}
+
+model SystemConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model FileUpload {
+  id        String   @id
+  data      Bytes
+  mimeType  String
+  ext       String
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan            Plan
+  status          String   @default("active")
+  stripeSubId     String?
+  paypalSubId     String?
+  currentPeriodEnd DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  type        String        @default("website")
+  status      ProjectStatus @default(ANALYZING)
+  qualityScore Float        @default(0)
+  inputType   String        @default("prompt")
+  inputData   String?
+  analysis    String?
+  outputPath  String?
+  agents      AgentRun[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model AgentRun {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agentId   String
+  agentName String
+  status    String   @default("pending")
+  output    String?
+  duration  Int?
+  createdAt DateTime @default(now())
+}
+
+model SystemMetric {
+  id        String   @id @default(cuid())
+  key       String
+  value     Float
+  metadata  String?
+  createdAt DateTime @default(now())
+}

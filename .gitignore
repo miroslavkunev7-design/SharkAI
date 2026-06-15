@@ -1,0 +1,14 @@
+node_modules
+.next
+dist
+release
+generated
+uploads
+.test-results.json
+*.db
+*.db-journal
+.env
+.env.local
+.DS_Store
+Thumbs.db
+.vercel
