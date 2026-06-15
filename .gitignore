@@ -4,11 +4,12 @@ dist
 release
 generated
 uploads
+.env.production.local
 .test-results.json
 *.db
 *.db-journal
 .env
-.env.local
+.env.production.local
 .DS_Store
 Thumbs.db
 .vercel
