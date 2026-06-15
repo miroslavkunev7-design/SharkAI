@@ -42,7 +42,7 @@ export async function saveUpload(
 
   if (useDbUploads()) {
     await prisma.fileUpload.create({
-      data: { id, data: buffer, mimeType, ext },
+      data: { id, data: new Uint8Array(buffer), mimeType, ext },
     });
     const filePath = await materializeUpload(id);
     return { id, filePath: filePath || '', mimeType, ext };
