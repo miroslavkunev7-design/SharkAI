@@ -25,4 +25,6 @@ CREATE TABLE IF NOT EXISTS "ResearchJob" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "ResearchJob_userId_requestId_key" ON "ResearchJob" ("userId", "requestId");
 
+ALTER TABLE "ResearchJob" ENABLE ROW LEVEL SECURITY;
+
 COMMIT;

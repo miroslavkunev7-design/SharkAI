@@ -1,6 +1,6 @@
 import { Prisma, type PrismaClient, type Role } from '@prisma/client';
 import type Stripe from 'stripe';
-import { paidStripeInvoicePeriod, stripeId, type PaidPlan } from './stripe-billing';
+import { paidStripeInvoicePeriod, stripeId, stripeSubscriptionMatch, type PaidPlan } from './stripe-billing';
 
 export class StripeReconcileError extends Error {}
 
@@ -71,9 +71,9 @@ async function inspectLocal(store: Store, period: VerifiedPeriod, account: Accou
   const { id, userId, customerId, stripeSubId, plan, currentPeriodStart, currentPeriodEnd } = period;
   const [otherCustomer, otherSubscription, byInvoice, matchingWindows] = await Promise.all([
     store.user.findFirst({ where: { id: { not: userId }, stripeId: customerId }, select: { id: true } }),
-    store.subscription.findFirst({ where: { userId: { not: userId }, stripeSubId }, select: { id: true } }),
+    store.subscription.findFirst({ where: { userId: { not: userId }, ...stripeSubscriptionMatch(stripeSubId) }, select: { id: true } }),
     store.subscription.findUnique({ where: { id } }),
-    store.subscription.findMany({ where: { userId, stripeSubId, currentPeriodEnd, OR: [{ currentPeriodStart }, { currentPeriodStart: null }] },
+    store.subscription.findMany({ where: { userId, currentPeriodEnd, AND: [stripeSubscriptionMatch(stripeSubId), { OR: [{ currentPeriodStart }, { currentPeriodStart: null }] }] },
       select: { status: true, plan: true, currentPeriodStart: true } }),
   ]);
   if ((account.stripeId && account.stripeId !== customerId) || otherCustomer || otherSubscription) {
@@ -82,7 +82,7 @@ async function inspectLocal(store: Store, period: VerifiedPeriod, account: Accou
   if (matchingWindows.some((record) => record.status !== 'active' || record.plan !== plan)) {
     throw new StripeReconcileError('Съществува противоречив или отнет запис за този период.');
   }
-  if (byInvoice && (byInvoice.status !== 'active' || byInvoice.userId !== userId || byInvoice.stripeSubId !== stripeSubId || byInvoice.plan !== plan
+  if (byInvoice && (byInvoice.status !== 'active' || byInvoice.userId !== userId || (byInvoice.stripePeriodSubId ?? byInvoice.stripeSubId) !== stripeSubId || byInvoice.plan !== plan
     || byInvoice.currentPeriodStart?.getTime() !== currentPeriodStart.getTime() || byInvoice.currentPeriodEnd?.getTime() !== currentPeriodEnd.getTime())) {
     throw new StripeReconcileError('Съществува противоречив или отнет запис за тази фактура.');
   }
@@ -111,7 +111,7 @@ export async function reconcileStripePeriod(prisma: PrismaClient, stripe: Stripe
         requireCurrentPeriod(currentPeriodStart, currentPeriodEnd);
         if (represented) return { ...coverage, outcome: 'already-recorded', customerLinkPending: false };
         if (needsLink) await tx.user.update({ where: { id: userId }, data: { stripeId: customerId } });
-        await tx.subscription.create({ data: { id, userId, stripeSubId, ...coverage } });
+        await tx.subscription.create({ data: { id, userId, stripePeriodSubId: stripeSubId, paymentMethod: 'stripe', status: 'active', ...coverage } });
         return { ...coverage, outcome: 'applied', customerLinkPending: false };
       }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     } catch (error) {

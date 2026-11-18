@@ -37,7 +37,7 @@ jobs:
           $uri = $null
           if (![Uri]::TryCreate($env:SHARKAI_WINDOWS_TEST_ORIGIN, [UriKind]::Absolute, [ref]$uri) -or
               $uri.Scheme -ne 'https' -or $uri.UserInfo -or $uri.AbsolutePath -ne '/' -or $uri.Query -or $uri.Fragment -or
-              $uri.Host -eq 'mm-auto-nadq-jeleva-s-projects.vercel.app') {
+              $uri.Host -in @('mm-auto-green.vercel.app', 'mm-auto-nadq-jeleva-s-projects.vercel.app')) {
             throw 'Set SHARKAI_WINDOWS_TEST_ORIGIN to the approved, existing HTTPS staging origin.'
           }
       - run: npm ci

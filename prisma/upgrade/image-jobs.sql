@@ -26,4 +26,6 @@ CREATE TABLE IF NOT EXISTS "ImageJob" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "ImageJob_userId_requestId_key" ON "ImageJob" ("userId", "requestId");
 
+ALTER TABLE "ImageJob" ENABLE ROW LEVEL SECURITY;
+
 COMMIT;

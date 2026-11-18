@@ -49,4 +49,7 @@ FROM (
 ) AS owners
 WHERE upload.id = owners.id AND upload."userId" IS NULL;
 
+ALTER TABLE "ChatConversation" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ChatRequest" ENABLE ROW LEVEL SECURITY;
+
 COMMIT;

@@ -4,7 +4,7 @@ const { version } = require('../package.json');
 
 const root = path.resolve(__dirname, '..');
 const staging = path.join(root, '.desktop-app');
-const defaultOrigin = 'https://mm-auto-nadq-jeleva-s-projects.vercel.app';
+const defaultOrigin = 'https://mm-auto-green.vercel.app';
 const service = new URL(process.env.SHARKAI_DESKTOP_ORIGIN?.trim() || defaultOrigin);
 if (service.protocol !== 'https:' || service.username || service.password || service.pathname !== '/' || service.search || service.hash) {
   throw new Error('SHARKAI_DESKTOP_ORIGIN must be a trusted HTTPS origin with no path or credentials.');

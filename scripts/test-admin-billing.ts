@@ -48,11 +48,10 @@ async function run() {
     assert.equal(billing.metrics.activeSubscriptions, initial.activeSubscriptions + 3);
     assert.equal(billing.metrics.activePaidAccounts, initial.activePaidAccounts + 1);
     assert.equal(billing.metrics.verifiedPaidPeriods, initial.verifiedPaidPeriods + 3);
-    assert.equal(billing.metrics.collected, null);
+    assert.deepEqual(billing.metrics.collected, initial.collected);
     assert.equal(billing.metrics.mrr, null);
-    assert.deepEqual(billing.pendingPayments.items, []);
-    assert(billing.pendingPayments.reason);
-    assert.equal(billing.pendingPayments.availability, 'unavailable');
+    assert.equal(billing.pendingPayments.reason, null);
+    assert.equal(billing.pendingPayments.availability, 'available');
     assert(subscriptionsPagination.total >= 5);
     assert.equal(subscriptionsPagination.pageSize, 50);
     const savedUltra = billing.byPlan.ULTRA.items.find(({ id }) => id === active.id);

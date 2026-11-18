@@ -4,7 +4,7 @@ $legacyVersion = '1.0.1'
 $origin = [Uri]$env:SHARKAI_WINDOWS_TEST_ORIGIN
 if (!$origin -or !$origin.IsAbsoluteUri -or $origin.Scheme -ne 'https' -or $origin.UserInfo -or
     $origin.AbsolutePath -ne '/' -or $origin.Query -or $origin.Fragment -or
-    $origin.Host -eq 'mm-auto-nadq-jeleva-s-projects.vercel.app') {
+    $origin.Host -in @('mm-auto-green.vercel.app', 'mm-auto-nadq-jeleva-s-projects.vercel.app')) {
   throw 'The baseline installer requires the approved HTTPS staging origin.'
 }
 $workspace = (Get-Location).Path

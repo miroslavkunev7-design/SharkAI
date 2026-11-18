@@ -10,4 +10,6 @@ CREATE TABLE IF NOT EXISTS "PersonalMemory" (
     CHECK (jsonb_typeof("notes") = 'array' AND jsonb_array_length("notes") <= 12 AND pg_column_size("notes") <= 16384)
 );
 
+ALTER TABLE "PersonalMemory" ENABLE ROW LEVEL SECURITY;
+
 COMMIT;

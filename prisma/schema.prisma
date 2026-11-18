@@ -53,6 +53,7 @@ model User {
   updatedAt     DateTime  @updatedAt
   projects      Project[]
   subscriptions Subscription[]
+  payments      Payment[]
   chatMessages  ChatMessage[]
   conversations ChatConversation[]
   chatRequests  ChatRequest[]
@@ -225,14 +226,41 @@ model Subscription {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   plan            Plan
   status          String   @default("active")
+  paymentMethod   String?
+  bankReference   String?  @unique
+  amountEur       Float?
   stripeSubId     String?
+  stripePeriodSubId String?
+  stripeSessionId String?
   paypalSubId     String?
   currentPeriodStart DateTime?
   currentPeriodEnd DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  payments        Payment[]
 
   @@index([stripeSubId])
+  @@index([stripePeriodSubId])
+  @@index([userId, status])
+  @@index([plan, status])
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  userId         String
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  amountEur      Float
+  currency       String        @default("EUR")
+  method         String
+  status         String        @default("completed")
+  externalId     String?
+  reference      String?
+  createdAt      DateTime      @default(now())
+
+  @@index([userId])
+  @@index([status])
 }
 
 model Project {

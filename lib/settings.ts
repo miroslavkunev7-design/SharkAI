@@ -2,6 +2,8 @@ import { prisma } from './db';
 
 const KEY_OPENAI = 'openai_api_key';
 const KEY_ANTHROPIC = 'anthropic_api_key';
+const KEY_GOOGLE = 'google_api_key';
+const KEY_GROQ = 'groq_api_key';
 const KEY_PAID_AI = 'sharkai_use_paid_ai';
 
 async function getConfig(key: string): Promise<string | null> {
@@ -41,6 +43,22 @@ export async function setAnthropicKey(key: string) {
   await setConfig(KEY_ANTHROPIC, key);
 }
 
+export async function getGoogleKey(): Promise<string | null> {
+  return await getConfig(KEY_GOOGLE) || process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim() || null;
+}
+
+export async function setGoogleKey(key: string) {
+  await setConfig(KEY_GOOGLE, key);
+}
+
+export async function getGroqKey(): Promise<string | null> {
+  return await getConfig(KEY_GROQ) || process.env.GROQ_API_KEY?.trim() || null;
+}
+
+export async function setGroqKey(key: string) {
+  await setConfig(KEY_GROQ, key);
+}
+
 export async function isPaidAIMode(): Promise<boolean> {
   if (process.env.SHARKAI_USE_PAID_AI === 'true') return true;
   const db = await getConfig(KEY_PAID_AI);
@@ -54,9 +72,8 @@ export async function setPaidAIMode(enabled: boolean) {
 export async function hasConfiguredAI(): Promise<boolean> {
   const paid = await isPaidAIMode();
   if (!paid) return false;
-  const openai = await getOpenAIKey();
-  const anthropic = await getAnthropicKey();
-  return !!(openai || anthropic || process.env.AI_GATEWAY_API_KEY);
+  const keys = await Promise.all([getOpenAIKey(), getAnthropicKey(), getGoogleKey(), getGroqKey()]);
+  return keys.some(Boolean) || Boolean(process.env.AI_GATEWAY_API_KEY);
 }
 
 export function maskKey(key: string | null): string | null {
@@ -65,16 +82,17 @@ export function maskKey(key: string | null): string | null {
 }
 
 export async function getAISettings() {
-  const openaiKey = await getOpenAIKey();
-  const anthropicKey = await getAnthropicKey();
-  const paidAIEnabled = await isPaidAIMode();
-  const configured = await hasConfiguredAI();
+  const [openaiKey, anthropicKey, googleKey, groqKey, paidAIEnabled] = await Promise.all([
+    getOpenAIKey(), getAnthropicKey(), getGoogleKey(), getGroqKey(), isPaidAIMode(),
+  ]);
 
   return {
     paidAIEnabled,
-    aiConfigured: configured,
+    aiConfigured: paidAIEnabled && Boolean(openaiKey || anthropicKey || googleKey || groqKey || process.env.AI_GATEWAY_API_KEY),
     openai: { hasKey: !!openaiKey, preview: maskKey(openaiKey) },
     anthropic: { hasKey: !!anthropicKey, preview: maskKey(anthropicKey) },
+    google: { hasKey: !!googleKey, preview: null },
+    groq: { hasKey: !!groqKey, preview: null },
     localMode: !paidAIEnabled,
   };
 }

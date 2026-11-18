@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Banknote, BarChart3, Boxes, CalendarCheck, ChevronLeft, ChevronRight, Crown, KeyRound, Landmark, MessageSquare, RefreshCw, Shield, TestTube, Users, Zap, type LucideIcon } from 'lucide-react';
@@ -33,12 +33,12 @@ type AccountRow = AccountPlan & {
 };
 type PlanMember = AccountRow & {
   currentPeriodStart: string | null;
-  source: 'lifetime' | 'stripe' | 'paypal' | 'recorded' | 'profile';
+  source: 'lifetime' | 'stripe' | 'paypal' | 'bank' | 'mobile' | 'recorded' | 'profile';
   paymentVerified: boolean;
 };
 type Money = { minor: number; currency: string };
-type PendingPayment = { id: string; user: { email: string }; plan: string; amountEur: number; paymentMethod: string; bankReference?: string | null };
-type PendingPayments = { availability: 'available' | 'unavailable'; reason: string | null; items: PendingPayment[] };
+type PendingPayment = { id: string; user: { email: string }; plan: string; amountEur: number | null; paymentMethod: 'bank' | 'mobile'; bankReference: string | null; approvable: boolean };
+type PendingPayments = { availability: 'available' | 'unavailable'; reason: string | null; items: PendingPayment[]; total?: number };
 type BillingData = {
   metrics: { activeSubscriptions: number; collected: Money | null; mrr: Money | null };
   byPlan: Record<Plan, { items: PlanMember[]; pagination: PageInfo }>;
@@ -51,7 +51,7 @@ const counts = new Intl.NumberFormat('bg-BG');
 const euro = new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' });
 const sourceLabel = {
   lifetime: 'Администраторски достъп', stripe: 'Stripe', paypal: 'PayPal',
-  recorded: 'Записан период', profile: 'План в профила',
+  bank: 'Банков превод', mobile: 'Мобилно плащане', recorded: 'Записан период', profile: 'План в профила',
 };
 
 function formatMoney(amount?: Money | null) {
@@ -142,21 +142,83 @@ function UsersSection({ users, pagination, loading, go }: { users: AccountRow[];
   );
 }
 
-function TransfersSection({ data }: { data?: PendingPayments }) {
+function TransfersSection({ data, busy, approve }: { data?: PendingPayments; busy: boolean; approve: (item: PendingPayment, reference: string, amount: number) => Promise<void> }) {
+  const [target, setTarget] = useState<PendingPayment | null>(null);
+  const [reference, setReference] = useState('');
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const referenceField = useRef<HTMLInputElement>(null);
   const available = data?.availability === 'available';
+  const total = available ? data.total ?? data.items.length : undefined;
+
+  useEffect(() => {
+    if (target) referenceField.current?.focus();
+  }, [target]);
+
+  function choose(item: PendingPayment) {
+    setTarget(item);
+    setReference('');
+    setAmount('');
+    setError('');
+    setNotice('');
+  }
+
+  async function confirm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !target || !data?.items.some((item) => item.id === target.id && item.approvable)) return;
+    const receivedAmount = Number(amount.trim().replace(',', '.'));
+    if (!reference.trim() || !Number.isFinite(receivedAmount) || receivedAmount <= 0) {
+      setError('Въведи получената сума и основанието от платежния документ.');
+      return;
+    }
+    setError('');
+    try {
+      await approve(target, reference.trim(), receivedAmount);
+      setTarget(null);
+      setNotice('Плащането е потвърдено и планът е активиран.');
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Плащането не можа да се потвърди.');
+    }
+  }
+
   return (
-    <AdminSection title="Чакащи банкови и мобилни плащания" icon={Landmark} art="markets" count={available ? data.items.length : undefined}>
+    <AdminSection title="Чакащи банкови и мобилни плащания" icon={Landmark} art="markets" count={total}>
+      {notice && <p className="operator-admin-panel-data" role="status">{notice}</p>}
       {!available ? <p className="operator-admin-panel-data">{data?.reason || 'Няма потвърден източник за банкови и мобилни плащания.'}</p>
         : !data.items.length ? <p className="operator-admin-panel-data">Няма чакащи плащания.</p> : (
-          <div className="operator-admin-panel-data operator-table shark-admin-table">
+          <>
+            <div className="operator-admin-panel-data operator-table shark-admin-table">
             <table>
               <thead><tr><th scope="col">Имейл</th><th scope="col">План</th><th scope="col">Сума</th><th scope="col">Метод</th></tr></thead>
-              <tbody>{data.items.map((item) => <tr key={item.id}>
-                <td>{item.user.email}</td><td>{item.plan}</td><td>{euro.format(item.amountEur)}</td><td>{item.paymentMethod}</td>
-              </tr>)}</tbody>
+              <tbody>{data.items.map((item) => <Fragment key={item.id}>
+                <tr><td>{item.user.email}</td><td>{item.plan}</td><td>{item.amountEur === null ? '—' : euro.format(item.amountEur)}</td>
+                  <td>{sourceLabel[item.paymentMethod]}{item.bankReference && <small>Основание {item.bankReference}</small>}</td></tr>
+                {item.approvable && target?.id !== item.id && <tr><td colSpan={4}>
+                  <button className="shark-action-secondary" type="button" disabled={busy} onClick={() => choose(item)}>Свери полученото плащане</button>
+                </td></tr>}
+              </Fragment>)}</tbody>
             </table>
-          </div>
+            </div>
+            {total !== undefined && total > data.items.length && <p className="operator-admin-panel-data text-sm">Показани са {data.items.length} от {total} чакащи заявки.</p>}
+          </>
         )}
+      {target && available && data.items.some((item) => item.id === target.id && item.approvable) && (
+        <form className="operator-admin-panel-data grid gap-3" aria-busy={busy} onSubmit={confirm}>
+          <p className="text-sm">Свери получения превод за {target.user.email} и план {target.plan} с платежния документ.</p>
+          <label className="grid gap-1 text-sm">Основание на получения превод
+            <input ref={referenceField} className="operator-input" disabled={busy} required value={reference} onChange={(event) => setReference(event.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm">Получена сума в EUR
+            <input className="operator-input" disabled={busy} required inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} />
+          </label>
+          {error && <p role="alert" className="operator-admin-error">{error}</p>}
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" className="shark-action" disabled={busy}>Потвърди получения превод</button>
+            <button type="button" className="shark-action-secondary" disabled={busy} onClick={() => setTarget(null)}>Отказ</button>
+          </div>
+        </form>
+      )}
     </AdminSection>
   );
 }
@@ -171,11 +233,13 @@ export default function AdminPage() {
   const [paidAIOverride, setPaidAIOverride] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [approving, setApproving] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [settingsError, setSettingsError] = useState('');
   const paidAI = paidAIOverride ?? data?.ai.paidAIEnabled ?? false;
-  const busy = loading || saving || testing;
+  const approvalLock = useRef(false);
+  const busy = loading || saving || testing || approving;
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -255,6 +319,31 @@ export default function AdminPage() {
     }
   }
 
+  async function approveTransfer(item: PendingPayment, reference: string, amount: number) {
+    if (!item.approvable || busy || approvalLock.current) throw new Error('Действието временно е недостъпно.');
+    approvalLock.current = true;
+    setApproving(true);
+    try {
+      const response = await fetch('/api/admin/payments', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionId: item.id, verified: true, reference, amount }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.ok !== true || result.subscription?.id !== item.id || result.subscription.status !== 'active') {
+        throw new Error(result?.error || 'Плащането не можа да се потвърди.');
+      }
+      setData((previous) => previous?.billing ? { ...previous, billing: { ...previous.billing, pendingPayments: {
+        ...previous.billing.pendingPayments,
+        items: previous.billing.pendingPayments.items.filter(({ id }) => id !== item.id),
+        total: previous.billing.pendingPayments.total === undefined ? undefined : Math.max(0, previous.billing.pendingPayments.total - 1),
+      } } } : previous);
+      await load();
+    } finally {
+      approvalLock.current = false;
+      setApproving(false);
+    }
+  }
+
   const metrics = data?.billing?.metrics;
   const transfers = data?.billing?.pendingPayments;
   const collected = formatMoney(metrics?.collected);
@@ -266,7 +355,7 @@ export default function AdminPage() {
     { label: 'Събрани плащания', value: collected, icon: Banknote, art: 'markets' },
     { label: 'Месечен приход (MRR)', value: mrr, icon: BarChart3, art: 'markets' },
     { label: 'Активни абонаменти', value: metrics?.activeSubscriptions ?? null, icon: CalendarCheck, art: 'agent' },
-    { label: 'Чакащи плащания', value: transfers?.availability === 'available' ? transfers.items.length : null, icon: Landmark, art: 'markets' },
+    { label: 'Чакащи плащания', value: transfers?.availability === 'available' ? transfers.total ?? transfers.items.length : null, icon: Landmark, art: 'markets' },
     { label: 'Проекти', value: data.stats.totalProjects, icon: Boxes, art: 'studio' },
   ] : [];
 
@@ -328,7 +417,7 @@ export default function AdminPage() {
                 </div>
               </form>
             </AdminSection>
-            <TransfersSection data={transfers} />
+            <TransfersSection data={transfers} busy={busy} approve={approveTransfer} />
           </div>
           <nav className="ice-section operator-admin-links" data-ice-art="studio" aria-label="Операторски инструменти">
             <div>

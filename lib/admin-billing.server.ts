@@ -16,8 +16,9 @@ export function adminPagination(page: number, total: number) {
 }
 
 const subscriptionSelection = {
-  id: true, plan: true, status: true, stripeSubId: true, paypalSubId: true,
-  currentPeriodStart: true, currentPeriodEnd: true, createdAt: true,
+  id: true, plan: true, status: true, stripeSubId: true, stripePeriodSubId: true, paypalSubId: true,
+  paymentMethod: true, currentPeriodStart: true, currentPeriodEnd: true, createdAt: true,
+  payments: { where: { status: 'completed' }, select: { id: true }, take: 1 },
 } satisfies Prisma.SubscriptionSelect;
 
 type Period = Prisma.SubscriptionGetPayload<{ select: typeof subscriptionSelection }>;
@@ -26,11 +27,13 @@ type Member = {
 };
 
 function periodSource(period: Period) {
-  return period.stripeSubId ? 'stripe' : period.paypalSubId ? 'paypal' : 'recorded';
+  if (period.paymentMethod === 'bank' || period.paymentMethod === 'mobile' || period.paymentMethod === 'stripe') return period.paymentMethod;
+  return period.stripeSubId || period.stripePeriodSubId ? 'stripe' : period.paypalSubId ? 'paypal' : 'recorded';
 }
 
 function verifiedPayment(period: Period) {
-  return period.status === 'active' && period.id.startsWith(verifiedInvoicePrefix) && !!period.stripeSubId && !!period.currentPeriodStart && !!period.currentPeriodEnd;
+  return period.status === 'active' && (period.payments.length > 0 || (period.id.startsWith(verifiedInvoicePrefix)
+    && !!(period.stripeSubId || period.stripePeriodSubId) && !!period.currentPeriodStart && !!period.currentPeriodEnd));
 }
 
 function dateWindow(period?: Period) {
@@ -74,11 +77,52 @@ export function adminLatestPeriod(now: Date) {
   } satisfies NonNullable<Exclude<Prisma.UserSelect['subscriptions'], boolean>>;
 }
 
-export function unavailablePendingPayments() {
+export async function loadAdminPendingPayments() {
+  const where = { status: 'pending', paymentMethod: { in: ['bank', 'mobile'] } } satisfies Prisma.SubscriptionWhereInput;
+  const [total, pending] = await Promise.all([
+    prisma.subscription.count({ where }),
+    prisma.subscription.findMany({
+      where, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: ADMIN_PAGE_SIZE,
+      select: { id: true, plan: true, amountEur: true, paymentMethod: true, bankReference: true, createdAt: true,
+        user: { select: { email: true, name: true, role: true } } },
+    }),
+  ]);
   return {
-    availability: 'unavailable' as const,
-    reason: 'Няма потвърден източник на заявки за банково или мобилно плащане за тази версия.',
-    items: [],
+    availability: 'available' as const, reason: null, total,
+    items: pending.map(({ user, ...item }) => ({
+      ...item, user: { email: user.email, name: user.name },
+      approvable: user.role === 'USER' && item.plan !== 'FREE' && Boolean(item.bankReference?.trim())
+        && item.amountEur !== null && item.amountEur > 0 && item.amountEur <= 100_000
+        && Math.abs(item.amountEur * 100 - Math.round(item.amountEur * 100)) < 0.000001,
+    })),
+  };
+}
+
+function euroAmount(euros: number) {
+  const minor = Math.round(euros * 100);
+  return Number.isSafeInteger(minor) ? { minor, currency: 'EUR' } : null;
+}
+
+async function financialMetrics(where: Prisma.SubscriptionWhereInput) {
+  const [completed, recurring] = await Promise.all([
+    prisma.payment.aggregate({ where: { status: 'completed', currency: { equals: 'EUR', mode: 'insensitive' } }, _sum: { amountEur: true } }),
+    prisma.subscription.findMany({
+      where,
+      select: { id: true, stripeSubId: true, stripePeriodSubId: true, paypalSubId: true, amountEur: true },
+      orderBy: [{ currentPeriodStart: { sort: 'desc', nulls: 'last' } }, { createdAt: 'desc' }, { id: 'desc' }],
+    }),
+  ]);
+  const windowAmounts = new Map<string, number | null>();
+  for (const row of recurring) {
+    const key = row.stripePeriodSubId ?? row.stripeSubId ?? row.paypalSubId ?? row.id;
+    if (!windowAmounts.has(key) || windowAmounts.get(key) === null) windowAmounts.set(key, row.amountEur);
+  }
+  const monthly = [...windowAmounts.values()];
+  const hasMissingAmount = monthly.some((amount) => amount === null);
+  return {
+    collected: euroAmount(completed._sum.amountEur ?? 0),
+    mrr: hasMissingAmount ? null : euroAmount(monthly.reduce<number>((sum, amount) => sum + (amount ?? 0), 0)),
+    amountsUnavailableReason: hasMissingAmount ? 'Поне един активен абонамент няма записана месечна сума.' : null,
   };
 }
 
@@ -86,8 +130,12 @@ export async function loadAdminBilling(pages: { subscriptions: number; pro: numb
   const paidPlan = { in: [...paidPlans] };
   const activePeriod = activePeriodWindow(now);
   const verifiedPeriod = {
-    id: { startsWith: verifiedInvoicePrefix }, stripeSubId: { not: null },
-    plan: paidPlan, status: 'active', currentPeriodStart: { not: null }, currentPeriodEnd: { not: null },
+    plan: paidPlan, status: 'active',
+    OR: [
+      { payments: { some: { status: 'completed' } } },
+      { id: { startsWith: verifiedInvoicePrefix }, currentPeriodStart: { not: null }, currentPeriodEnd: { not: null },
+        OR: [{ stripeSubId: { not: null } }, { stripePeriodSubId: { not: null } }] },
+    ],
   } satisfies Prisma.SubscriptionWhereInput;
   const storedPeriod = { plan: paidPlan, user: { role: 'USER' } } satisfies Prisma.SubscriptionWhereInput;
   const activePaidPeriod = { ...activePeriod, ...verifiedPeriod };
@@ -117,7 +165,7 @@ export async function loadAdminBilling(pages: { subscriptions: number; pro: numb
     ]);
     return { items: records.map((record) => describeAdminMember(record)), pagination: adminPagination(page, total) };
   }
-  const [subscriptionTotal, periods, activeSubscriptions, activePaidAccounts, verifiedPaidPeriods, pro, ultra] = await Promise.all([
+  const [subscriptionTotal, periods, activeSubscriptions, activePaidAccounts, verifiedPaidPeriods, pro, ultra, money, pendingPayments] = await Promise.all([
     prisma.subscription.count({ where: storedPeriod }),
     prisma.subscription.findMany({
       where: storedPeriod, select: { ...subscriptionSelection, user: { select: { id: true, email: true } } },
@@ -127,19 +175,20 @@ export async function loadAdminBilling(pages: { subscriptions: number; pro: numb
     prisma.user.count({ where: { role: 'USER', subscriptions: { some: activePaidPeriod } } }),
     prisma.subscription.count({ where: { ...storedPeriod, ...verifiedPeriod } }),
     members(proMember, pages.pro), members(ultraMember, pages.ultra),
+    financialMetrics({ ...activePeriod, ...storedPeriod }), loadAdminPendingPayments(),
   ]);
   return {
     subscriptionsPagination: adminPagination(pages.subscriptions, subscriptionTotal),
     billing: {
-      metrics: { activeSubscriptions, activePaidAccounts, verifiedPaidPeriods, collected: null, mrr: null },
-      amountsUnavailableReason: 'Абонаментните записи не съдържат получени суми и валута.',
+      metrics: { activeSubscriptions, activePaidAccounts, verifiedPaidPeriods, collected: money.collected, mrr: money.mrr },
+      amountsUnavailableReason: money.amountsUnavailableReason,
       subscriptions: periods.map((period) => ({
         key: createHash('sha256').update(period.id).digest('base64url').slice(0, 22),
         userId: period.user.id, email: period.user.email, plan: period.plan, status: periodStatus(period, now),
         createdAt: period.createdAt, ...dateWindow(period), source: periodSource(period), paymentVerified: verifiedPayment(period),
       })),
       byPlan: { PRO: pro, ULTRA: ultra },
-      pendingPayments: unavailablePendingPayments(),
+      pendingPayments,
     },
   };
 }

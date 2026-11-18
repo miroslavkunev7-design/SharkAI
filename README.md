@@ -23,8 +23,9 @@ npm run dev
 ## Месечни абонаменти в SharkAI
 
 - Съществуващ профил с роля `ADMIN` и записан план `ULTRA` запазва безсрочния си достъп. Ако записаният план на собственика е друг, настройте `ADMIN_EMAIL` с точния адрес на съществуващия му администраторски профил. Достъпът се определя на сървъра без плащане или промяна в профила.
-- Приложете `prisma/upgrade/subscription-periods.sql` върху съществуваща PostgreSQL база преди обновяване на приложението. При чисто инсталиране полето идва от Prisma схемата.
-- Настройте `NEXT_PUBLIC_APP_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID` и `STRIPE_ULTRA_PRICE_ID`. Използвайте отделни месечни Stripe цени за Pro (€12) и Ultra (€28).
+- Приложете `prisma/upgrade/subscription-periods.sql` и `prisma/upgrade/legacy-payment-ledger.sql` върху съществуваща PostgreSQL база преди обновяване на приложението. При чисто инсталиране полетата идват от Prisma схемата.
+- Банковият превод използва съществуващите `PAYOUT_IBAN`, `PAYOUT_BANK` и `PAYOUT_ACCOUNT_NAME`. Правата по банка се активират след потвърждение от администратор на действително получената сума и референцията.
+- Настройте `NEXT_PUBLIC_APP_URL`, `STRIPE_SECRET_KEY` и `STRIPE_WEBHOOK_SECRET`. По избор посочете отделни месечни Stripe цени чрез `STRIPE_PRO_PRICE_ID` и `STRIPE_ULTRA_PRICE_ID`. При липса на идентификатор сървърът подава фиксираната месечна цена на SharkAI за Pro (€12) или Ultra (€28).
 - Насочете Stripe webhooks към `/api/payments/webhook` за `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `invoice.paid`, `charge.refunded`, `charge.dispute.created` и `radar.early_fraud_warning.created`. Достъп се предоставя за потвърдения платен период. Отказаното подновяване и обичайното прекратяване оставят вече платения период валиден до крайната му дата.
 - Изпълнете `SHARKAI_TEST_BILLING=1 npx tsx scripts/test-billing.ts` с отделна PostgreSQL тестова база и приложена Prisma схема. За проверка на Stripe Checkout от край до край използвайте тестова Stripe среда и нейния webhook secret.
 

@@ -34,4 +34,7 @@ CREATE INDEX IF NOT EXISTS "Reminder_userId_nextAt_idx" ON "Reminder" ("userId",
 CREATE UNIQUE INDEX IF NOT EXISTS "ReminderOccurrence_reminderId_dueAt_key" ON "ReminderOccurrence" ("reminderId", "dueAt");
 CREATE INDEX IF NOT EXISTS "ReminderOccurrence_reminderId_acknowledgedAt_idx" ON "ReminderOccurrence" ("reminderId", "acknowledgedAt");
 
+ALTER TABLE "Reminder" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ReminderOccurrence" ENABLE ROW LEVEL SECURITY;
+
 COMMIT;

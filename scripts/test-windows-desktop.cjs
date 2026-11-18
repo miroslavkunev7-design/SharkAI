@@ -158,7 +158,8 @@ async function offline(executable) {
 function approvedOrigin() {
   const url = new URL(process.env.SHARKAI_WINDOWS_TEST_ORIGIN || 'https://invalid.invalid');
   assert.ok(url.protocol === 'https:' && url.href === `${url.origin}/` && url.hostname !== 'invalid.invalid', 'An approved HTTPS staging origin is required.');
-  assert.notEqual(url.hostname, 'mm-auto-nadq-jeleva-s-projects.vercel.app', 'Online verification requires a staging server.');
+  assert.ok(!['mm-auto-green.vercel.app', 'mm-auto-nadq-jeleva-s-projects.vercel.app'].includes(url.hostname),
+    'Online verification requires a staging server.');
   return url.origin;
 }
 

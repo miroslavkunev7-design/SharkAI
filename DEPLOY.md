@@ -48,7 +48,7 @@ tenant/user postgres.bxtxygakafwusstpptkg not found
 
 ## Production URL (след успешен deploy)
 
-https://mm-auto-nadq-jeleva-s-projects.vercel.app
+https://mm-auto-green.vercel.app
 
 ## Installer за download страницата
 

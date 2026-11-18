@@ -1,7 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai';
 import { gateway, type LanguageModel } from 'ai';
 import type { AccountSession } from '../auth';
-import { getChatModel, getOpenAI, isPaidAIEnabled } from './config';
+import { getAnthropic, getGoogle, getGroq, getOpenAI, googleChatModels, groqChatModels, isPaidAIEnabled } from './config';
 
 export type ReasoningLevel = 'standard' | 'deep';
 
@@ -52,21 +52,51 @@ export async function workspaceModels(session: AccountSession | null) {
   if (custom) return { models: [custom], reason: null };
   const openai = await getOpenAI();
   const models: WorkspaceModel[] = [];
+  const advanced = session.plan !== 'FREE' || session.role === 'ADMIN';
   if (openai || process.env.AI_GATEWAY_API_KEY) {
     models.push({
       id: 'standard', label: 'GPT-4o mini', imageInput: true, reasoningLevels: ['standard'],
       model: openai ? openai('gpt-4o-mini') : gateway('openai/gpt-4o-mini'),
       nativeToolCalls: 'openai',
     });
-    if (session.plan !== 'FREE' || session.role === 'ADMIN') {
+    if (advanced) {
       models.push({
         id: 'advanced', label: 'GPT-5 mini', imageInput: true, reasoningLevels: ['standard', 'deep'],
         model: openai ? openai('gpt-5-mini') : gateway('openai/gpt-5-mini'), reasoning: 'openai', nativeToolCalls: 'openai',
       });
     }
   } else {
-    const anthropic = await getChatModel();
-    if (anthropic) models.push({ id: 'standard', label: 'Claude Haiku', imageInput: true, reasoningLevels: ['standard'], model: anthropic, nativeToolCalls: 'anthropic' });
+    const anthropic = await getAnthropic();
+    if (anthropic) {
+      models.push({
+        id: 'standard', label: 'Claude Haiku', imageInput: true, reasoningLevels: ['standard'],
+        model: anthropic('claude-3-5-haiku-20241022'), nativeToolCalls: 'anthropic',
+      });
+    } else {
+      const [google, groq] = await Promise.all([getGoogle(), getGroq()]);
+      if (google) {
+        models.push({
+          id: 'standard', label: 'Gemini 3.5 Flash-Lite', imageInput: true, reasoningLevels: ['standard'],
+          model: google.chat(googleChatModels.standard), nativeToolCalls: 'compatible',
+        });
+      } else if (groq) {
+        models.push({
+          id: 'standard', label: 'Llama 3.1 8B · Groq', imageInput: false, reasoningLevels: ['standard'],
+          model: groq.chat(groqChatModels.standard), nativeToolCalls: 'compatible',
+        });
+      }
+      if (advanced && groq) {
+        models.push({
+          id: 'advanced', label: 'Llama 3.3 70B · Groq', imageInput: false, reasoningLevels: ['standard'],
+          model: groq.chat(groqChatModels.advanced), nativeToolCalls: 'compatible',
+        });
+      } else if (advanced && google) {
+        models.push({
+          id: 'advanced', label: 'Gemini 3.8 Flash', imageInput: true, reasoningLevels: ['standard'],
+          model: google.chat(googleChatModels.advanced), nativeToolCalls: 'compatible',
+        });
+      }
+    }
   }
   return { models, reason: models.length ? null : 'Няма конфигуриран доставчик за AI чат.' };
 }
