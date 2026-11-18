@@ -10,7 +10,7 @@ export const SUPREME_BRAIN = {
   id: 'supreme-brain',
   name: 'Supreme Brain',
   role: 'Master Reasoning Engine',
-  description: 'Controls all agents and makes final decisions',
+  description: 'Разчита заявката и подготвя обхвата на проекта.',
 };
 
 export const AGENTS: Agent[] = [
@@ -30,6 +30,27 @@ export const AGENTS: Agent[] = [
   { id: 'agent-14', name: 'AI Research Agent', role: 'Research', description: 'Researches best practices and patterns', icon: 'search' },
   { id: 'agent-15', name: 'Code Refactor Agent', role: 'Refactor', description: 'Improves code quality and structure', icon: 'code' },
 ];
+
+export const STUDIO_AGENT_ACTIONS: Readonly<Record<string, { featureId: string; description: string }>> = {
+  'agent-1': { featureId: 'screenshot-website', description: 'Измерва размерите, цветовете и структурата на референтно изображение.' },
+  'agent-2': { featureId: 'prompt-software', description: 'Създава файловете на уеб интерфейс.' },
+  'agent-3': { featureId: 'api-gen', description: 'Генерира начална структура за REST API.' },
+  'agent-4': { featureId: 'db-gen', description: 'Генерира начална Prisma схема и SQL за примерни записи.' },
+  'agent-5': { featureId: 'screenshot-website', description: 'Подготвя Dockerfile и конфигурация за статичния сайт.' },
+  'agent-8': { featureId: 'prompt-software', description: 'Проверява записаните файлове и входните точки на генерирания проект.' },
+  'agent-12': { featureId: 'ai-docs', description: 'Подготвя документ с описание и обхват от заданието.' },
+  'agent-13': { featureId: 'screenshot-website', description: 'Извлича палитра от референтното изображение и я записва в проекта.' },
+};
+
+export const STUDIO_AGENT_DEPENDENCIES: Readonly<Record<string, string>> = {
+  'agent-6': 'Нужен е конфигуриран анализатор за сигурност.',
+  'agent-7': 'Нужна е среда за измерване и сравнение на производителността.',
+  'agent-9': 'Нужни са изходен код и среда за проверка.',
+  'agent-10': 'Нужни са изходен код, потвърден проблем и проверка на корекцията.',
+  'agent-11': 'Нужна е свързана среда за публикуване.',
+  'agent-14': 'Изследванията се стартират през инструмента в чата.',
+  'agent-15': 'Нужни са изходен код и среда за проверка.',
+};
 
 export const AUTONOMOUS_LOOP = [
   { step: 'analyze', label: 'Analyze', description: 'Parse input and plan architecture' },

@@ -14,6 +14,8 @@ const EXTENSIONS: Record<string, string> = {
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
   'text/csv': 'csv',
+  'text/plain': 'txt',
+  'text/markdown': 'md',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
   'video/quicktime': 'mov',
@@ -34,6 +36,9 @@ export function resolveUploadMime(mime: string, name: string): string {
   const ext = path.extname(name).slice(1).toLowerCase();
   const type = mime.split(';', 1)[0].trim().toLowerCase();
   if (ext === 'csv' && ['', 'application/octet-stream', 'application/vnd.ms-excel', 'text/plain'].includes(type)) return 'text/csv';
+  if (['txt', 'md', 'markdown'].includes(ext) && ['', 'application/octet-stream', 'text/plain', 'text/markdown'].includes(type)) {
+    return ext === 'txt' ? 'text/plain' : 'text/markdown';
+  }
   if (['docx', 'xlsx'].includes(ext) && ['', 'application/octet-stream', 'application/zip'].includes(type)) return mimeFromExt(ext);
   return type;
 }
@@ -50,6 +55,8 @@ export function validateUpload(buffer: Buffer, mime: string): boolean {
       return buffer.subarray(0, 4).equals(Buffer.from([80, 75, 3, 4])) &&
         buffer.includes('[Content_Types].xml') && buffer.includes(member);
     }
+    case 'md':
+    case 'txt':
     case 'csv':
       try {
         const text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);

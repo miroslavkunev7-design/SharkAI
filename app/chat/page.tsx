@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
-import type { ChatTool, ChatToolResult } from '@/lib/chat-tools';
+import type { ChatTool } from '@/lib/chat-tools';
 import {
   AppWindow, ArrowUp, AudioLines, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, ExternalLink,
   FileText, Folder, Globe2, Image as ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare,
@@ -13,8 +13,9 @@ import {
 import { captureFrame, useChatMedia } from './chat-media';
 import { readChatResponse } from './chat-response';
 import { Inspector } from './inspector';
+import { ToolReceipt } from './tool-receipt';
 import {
-  imageUrl, projectInProgress, PROJECT_STATUS, safeLink, type Account, type Attachment, type Conversation,
+  artifactAttachment, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, CANVAS_SAVE_PREFIX, imageUrl, projectInProgress, type Account, type Attachment, type Conversation,
   type InspectorItem, type Message, type Mode, type Model, type Project,
 } from './workspace-types';
 import './workspace.css';
@@ -51,16 +52,19 @@ const PDF_TYPE = 'application/pdf';
 const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const CSV_TYPE = 'text/csv';
-const WORK_TYPES = [...IMAGE_TYPES, PDF_TYPE, DOCX_TYPE, XLSX_TYPE, CSV_TYPE];
+const UPLOAD_TYPES = [...IMAGE_TYPES, PDF_TYPE, DOCX_TYPE, XLSX_TYPE, CSV_TYPE, ...CANVAS_MIME_TYPES];
+const FILE_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.docx,.csv,.xlsx,.txt,.md,.json';
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
   pdf: PDF_TYPE, docx: DOCX_TYPE, xlsx: XLSX_TYPE, csv: CSV_TYPE,
+  txt: 'text/plain', md: 'text/markdown', json: 'application/json',
 };
 const INPUT_FILES: Record<string, { types: string[]; accept: string; required: string }> = {
   image: { types: IMAGE_TYPES, accept: '.jpg,.jpeg,.png,.webp', required: 'За този инструмент е нужно изображение.' },
   pdf: { types: [PDF_TYPE], accept: '.pdf', required: 'За този инструмент е нужен PDF файл.' },
   document: { types: [PDF_TYPE, DOCX_TYPE], accept: '.pdf,.docx', required: 'За този инструмент е нужен PDF или DOCX файл.' },
   dataset: { types: [XLSX_TYPE, CSV_TYPE], accept: '.xlsx,.csv', required: 'За този инструмент е нужен CSV или XLSX файл.' },
+  textfile: { types: CANVAS_MIME_TYPES, accept: '.txt,.md,.json', required: 'За този инструмент е нужен TXT, Markdown или JSON файл.' },
 };
 const modeLabel = (mode: Mode) => mode === 'chat' ? 'Чат' : 'Работа';
 const suggestions = [
@@ -72,31 +76,8 @@ const suggestions = [
 function ToolIcon({ tool, size = 17 }: { tool: ChatTool; size?: number }) {
   const id = tool.id;
   const Icon = id.includes('search') ? Globe2 : id.includes('image') ? ImageIcon
-    : id.includes('ocr') ? ScanLine : tool.input === 'dataset' ? Table2 : /pdf|document/.test(tool.input) ? FileText : AppWindow;
+    : id.includes('ocr') ? ScanLine : tool.input === 'dataset' ? Table2 : /pdf|document|textfile/.test(tool.input) ? FileText : AppWindow;
   return <Icon size={size} />;
-}
-
-function ToolReceipt({ result, open, projectStatus }: { result: ChatToolResult; open: (item: InspectorItem) => void; projectStatus?: string }) {
-  const url = result.url ? safeLink(result.url) : null;
-  const artifactUrl = result.artifact?.url ? safeLink(result.artifact.url) : null;
-  const projectId = result.projectId;
-  return (
-    <div className="shark-chat-receipt">
-      <div><Sparkles size={16} /><strong>{result.label}</strong><span>{projectStatus ? PROJECT_STATUS[projectStatus] || projectStatus : result.status === 'started' ? 'Стартиран' : 'Завършен'}</span></div>
-      {projectId && <button type="button" onClick={() => open({ type: 'project', id: projectId, title: result.label })}>Виж статуса <ExternalLink size={15} /></button>}
-      {artifactUrl && result.artifact?.mimeType.startsWith('image/') && (
-        <button type="button" className="shark-chat-image" onClick={() => open({ type: 'image', url: artifactUrl, title: result.label })}>
-          <img src={artifactUrl} alt={result.label} />
-        </button>
-      )}
-      {artifactUrl && !result.artifact?.mimeType.startsWith('image/') && <a href={artifactUrl} download><FileText size={15} /> Изтегли резултата</a>}
-      {url && !projectId && !artifactUrl && <a href={url} target="_blank" rel="noreferrer">Отвори резултата <ExternalLink size={15} /></a>}
-      {!!result.sources?.length && <ol>{result.sources.map((source, index) => {
-        const href = safeLink(source.url);
-        return href ? <li key={`${source.url}-${index}`}><a href={href} target="_blank" rel="noreferrer">{source.title || href} <ExternalLink size={12} /></a></li> : null;
-      })}</ol>}
-    </div>
-  );
 }
 
 export default function ChatPage() {
@@ -141,6 +122,7 @@ export default function ChatPage() {
   const sendController = useRef<AbortController | null>(null);
   const loadController = useRef<AbortController | null>(null);
   const failedRequest = useRef<ChatRequest | null>(null);
+  const failedCanvasRequest = useRef<ChatRequest | null>(null);
   const mounted = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -158,7 +140,7 @@ export default function ChatPage() {
   const media = useChatMedia(setProblem);
 
   const model = models.find((option) => option.id === modelId) ?? models[0];
-  const canSend = !!account && (!!model || (mode === 'work' && tools.some((tool) => tool.available)));
+  const canSend = !!account;
   const pending = loading || sending || uploading || mediaPending || modeSaving;
   const awaitingProjects = projects.some((project) => projectInProgress(project.status));
   const showStart = !loading && !loadProblem && messages.length === 0 && !optimistic;
@@ -322,7 +304,7 @@ export default function ChatPage() {
       }
       const modal = small ? (popup === 'tools' ? popupRef.current : inspector ? inspectorRegion.current : drawerOpen ? railRef.current : null) : null;
       if (event.key !== 'Tab' || !modal) return;
-      const entries = Array.from(modal.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not([type=hidden]):not(:disabled),iframe'));
+      const entries = Array.from(modal.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not([type=hidden]):not(:disabled),textarea:not(:disabled),iframe'));
       const first = entries[0];
       const last = entries[entries.length - 1];
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
@@ -342,7 +324,7 @@ export default function ChatPage() {
     else url.searchParams.delete('conversationId');
     if (project) url.searchParams.set('project', project);
     else url.searchParams.delete('project');
-    window.history.replaceState(window.history.state, '', url);
+    window.history.replaceState(null, '', url);
   }
 
   function resetDraft() {
@@ -354,6 +336,7 @@ export default function ChatPage() {
     setProblem('');
     setNotice('');
     failedRequest.current = null;
+    failedCanvasRequest.current = null;
     media.stopListening();
     media.stopSpeaking();
   }
@@ -410,12 +393,11 @@ export default function ChatPage() {
   }
 
   async function uploadFile(file: File) {
-    const types = mode === 'work' ? WORK_TYPES : IMAGE_TYPES;
     const extension = file.name.split('.').pop()?.toLowerCase() || '';
-    const mime = WORK_TYPES.includes(file.type) ? file.type : MIME_BY_EXTENSION[extension];
-    const allowed = types.includes(mime);
+    const mime = MIME_BY_EXTENSION[extension] || file.type;
+    const allowed = UPLOAD_TYPES.includes(mime);
     if (!allowed || file.size > 25 * 1024 * 1024) {
-      setProblem(allowed ? 'Файлът трябва да бъде до 25 MB.' : 'Избери JPG, PNG или WebP. PDF, DOCX, CSV и XLSX се обработват в режим „Работа“.');
+      setProblem(allowed ? 'Файлът трябва да бъде до 25 MB.' : 'Поддържат се JPG, PNG, WebP, PDF, DOCX, CSV, XLSX, TXT, Markdown и JSON.');
       return;
     }
     setUploading(true);
@@ -438,7 +420,7 @@ export default function ChatPage() {
   function chooseFile(kind = 'any') {
     closePopup();
     if (!fileRef.current) return;
-    fileRef.current.accept = INPUT_FILES[kind]?.accept ?? (mode === 'work' ? '.jpg,.jpeg,.png,.webp,.pdf,.docx,.csv,.xlsx' : INPUT_FILES.image.accept);
+    fileRef.current.accept = INPUT_FILES[kind]?.accept ?? FILE_ACCEPT;
     fileRef.current.click();
   }
 
@@ -510,16 +492,19 @@ export default function ChatPage() {
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
-  async function submit(request: ChatRequest, speak = false) {
-    if (sendController.current) return;
+  async function submit(request: ChatRequest, { speak = false, canvasMime }: { speak?: boolean; canvasMime?: string } = {}) {
+    if (sendController.current) return { error: 'Изчакай текущата заявка да завърши.' };
+    const retry = canvasMime ? failedCanvasRequest : failedRequest;
     const controller = new AbortController();
     sendController.current = controller;
     setSending(true);
-    setProblem('');
-    setNotice('');
+    if (!canvasMime) {
+      setProblem('');
+      setNotice('');
+    }
     setPartial('');
     setOptimistic({ id: request.requestId, role: 'user', content: request.message || 'Прикачен файл', imagePath: request.uploadId,
-      attachmentMime: request.uploadId === attachment?.id ? attachment?.mimeType : undefined });
+      attachmentMime: canvasMime || (request.uploadId === attachment?.id ? attachment?.mimeType : undefined) });
     closePopup();
     try {
       const response = await fetch('/api/chat', {
@@ -527,14 +512,14 @@ export default function ChatPage() {
         body: JSON.stringify(request), signal: controller.signal,
       });
       const result = await readChatResponse(response, (delta) => setPartial((text) => text + delta));
-      if (controller.signal.aborted) return;
-      failedRequest.current = null;
+      controller.signal.throwIfAborted();
+      retry.current = null;
       const id = result.conversationId ?? request.conversationId;
       if (request.branchFrom) {
         await loadConversation(id);
       } else {
         const received = result.messages ?? [
-          { id: request.requestId, role: 'user', content: request.message, imagePath: request.uploadId },
+          { id: request.requestId, role: 'user', content: request.message, imagePath: request.uploadId, attachmentMime: canvasMime },
           { id: `${request.requestId}-answer`, role: 'assistant', content: result.content, toolResult: result.toolResult },
         ];
         setMessages((current) => [...current, ...received.filter((item) => !current.some(({ id: existing }) => item.id === existing))]);
@@ -548,16 +533,24 @@ export default function ChatPage() {
         });
       }
       updateUrl(id);
-      setInput('');
-      setAttachment(null);
-      setSelectedTool(null);
-      setBranchFrom(null);
+      if (!canvasMime) {
+        setInput('');
+        setAttachment(null);
+        setSelectedTool(null);
+        setBranchFrom(null);
+      }
       if (result.toolResult?.projectId || result.messages?.some((message) => message.toolResult?.projectId)) void loadProjects();
       if (speak) media.speak(result.content);
-    } catch (error) {
-      failedRequest.current = request;
-      if (controller.signal.aborted) setNotice('Получаването на отговора е прекъснато.');
-      else setProblem(error instanceof Error ? error.message : 'Връзката прекъсна.');
+      return { result };
+    } catch (cause) {
+      retry.current = request;
+      const error = controller.signal.aborted ? 'Получаването на отговора е прекъснато.'
+        : cause instanceof Error ? cause.message : 'Връзката прекъсна.';
+      if (!canvasMime) {
+        if (controller.signal.aborted) setNotice(error);
+        else setProblem(error);
+      }
+      return { error };
     } finally {
       if (sendController.current === controller) sendController.current = null;
       setSending(false);
@@ -566,38 +559,55 @@ export default function ChatPage() {
     }
   }
 
-  function send(text = input, options: { speak?: boolean; origin?: BranchFrom; uploadId?: string } = {}) {
+  function send(text = input, options: { speak?: boolean; origin?: BranchFrom; prior?: Message; tool?: ChatTool } = {}) {
     if (!canSend || pending || loadProblem) return;
     const origin = options.origin ?? branchFrom;
     const repeat = !!options.origin;
-    const uploadId = repeat ? options.uploadId : attachment?.id;
-    const tool = repeat ? null : selectedTool;
+    const uploadId = repeat ? options.prior?.imagePath || undefined : attachment?.id;
+    const mime = repeat ? options.prior?.attachmentMime || (uploadId ? 'image/jpeg' : '') : attachment?.mimeType;
+    const tool = repeat ? options.tool : selectedTool;
     const message = text.trim() || (tool?.input === 'none' ? tool.label : '');
     if (!message && !uploadId) return;
     const requiredFile = tool && INPUT_FILES[tool.input];
-    if (requiredFile && (!attachment || !requiredFile.types.includes(attachment.mimeType || ''))) {
+    if (requiredFile && (!uploadId || !requiredFile.types.includes(mime || ''))) {
       setProblem(requiredFile.required);
-      return;
-    }
-    if (uploadId && (repeat || mode === 'chat') && model?.imageInput === false) {
-      setProblem('Този модел обработва текст. В режим „Работа“ избери инструмент за прикачения файл.');
-      return;
-    }
-    if (!repeat && attachment?.mimeType && !IMAGE_TYPES.includes(attachment.mimeType) && mode === 'chat') {
-      setProblem('Избери режим „Работа“, за да обработиш този файл.');
       return;
     }
     const previous = failedRequest.current;
     const current = {
-      message, mode: repeat ? 'chat' as const : mode, model: model?.id, reasoning: appliedReasoning, uploadId,
+      message, mode: repeat ? (tool ? 'work' as const : 'chat' as const) : mode, model: model?.id, reasoning: appliedReasoning, uploadId,
       toolId: tool?.id, projectId: projectContext ?? undefined, branchFrom: origin || undefined,
     };
     const equivalent = !!previous && previous.message === message && previous.uploadId === uploadId && previous.toolId === current.toolId
       && previous.mode === current.mode && previous.projectId === current.projectId && previous.model === current.model && previous.reasoning === current.reasoning
       && previous.branchFrom?.messageId === current.branchFrom?.messageId;
-    if (equivalent) { void submit(previous, options.speak); return; }
+    if (equivalent) { void submit(previous, { speak: options.speak }); return; }
     const id = !origin && conversationId ? conversationId : crypto.randomUUID();
-    void submit({ ...current, conversationId: id, requestId: crypto.randomUUID() }, options.speak);
+    void submit({ ...current, conversationId: id, requestId: crypto.randomUUID() }, { speak: options.speak });
+  }
+
+  async function saveCanvas(file: Attachment, value: string) {
+    const mime = file.mimeType || '';
+    const tool = tools.find(({ id, available }) => id === 'text-file-edit' && available);
+    if (!account || !conversationId || pending || loadProblem || !tool || !CANVAS_MIME_TYPES.includes(mime)) {
+      throw new Error('В този разговор записът на текстово копие е недостъпен.');
+    }
+    if (value.length > CANVAS_CONTENT_LIMIT) throw new Error('Съдържанието надхвърля допустимия размер.');
+    const message = CANVAS_SAVE_PREFIX + value;
+    const previous = failedCanvasRequest.current;
+    const request = previous?.message === message && previous.uploadId === file.id && previous.conversationId === conversationId
+      ? previous : { message, uploadId: file.id, mode, conversationId, projectId: projectContext ?? undefined,
+        requestId: crypto.randomUUID(), toolId: tool.id };
+    const reply = await submit(request, { canvasMime: mime });
+    if (!reply.result) throw new Error(reply.error);
+    const receipt = reply.result.toolResult ?? reply.result.messages?.at(-1)?.toolResult;
+    const revision = receipt ? artifactAttachment(receipt) : null;
+    const url = receipt?.artifact?.url;
+    if (!revision || !url || revision.id === file.id || revision.mimeType !== mime) {
+      throw new Error('Сървърът не потвърди ново копие.');
+    }
+    setInspector((current) => current?.type === 'text' && current.attachment?.id === file.id
+      ? { type: 'text', url, title: revision.name, attachment: revision, saved: true } : current);
   }
 
   function startDictation() {
@@ -614,17 +624,40 @@ export default function ChatPage() {
     media.listen('conversation', (text) => { setInput(text); send(text, { speak: true }); });
   }
 
-  function editMessage(message: Message) {
+  function editMessage(message: Message, toolId?: string) {
     if (!conversationId || pending) return;
     setBranchFrom({ conversationId, messageId: message.id });
     const image = !message.attachmentMime || message.attachmentMime.startsWith('image/');
     setAttachment(message.imagePath ? {
       id: message.imagePath, name: image ? 'Прикачено изображение' : 'Прикачен файл',
-      previewUrl: image ? imageUrl(message.imagePath) : undefined, mimeType: message.attachmentMime ?? undefined,
+      previewUrl: image ? imageUrl(message.imagePath) : undefined, mimeType: message.attachmentMime ?? (image ? 'image/jpeg' : undefined),
     } : null);
-    setSelectedTool(null);
+    const previousTool = tools.find((tool) => tool.id === toolId && tool.available);
+    setSelectedTool(previousTool ?? null);
+    if (previousTool) setMode('work');
     setInput(message.content);
     setNotice('Редакцията ще отвори нов клон от този момент в разговора.');
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  function artifactEditor(file: Attachment) {
+    const mime = file.mimeType || '';
+    const ids = mime.startsWith('image/') ? ['image-edit', 'image-transform']
+      : INPUT_FILES.document.types.includes(mime) ? ['document-edit']
+      : CANVAS_MIME_TYPES.includes(mime) ? ['text-file-edit'] : [];
+    return ids.map((id) => tools.find((tool) => tool.id === id && tool.available)).find(Boolean);
+  }
+
+  function useArtifact(file: Attachment, edit: boolean) {
+    if (pending) return;
+    const editor = edit ? artifactEditor(file) : undefined;
+    setBranchFrom(null);
+    setAttachment(file);
+    setSelectedTool(editor ?? null);
+    setMode('work');
+    setProblem('');
+    setNotice(editor ? 'Опиши желаните промени.' : 'Резултатът е прикачен към този разговор.');
+    failedRequest.current = null;
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
@@ -652,6 +685,8 @@ export default function ChatPage() {
 
   function renderMessage(message: Message, index: number, local = false) {
     const prior = message.role === 'assistant' ? messages[index - 1] : undefined;
+    const regenerate = message.toolResult?.artifact ? tools.find((tool) => tool.id === message.toolResult?.toolId && tool.available) : undefined;
+    const regenerateLabel = regenerate ? 'Прегенерирай резултата в клон' : 'Поискай нов отговор в клон';
     const attached = message.imagePath ? imageUrl(message.imagePath) : null;
     const image = !message.attachmentMime || message.attachmentMime.startsWith('image/');
     return (
@@ -659,12 +694,12 @@ export default function ChatPage() {
         {message.role === 'assistant' && <div className="shark-chat-message-author"><Logo size="sm" /> SharkAI</div>}
         {attached && (image ? <button type="button" className="shark-chat-image" onClick={() => openInspector({ type: 'image', url: attached, title: 'Прикачено изображение' })}><img src={attached} alt="Прикачено изображение" /></button> : <a className="shark-chat-attachment-link" href={attached} download><FileText size={16} /> Прикачен файл</a>)}
         <div className="shark-chat-message-text">{message.content}</div>
-        {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} projectStatus={projects.find((project) => project.id === message.toolResult?.projectId)?.status} />}
+        {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} reuse={useArtifact} editable={(file) => !!artifactEditor(file)} disabled={pending} projectStatus={projects.find((project) => project.id === message.toolResult?.projectId)?.status} />}
         {!local && (
           <div className="shark-chat-message-actions">
             <button type="button" title={copied === message.id ? 'Копирано' : 'Копирай'} aria-label={copied === message.id ? 'Копирано' : 'Копирай'} onClick={() => void copyMessage(message)}>{copied === message.id ? <Check size={15} /> : <Copy size={15} />}</button>
-            {message.role === 'user' && conversationId && <button type="button" disabled={pending} title="Редактирай в нов клон" aria-label="Редактирай в нов клон" onClick={() => editMessage(message)}><Pencil size={15} /></button>}
-            {prior?.role === 'user' && conversationId && !message.toolResult && <button type="button" disabled={pending || !canSend} title="Поискай нов отговор в клон" aria-label="Поискай нов отговор в клон" onClick={() => send(prior.content, { origin: { conversationId, messageId: prior.id }, uploadId: prior.imagePath || undefined })}><RotateCcw size={15} /></button>}
+            {message.role === 'user' && conversationId && <button type="button" disabled={pending} title="Редактирай в нов клон" aria-label="Редактирай в нов клон" onClick={() => editMessage(message, messages[index + 1]?.toolResult?.toolId)}><Pencil size={15} /></button>}
+            {prior?.role === 'user' && conversationId && (!message.toolResult || regenerate) && <button type="button" disabled={pending || !canSend} title={regenerateLabel} aria-label={regenerateLabel} onClick={() => send(prior.content, { origin: { conversationId, messageId: prior.id }, prior, tool: regenerate })}><RotateCcw size={15} /></button>}
           </div>
         )}
       </article>
@@ -797,7 +832,7 @@ export default function ChatPage() {
                       <header><span>Още действия</span><button className="shark-chat-icon" type="button" aria-label="Затвори още действия" onClick={() => closePopup(true)}><X size={17} /></button></header>
                       <section>
                         <h2>Прикачване</h2>
-                        <button type="button" disabled={!account || pending} onClick={() => chooseFile()}><Paperclip size={17} /><span><strong>Прикачи файл</strong><small>{account ? (mode === 'work' ? 'Изображение, PDF, DOCX, CSV или XLSX · до 25 MB' : 'Изображение · до 25 MB') : 'Изисква вход в акаунт'}</small></span></button>
+                        <button type="button" disabled={!account || pending} onClick={() => chooseFile()}><Paperclip size={17} /><span><strong>Прикачи файл</strong><small>{account ? 'Изображение, документ, таблица или текст · до 25 MB' : 'Изисква вход в акаунт'}</small></span></button>
                         <button type="button" disabled={!account || !media.camera || pending} onClick={() => void openCamera()}><Camera size={17} /><span><strong>Камера</strong><small>{!account ? 'Изисква вход в акаунт' : !media.camera ? 'Браузърът не предоставя камера' : 'Направи снимка'}</small></span></button>
                         <button type="button" disabled={!account || !media.screen || pending} onClick={() => void captureScreen()}><ScreenShare size={17} /><span><strong>Сподели екран</strong><small>{!account ? 'Изисква вход в акаунт' : !media.screen ? 'Браузърът не поддържа споделяне' : 'Прикачи кадър от избрания екран'}</small></span></button>
                       </section>
@@ -840,7 +875,7 @@ export default function ChatPage() {
           </div>
         </main>
       </div>
-      {inspector && <div className="shark-chat-inspector-region" ref={inspectorRegion} role={small ? 'dialog' : undefined} aria-modal={small ? true : undefined} aria-label={inspector.title}><Inspector item={inspector} close={closeInspector} talk={pending ? undefined : (project) => newConversation(project)} /></div>}
+      {inspector && <div className="shark-chat-inspector-region" ref={inspectorRegion} role={small ? 'dialog' : undefined} aria-modal={small ? true : undefined} aria-label={inspector.title}><Inspector item={inspector} close={closeInspector} disabled={pending} save={account && tools.some(({ id, available }) => id === 'text-file-edit' && available) ? saveCanvas : undefined} talk={pending ? undefined : (project) => newConversation(project)} /></div>}
       <dialog className="shark-chat-camera-dialog" ref={cameraDialog} onCancel={(event) => { event.preventDefault(); closeCamera(); }}>
         <header><h2>Камера</h2><button className="shark-chat-icon" type="button" aria-label="Затвори камерата" onClick={closeCamera}><X size={18} /></button></header>
         <video ref={cameraVideo} muted autoPlay playsInline onLoadedMetadata={() => setCameraReady(true)} />

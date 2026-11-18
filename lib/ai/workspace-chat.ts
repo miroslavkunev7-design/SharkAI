@@ -12,6 +12,7 @@ interface WorkspaceModel {
   reasoningLevels: ReasoningLevel[];
   model: LanguageModel;
   reasoning?: 'openai';
+  nativeToolCalls?: 'openai' | 'compatible' | 'anthropic';
 }
 
 function configuredCompatibleChat(): WorkspaceModel | null {
@@ -33,6 +34,7 @@ function configuredCompatibleChat(): WorkspaceModel | null {
     imageInput: process.env.SHARKAI_OPENAI_CHAT_VISION === 'true',
     reasoningLevels: ['standard'],
     model: provider.chat(modelId),
+    nativeToolCalls: process.env.SHARKAI_OPENAI_CHAT_TOOLS === 'true' ? 'compatible' : undefined,
   };
 }
 
@@ -54,16 +56,17 @@ export async function workspaceModels(session: AccountSession | null) {
     models.push({
       id: 'standard', label: 'GPT-4o mini', imageInput: true, reasoningLevels: ['standard'],
       model: openai ? openai('gpt-4o-mini') : gateway('openai/gpt-4o-mini'),
+      nativeToolCalls: 'openai',
     });
     if (session.plan !== 'FREE' || session.role === 'ADMIN') {
       models.push({
         id: 'advanced', label: 'GPT-5 mini', imageInput: true, reasoningLevels: ['standard', 'deep'],
-        model: openai ? openai('gpt-5-mini') : gateway('openai/gpt-5-mini'), reasoning: 'openai',
+        model: openai ? openai('gpt-5-mini') : gateway('openai/gpt-5-mini'), reasoning: 'openai', nativeToolCalls: 'openai',
       });
     }
   } else {
     const anthropic = await getChatModel();
-    if (anthropic) models.push({ id: 'standard', label: 'Claude Haiku', imageInput: true, reasoningLevels: ['standard'], model: anthropic });
+    if (anthropic) models.push({ id: 'standard', label: 'Claude Haiku', imageInput: true, reasoningLevels: ['standard'], model: anthropic, nativeToolCalls: 'anthropic' });
   }
   return { models, reason: models.length ? null : 'Няма конфигуриран доставчик за AI чат.' };
 }

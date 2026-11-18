@@ -143,6 +143,8 @@
 .module-status { display: inline-block; flex: none; border: 1px solid #a8acff44; border-radius: 8px; color: #dddfff; background: #303d69a0; padding: 3px 7px; font-size: .73rem; }
 .module-status-completed { color: #abf7de; background: #06574659; border-color: #81e8cc50; }
 .module-status-failed { color: #ffccdb; background: #59204d; border-color: #ffabda57; }
+.module-status-running { color: #c6f7ff; background: #184768; border-color: #6bcaf461; }
+.module-status-unknown { color: #ffe2af; background: #4b3828; border-color: #b9945766; }
 
 .module-form { display: grid; gap: 14px; }
 .module-form label { display: grid; gap: 6px; font-size: .84rem; font-weight: 650; }
@@ -189,6 +191,13 @@
 .module-agents li:nth-child(3n) .module-agent-icon { background: #6b498467; color: #e4c4fa; }
 .module-agents strong { display: block; font-size: .85rem; }
 .module-agents p { margin-top: 2px; font-size: .79rem; }
+.module-agents li { align-items: flex-start; }
+.module-agents .module-link { margin-top: 6px; }
+.module-agents-status { margin-bottom: 10px; color: var(--shark-muted); font-size: .84rem; }
+.module-agent-receipt { margin-top: 9px; border-top: 1px solid #8fb2e12e; padding-top: 8px; font-size: .8rem; }
+.module-agent-receipt > .module-link { display: flex; width: fit-content; }
+.module-receipt-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.module-agent-receipt time { display: block; margin-top: 4px; color: var(--shark-muted); }
 .module-account { display: grid; gap: 9px; }
 .module-account > div { display: grid; gap: 8px; grid-template-columns: minmax(100px, 145px) minmax(0, 1fr); padding: 9px 0; border-bottom: 1px solid #8fb2e128; }
 .module-account dt { color: var(--shark-muted); font-size: .85rem; }

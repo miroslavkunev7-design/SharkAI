@@ -10,7 +10,11 @@ import {
   Settings, Sparkles, TrendingUp, Upload, Users, X,
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
-import { AGENTS, FEATURES, SUPREME_BRAIN, getFeature, getStudioFeatureAvailability } from '@/lib/agents';
+import {
+  AGENTS, FEATURES, STUDIO_AGENT_ACTIONS, STUDIO_AGENT_DEPENDENCIES,
+  SUPREME_BRAIN, getFeature, getStudioFeatureAvailability,
+} from '@/lib/agents';
+import { isTerminalStudioStatus, TRACKED_STUDIO_RUNS, type AgentRunActivity } from '@/lib/studio-activity';
 import './workspace.css';
 
 const VIEWS = {
@@ -41,15 +45,18 @@ const STUDIO_LABELS: Record<string, string> = {
   'api-gen': 'Начален REST API проект', 'ai-docs': 'Markdown документ от описание',
 };
 const STUDIO_FEATURES = FEATURES.filter(({ id }) => !getStudioFeatureAvailability(id));
-const TERMINAL = ['COMPLETED', 'FAILED'];
+const AGENT_STATUS: Record<AgentRunActivity, string> = {
+  running: 'Изпълнява се', completed: 'Завършено', failed: 'Неуспешно', unknown: 'Непотвърден статус',
+};
 
 type User = { name: string | null; email?: string; plan: string; role: string };
-type Project = { id: string; name: string; type: string; status: string; createdAt: string };
+type Project = { id: string; name: string; type: string; status: string; statusUnknown?: boolean; createdAt: string };
+type AgentExecution = { id: string; agentName: string; activity: AgentRunActivity; output: string | null };
 type ProjectDetail = {
-  project: Project & { description: string | null; analysis?: { understanding?: string; buildMethod?: string; feature?: string } | null };
+  project: Project & { description: string | null; analysis?: { understanding?: string; buildMethod?: string; feature?: string; runSemantics?: string } | null };
   files: string[];
   fileCount: number;
-  agents: Array<{ id: string; agentName: string; status: string; output: string | null }>;
+  agents: AgentExecution[];
   previewUrl: string | null;
   downloadUrl: string | null;
 };
@@ -66,6 +73,16 @@ async function json<T>(url: string, options?: RequestInit): Promise<T> {
 
 function signIn(href: string) {
   return `/login?next=${encodeURIComponent(href)}`;
+}
+
+function ProjectStatus({ project }: { project: Project }) {
+  const tone = project.statusUnknown ? 'unknown' : project.status.toLowerCase();
+  const label = project.statusUnknown ? 'Непотвърден статус' : PROJECT_STATUS[project.status] || project.status;
+  return <span className={`module-status module-status-${tone}`}>{label}</span>;
+}
+
+function RoleStatus({ status }: { status: AgentRunActivity }) {
+  return <span className={`module-status module-status-${status}`}>{AGENT_STATUS[status]}</span>;
 }
 
 function WorkspaceNav({ view, onNavigate }: { view: View; onNavigate?: () => void }) {
@@ -112,7 +129,7 @@ function ProjectList({ projects, error, isLoading, onRetry }: {
                   <Link href={`/dashboard?project=${encodeURIComponent(project.id)}`}>
                     <FolderOpen size={19} aria-hidden="true" />
                     <span>{project.name}</span>
-                    <small className={`module-status module-status-${project.status.toLowerCase()}`}>{PROJECT_STATUS[project.status] || project.status}</small>
+                    <ProjectStatus project={project} />
                   </Link>
                 </li>
               ))}
@@ -340,15 +357,22 @@ function StudioForm({ featureParam, user, loading, onCreated }: {
 }
 
 function Result({ detail, error, onRetry }: { detail: ProjectDetail | null; error: string; onRetry: () => void }) {
+  const agents = detail?.project.analysis?.runSemantics === TRACKED_STUDIO_RUNS || BUILD_METHODS[detail?.project.analysis?.buildMethod || '']
+    ? detail?.agents ?? []
+    : [];
+  const active = agents.find(({ activity }) => activity === 'running');
+  const awaiting = detail?.project.statusUnknown || !!error;
   return (
     <section className="shark-glass module-panel" aria-labelledby="studio-result">
       <div className="module-heading">
         <h2 id="studio-result">{detail?.project.name || 'Резултат от Студиото'}</h2>
-        {detail && <span className={`module-status module-status-${detail.project.status.toLowerCase()}`} role="status">{PROJECT_STATUS[detail.project.status] || detail.project.status}</span>}
+        {detail && <span role="status"><ProjectStatus project={awaiting ? { ...detail.project, statusUnknown: !isTerminalStudioStatus(detail.project.status) } : detail.project} /></span>}
       </div>
       {error && <p className="module-error" role="alert">{error} <button type="button" className="module-link" onClick={onRetry}>Провери отново</button></p>}
       {!detail && !error && <p role="status"><LoaderCircle size={17} className="inline animate-spin" /> Зареждане на проекта…</p>}
       {detail?.project.status === 'FAILED' && <p role="alert">Студиото не завърши проекта. Прегледай входа и създай нов проект при нужда.</p>}
+      {detail?.project.statusUnknown && !error && <p className="module-copy">Сървърът не е потвърдил скорошно изпълнение. <button type="button" className="module-link" onClick={onRetry}>Провери отново</button></p>}
+      {active && !awaiting && <p className="module-copy" role="status">{active.agentName} изпълнява задачата.</p>}
       {detail?.project.analysis?.understanding && <p className="module-copy">{detail.project.analysis.understanding}</p>}
       {detail?.project.status === 'COMPLETED' && (
         <>
@@ -365,36 +389,95 @@ function Result({ detail, error, onRetry }: { detail: ProjectDetail | null; erro
           )}
         </>
       )}
-      {detail && detail.agents.length > 0 && BUILD_METHODS[detail.project.analysis?.buildMethod || ''] && (
-        <details className="module-disclosure">
+      {agents.length > 0 && (
+        <details className="module-disclosure" open={agents.some(({ activity }) => activity !== 'completed') || undefined}>
           <summary>Резултати от изпълнението</summary>
-          <ul>{detail.agents.map(({ id, agentName, output }) => <li key={id}><strong>{agentName}</strong>{output && <p>{output}</p>}</li>)}</ul>
+          <ul>{agents.map(({ id, activity, agentName, output }) => (
+            <li key={id}>
+              <div className="module-receipt-heading"><strong>{agentName}</strong><RoleStatus status={awaiting && activity === 'running' ? 'unknown' : activity} /></div>
+              {output && <p>{output}</p>}
+            </li>
+          ))}</ul>
         </details>
       )}
     </section>
   );
 }
 
-function Agents() {
+type AgentReceipt = {
+  id: string; agentId: string; activity: AgentRunActivity;
+  output: string | null; startedAt: string | null; createdAt: string; project: { id: string; name: string };
+};
+
+function Agents({ user }: { user: User | null }) {
+  const [runs, setRuns] = useState<AgentReceipt[] | null>(null);
+  const [error, setError] = useState('');
+  const [reload, setReload] = useState(0);
+  useEffect(() => {
+    if (!user) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function refresh() {
+      try {
+        if (document.visibilityState !== 'visible') return;
+        const data = await json<{ runs: AgentReceipt[] }>('/api/projects/agents', { signal: controller.signal });
+        if (!controller.signal.aborted) {
+          setRuns(data.runs);
+          setError('');
+        }
+      } catch {
+        if (!controller.signal.aborted) setError('Изпълненията не се обновиха.');
+      } finally {
+        if (!controller.signal.aborted) timer = setTimeout(refresh, 5000);
+      }
+    }
+    void refresh();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [user, reload]);
+  const receipts = new Map(runs?.map((run) => [run.agentId, run]));
+  function receipt(agentId: string) {
+    const run = receipts.get(agentId);
+    return run ? (
+      <div className="module-agent-receipt">
+        <RoleStatus status={error && run.activity === 'running' ? 'unknown' : run.activity} />
+        {run.output && <p>{run.output}</p>}
+        <Link className="module-link" href={`/dashboard?project=${encodeURIComponent(run.project.id)}`}>{run.project.name} <ArrowUpRight size={14} /></Link>
+        <time dateTime={run.startedAt ?? run.createdAt}>{run.startedAt ? 'Начало' : 'Записано'} {new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(run.startedAt ?? run.createdAt))}</time>
+      </div>
+    ) : null;
+  }
   return (
     <>
-      <Banner view="agents">Ролите, регистрирани в SharkAI.</Banner>
+      <Banner view="agents">Задачи в Студиото и последни резултати от твоите проекти.</Banner>
       <section className="shark-glass module-panel">
         <div className="module-heading">
           <div className="module-brain"><Logo size="md" /><div><h2>{SUPREME_BRAIN.name}</h2><p>{SUPREME_BRAIN.description}</p></div></div>
           <Link className="module-link" href={VIEWS.studio.href}>Студио <ArrowRight size={16} /></Link>
         </div>
-        <p>Изпълнените роли и резултатите се показват в конкретния проект.</p>
+        {receipt(SUPREME_BRAIN.id)}
       </section>
       <section aria-labelledby="module-agents-title">
-        <h2 className="module-section-title" id="module-agents-title">Специализирани роли</h2>
+        <div className="module-heading">
+          <h2 id="module-agents-title">Специализирани роли</h2>
+          {user && <button type="button" className="module-link" onClick={() => setReload((value) => value + 1)}>Обнови резултатите</button>}
+        </div>
+        {user && !runs && !error && <p className="module-agents-status" role="status">Зареждане на изпълненията…</p>}
+        {error && <p className="module-agents-status module-error" role="alert">{error}</p>}
         <ul className="module-agents">
-          {AGENTS.map((agent) => (
-            <li key={agent.id} className="shark-glass module-panel">
-              <span className="module-agent-icon"><Users size={18} /></span>
-              <div><strong>{agent.name}</strong><p>{agent.description}</p></div>
-            </li>
-          ))}
+          {AGENTS.map((agent) => {
+            const action = STUDIO_AGENT_ACTIONS[agent.id];
+            return (
+              <li key={agent.id} className="shark-glass module-panel">
+                <span className="module-agent-icon"><Users size={18} /></span>
+                <div>
+                  <strong>{agent.name}</strong><p>{action?.description ?? STUDIO_AGENT_DEPENDENCIES[agent.id]}</p>
+                  {action && <Link className="module-link" href={`/dashboard?feature=${action.featureId}`}>Отвори задача <ArrowRight size={14} /></Link>}
+                  {agent.id === 'agent-14' && <Link className="module-link" href="/chat">Към чата <ArrowRight size={14} /></Link>}
+                  {receipt(agent.id)}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </section>
     </>
@@ -515,6 +598,15 @@ function DashboardContent() {
   }, [fetchProjects]);
 
   useEffect(() => {
+    if (view !== 'overview' || !data?.summary?.active) return;
+    const request = new AbortController();
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible') void fetchProjects(request.signal);
+    }, 10_000);
+    return () => { request.abort(); clearInterval(timer); };
+  }, [view, data?.summary?.active, fetchProjects]);
+
+  useEffect(() => {
     setDetails(null);
     setProjectError('');
     if (!projectId || !data?.user) return;
@@ -526,7 +618,7 @@ function DashboardContent() {
         const result = await json<ProjectDetail>(`/api/projects/${encodeURIComponent(projectId!)}`, { signal: controller.signal });
         if (controller.signal.aborted) return;
         setDetails(result);
-        if (TERMINAL.includes(result.project.status)) {
+        if (isTerminalStudioStatus(result.project.status) || result.project.statusUnknown) {
           void fetchProjects(controller.signal);
         } else {
           timer = setTimeout(poll, 1600);
@@ -571,7 +663,7 @@ function DashboardContent() {
             <StudioForm key={featureParam ?? 'screenshot-website'} featureParam={featureParam ?? 'screenshot-website'} user={data?.user ?? null} loading={loading} onCreated={created} />
             {data?.user && <ProjectList projects={data.projects} onRetry={() => void fetchProjects()} />}
           </>}
-          {view === 'agents' && <Agents />}
+          {view === 'agents' && <Agents user={data?.user ?? null} />}
           {view === 'automotive' && <Automotive />}
           {view === 'investments' && <>
             <Banner view="investments">Състояние на свързания портфейл.</Banner>

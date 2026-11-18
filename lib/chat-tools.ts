@@ -1,5 +1,5 @@
 export type ChatToolPlatform = 'web-desktop' | 'web-mobile' | 'windows';
-export type ChatToolInput = 'prompt' | 'image' | 'pdf' | 'dataset' | 'document' | 'none';
+export type ChatToolInput = 'prompt' | 'image' | 'pdf' | 'dataset' | 'document' | 'textfile' | 'none';
 
 export interface ChatTool {
   id: string;
@@ -20,7 +20,8 @@ export interface ChatToolResult {
   usageTokens?: number;
   text?: string;
   projectId?: string;
+  researchId?: string;
   url?: string;
-  artifact?: { url: string; mimeType: string };
+  artifact?: { url: string; mimeType: string; filename?: string };
   sources?: Array<{ title: string; url: string }>;
 }

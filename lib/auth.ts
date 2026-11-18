@@ -76,9 +76,12 @@ export async function getSession(): Promise<AccountSession | null> {
   if (!token) return null;
   const claims = await verifyToken(token);
   if (!claims) return null;
+  return getAccountSession(claims.id);
+}
 
+export async function getAccountSession(userId: string): Promise<AccountSession | null> {
   const user = await prisma.user.findUnique({
-    where: { id: claims.id },
+    where: { id: userId },
     select: { id: true, email: true, name: true, role: true, plan: true, tokensUsed: true, tokensLimit: true },
   });
   if (!user || user.email === LEGACY_GUEST_EMAIL) return null;

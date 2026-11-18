@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getProjectPreviewPath, readProjectManifest } from '@/lib/project-files';
 import { getSession } from '@/lib/auth';
+import { describeAgentRunActivity, studioStatusUnknown } from '@/lib/studio-activity';
 
 export async function GET(
   _req: NextRequest,
@@ -37,6 +38,7 @@ export async function GET(
       description: project.description,
       type: project.type,
       status: project.status,
+      statusUnknown: studioStatusUnknown(project.status, project.updatedAt),
       qualityScore: project.qualityScore,
       outputPath: project.outputPath,
       analysis,
@@ -44,7 +46,7 @@ export async function GET(
     },
     files: manifest?.files ?? [],
     fileCount: manifest?.fileCount ?? 0,
-    agents: project.agents,
+    agents: project.agents.map((run) => ({ ...run, activity: describeAgentRunActivity(run.status, run.createdAt, project.status) })),
     previewUrl: downloadable && getProjectPreviewPath(manifest) ? `/api/projects/${id}/preview` : null,
     downloadUrl: downloadable ? `/api/projects/${id}/download` : null,
     zipUrl: downloadable ? `/api/projects/${id}/download` : null,

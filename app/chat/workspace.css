@@ -303,3 +303,32 @@
 }
 
 .shark-chat-attachment-link { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; color: #a9e6ff; text-decoration: underline; }
+
+.shark-chat-result-actions { display: flex; flex-wrap: wrap; gap: 5px 12px; }
+.shark-chat-research-topic { font-size: .9rem; color: #e4edff; }
+.shark-chat-research-progress { display: grid; gap: 4px; color: #bdd2ee; font-size: .78rem; }
+.shark-chat-research-progress > div { display: flex; justify-content: space-between; gap: 8px; }
+.shark-chat-research-progress progress { display: block; width: 100%; height: 8px; accent-color: #88c9ff; }
+.shark-chat-research-warnings { color: #ffd9ab; padding-left: 19px; list-style: disc; font-size: .82rem; }
+.shark-chat-research-sources summary { cursor: pointer; color: #bde2ff; font-size: .85rem; padding-block: 3px; }
+.shark-chat-text-preview { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 55px; padding: 10px; font-size: .82rem; border: 1px solid var(--chat-line); border-radius: 10px; background: #0a1124; }
+.shark-chat-result-actions button:disabled { opacity: .65; }
+
+.shark-chat-artifact-name { display: flex; align-items: center; gap: 6px; color: #d0ddf6; font-size: .82rem; overflow-wrap: anywhere; }
+
+.shark-chat-canvas { display: grid; gap: 7px; min-width: 0; }
+.shark-chat-canvas label { font-size: .84rem; font-weight: 690; }
+.shark-chat-canvas textarea {
+  min-width: 0;
+  min-height: 190px;
+  padding: 9px;
+  border: 1px solid var(--chat-line);
+  border-radius: 10px;
+  background: #0a1124;
+  color: #e8f0ff;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: .87rem;
+  resize: vertical;
+}
+.shark-chat-canvas textarea[aria-invalid='true'] { border-color: #efadbc; }
+.shark-chat-inspector-links button:disabled { opacity: .65; }

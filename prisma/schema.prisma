@@ -30,6 +30,14 @@ enum ProjectStatus {
   FAILED
 }
 
+enum ResearchStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -49,6 +57,27 @@ model User {
   conversations ChatConversation[]
   chatRequests  ChatRequest[]
   uploads       FileUpload[]
+  researchJobs  ResearchJob[]
+}
+
+model ResearchJob {
+  id         String         @id
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId  String
+  topic      String
+  status     ResearchStatus @default(QUEUED)
+  stage      Int            @default(0)
+  evidence   Json?
+  warnings   String[]       @default([])
+  report     String?
+  error      String?
+  runnerId   String?
+  leaseUntil DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([userId, requestId])
 }
 
 model ChatConversation {

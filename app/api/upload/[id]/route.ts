@@ -5,7 +5,7 @@ import { readOwnedUpload } from '@/lib/uploads';
 export const runtime = 'nodejs';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await getSession();
@@ -14,10 +14,14 @@ export async function GET(
   const file = await readOwnedUpload(id, session.id);
   if (!file) return NextResponse.json({ error: 'Файлът не е намерен.' }, { status: 404 });
 
+  const requestedName = req.nextUrl.searchParams.get('download');
+  const safeName = requestedName?.normalize('NFC').replace(/[^\p{L}\p{N} _.-]/gu, '').replace(/^\.+/u, '').trim().slice(0, 128);
+  const downloadName = safeName?.toLowerCase().endsWith('.' + file.ext) ? safeName : null;
+  const disposition = requestedName !== null || !file.mimeType.startsWith('image/') ? 'attachment' : 'inline';
   return new NextResponse(new Uint8Array(file.data), {
     headers: {
       'Content-Type': file.mimeType,
-      'Content-Disposition': `${file.mimeType.startsWith('image/') ? 'inline' : 'attachment'}; filename="${id}.${file.ext}"`,
+      'Content-Disposition': disposition + '; filename="' + id + '.' + file.ext + '"' + (downloadName ? "; filename*=UTF-8''" + encodeURIComponent(downloadName) : ''),
       'Cache-Control': 'private, no-store',
       'X-Content-Type-Options': 'nosniff',
     },

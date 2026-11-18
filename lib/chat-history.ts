@@ -73,7 +73,7 @@ export async function getCompletedTurn(userId: string, requestId: string, conver
 export async function acquireChatLease(userId: string, requestId: string) {
   const lease = randomUUID();
   const now = new Date();
-  const stale = new Date(now.getTime() - 120_000);
+  const stale = new Date(now.getTime() - 185_000);
   try {
     await prisma.chatRequest.create({ data: { id: requestId, userId, lease } });
     return lease;

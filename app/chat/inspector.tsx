@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { Download, ExternalLink, LoaderCircle, MessageSquare, X } from 'lucide-react';
-import { projectInProgress, PROJECT_STATUS, type InspectorItem, type Project } from './workspace-types';
+import { Download, ExternalLink, LoaderCircle, MessageSquare, Pencil, Save, X } from 'lucide-react';
+import { artifactDownloadUrl, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, projectInProgress, PROJECT_STATUS, type Attachment, type InspectorItem, type Project } from './workspace-types';
+
+type SaveCanvas = (file: Attachment, content: string) => Promise<void>;
 
 interface ProjectDetails {
   project: Project & { description?: string };
@@ -71,7 +73,100 @@ function ProjectInspector({ id, talk }: { id: string; talk?: (project: string) =
   );
 }
 
-export function Inspector({ item, close, talk }: { item: InspectorItem; close: () => void; talk?: (project: string) => void }) {
+function TextInspector({ item, save, disabled }: { item: Extract<InspectorItem, { type: 'text' }>; save?: SaveCanvas; disabled?: boolean }) {
+  const { url, attachment } = item;
+  const [text, setText] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [value, setValue] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const editRef = useRef<HTMLTextAreaElement>(null);
+  const lengthRef = useRef<HTMLParagraphElement>(null);
+  const isEditable = !!save && !!attachment && CANVAS_MIME_TYPES.includes(attachment.mimeType || '');
+
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
+        if (!response.ok || !response.body) throw new Error('Файлът не можа да се зареди.');
+        const limit = 256 * 1024;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+        let value = '';
+        let size = 0;
+        try {
+          while (true) {
+            const chunk = await reader.read();
+            if (chunk.done) break;
+            size += chunk.value.byteLength;
+            if (size > limit) {
+              await reader.cancel();
+              throw new Error('Файлът е над 256 KB. Изтегли го за пълен преглед.');
+            }
+            value += decoder.decode(chunk.value, { stream: true });
+          }
+        } finally { reader.releaseLock(); }
+        if (!controller.signal.aborted) setText(value + decoder.decode());
+      } catch (cause) {
+        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'Връзката с файла прекъсна.');
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [url]);
+
+  if (error) return <p className="shark-chat-notice" role="alert">{error}</p>;
+  if (text === null) return <p className="shark-chat-status" role="status"><LoaderCircle className="shark-chat-spinner" size={16} /> Зареждане на файла…</p>;
+  if (value === null) return (
+    <>
+      {item.saved && <p className="shark-chat-status" role="status">Запазено е отделно копие в разговора.</p>}
+      <pre className="shark-chat-text-preview">{text || 'Файлът е празен.'}</pre>
+      {isEditable && <div className="shark-chat-inspector-links">
+        <button type="button" disabled={disabled} onClick={() => { setValue(text); requestAnimationFrame(() => editRef.current?.focus()); }}><Pencil size={16} /> Редактирай в платното</button>
+      </div>}
+    </>
+  );
+
+  const tooLong = value.length > CANVAS_CONTENT_LIMIT;
+
+  async function saveRevision(event: FormEvent) {
+    event.preventDefault();
+    if (!save || !attachment || value === null || value === text || disabled || saving) return;
+    if (value.length > CANVAS_CONTENT_LIMIT) { lengthRef.current?.focus(); return; }
+    if (!value.trim()) { setSaveError('Въведи съдържание за копието.'); return; }
+    if (attachment.mimeType === 'application/json') {
+      try { JSON.parse(value); }
+      catch { setSaveError('Въведи валиден JSON.'); return; }
+    }
+    setSaving(true);
+    setSaveError('');
+    try { await save(attachment, value); }
+    catch (cause) { setSaveError(cause instanceof Error ? cause.message : 'Копието не можа да се запази.'); }
+    finally { setSaving(false); }
+  }
+
+  return (
+    <form className="shark-chat-canvas" onSubmit={saveRevision} aria-busy={saving}>
+      <label htmlFor="shark-chat-canvas-input">Съдържание на файла</label>
+      <textarea id="shark-chat-canvas-input" ref={editRef} rows={12} value={value} disabled={saving} spellCheck={false} wrap="off"
+        aria-describedby="shark-chat-canvas-length" aria-invalid={tooLong || !!saveError || undefined}
+        onChange={(event) => { setValue(event.target.value); setSaveError(''); }} />
+      <p id="shark-chat-canvas-length" ref={lengthRef} tabIndex={-1} className={tooLong ? 'shark-chat-notice' : 'shark-chat-status'}>
+        {value.length} / {CANVAS_CONTENT_LIMIT} знака{tooLong ? ' · Съкрати текста, за да запазиш копието.' : ''}
+      </p>
+      {saveError && <p className="shark-chat-notice" role="alert">{saveError}</p>}
+      <div className="shark-chat-inspector-links">
+        <button type="submit" disabled={disabled || saving || !isEditable || value === text || tooLong}>
+          {saving ? <LoaderCircle className="shark-chat-spinner" size={16} /> : <Save size={16} />} {saving ? 'Запазвам…' : 'Запази като копие'}
+        </button>
+        <button type="button" disabled={saving} onClick={() => { setValue(null); setSaveError(''); }}>Отмени</button>
+      </div>
+    </form>
+  );
+}
+
+export function Inspector({ item, close, talk, save, disabled }: { item: InspectorItem; close: () => void; talk?: (project: string) => void; save?: SaveCanvas; disabled?: boolean }) {
   return (
     <aside className="shark-chat-inspector" aria-label={item.title}>
       <header>
@@ -80,9 +175,9 @@ export function Inspector({ item, close, talk }: { item: InspectorItem; close: (
       </header>
       {item.type === 'project' ? <ProjectInspector key={item.id} id={item.id} talk={talk} /> : (
         <>
-          <img className="shark-chat-inspector-image" src={item.url} alt={item.title} />
+          {item.type === 'text' ? <TextInspector key={item.url} item={item} save={save} disabled={disabled} /> : <img className="shark-chat-inspector-image" src={item.url} alt={item.title} />}
           <div className="shark-chat-inspector-links">
-            <a href={item.url} download><Download size={16} /> Изтегли</a>
+            <a href={artifactDownloadUrl(item.url, item.type === 'text' ? item.attachment : undefined)} download={item.title}><Download size={16} /> Изтегли</a>
           </div>
         </>
       )}

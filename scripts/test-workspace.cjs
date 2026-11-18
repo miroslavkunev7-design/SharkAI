@@ -51,6 +51,107 @@ async function uploadImage(cookie) {
   return { ...data, bytes };
 }
 
+async function verifyStreamingAbort(account) {
+  const conversationId = randomUUID();
+  const requestId = randomUUID();
+  const before = await prisma.user.findUniqueOrThrow({ where: { id: account.id }, select: { tokensUsed: true } });
+  const stop = new AbortController();
+  const response = await request('/api/chat', {
+    cookie: account.cookie, signal: stop.signal, headers: { Accept: 'application/x-ndjson' },
+    body: { conversationId, requestId, message: 'Write a long science fiction story in English with multiple sections. Begin the story directly.' },
+  });
+  assert.match(response.headers.get('content-type'), /application\/x-ndjson/);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+  try {
+    while (true) {
+      const part = await reader.read();
+      assert.ok(!part.done, 'The provider ended before cancellation could be tested.');
+      pending += decoder.decode(part.value, { stream: true });
+      const lines = pending.split('\n');
+      pending = lines.pop();
+      const events = lines.filter(Boolean).map(JSON.parse);
+      const failure = events.find(({ type }) => type !== 'delta');
+      assert.ok(!failure, JSON.stringify(failure));
+      if (events.some(({ text }) => text)) break;
+    }
+    stop.abort();
+    await reader.cancel().catch(() => {});
+  } finally {
+    reader.releaseLock();
+    stop.abort();
+  }
+  const lease = { id: requestId, userId: account.id };
+  for (let attempt = 0; attempt < 40; attempt++) {
+    if (!(await prisma.chatRequest.count({ where: lease }))) break;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.equal(await prisma.chatRequest.count({ where: lease }), 0, 'The cancelled request lease was not released.');
+  assert.equal(await prisma.chatMessage.count({ where: { requestId, userId: account.id } }), 0, 'The incomplete response was saved.');
+  assert.deepEqual(await prisma.user.findUniqueOrThrow({ where: { id: account.id }, select: { tokensUsed: true } }), before);
+  await json(`/api/chat?conversationId=${conversationId}`, { cookie: account.cookie }, 404);
+}
+
+async function verifyEntitlements(actor) {
+  const cookie = actor.cookie;
+  const user = { id: actor.id };
+  const tokenState = { tokensUsed: 50, tokensLimit: 50 };
+  const canChat = async () => (await json('/api/chat', { cookie })).capabilities.models.length > 0;
+  const trial = { conversationId: randomUUID(), requestId: randomUUID(), message: 'What animal meows? Answer in one sentence.' };
+  const select = { plan: true, role: true, tokensLimit: true, tokensUsed: true, stripeId: true };
+
+  await prisma.user.update({ where: user, data: tokenState });
+  assert.equal(await canChat(), false);
+  await json('/api/chat', { cookie, body: trial }, 429);
+
+  await prisma.user.update({ where: user, data: { plan: 'PRO', tokensUsed: 49 } });
+  assert.equal((await json('/api/payments/status', { cookie })).plan, 'PRO');
+  assert.equal(await canChat(), true);
+  await prisma.user.update({ where: user, data: { tokensUsed: 50 } });
+  assert.equal(await canChat(), false);
+  await json('/api/chat', { cookie, body: trial }, 429);
+
+  await prisma.user.update({ where: user, data: { plan: 'FREE', role: 'ADMIN' } });
+  assert.equal(await canChat(), true);
+  assert.deepEqual(await json('/api/payments/status', { cookie }), { plan: 'FREE', period: null, canPurchase: false });
+  await json('/api/payments/checkout', { cookie, body: { plan: 'ULTRA' } }, 409);
+  const adminResponse = await json('/api/chat', { cookie, body: trial });
+  assert.ok(adminResponse.content.trim());
+  const admin = await prisma.user.findUniqueOrThrow({ where: user, select });
+  assert.equal(admin.plan, 'FREE');
+  assert.equal(admin.role, 'ADMIN');
+  assert.equal(admin.tokensLimit, 50);
+  assert.equal(admin.stripeId, null);
+  assert.ok(admin.tokensUsed > 50);
+  assert.equal(await prisma.subscription.count({ where: { userId: actor.id } }), 0);
+
+  await prisma.user.update({ where: user, data: { role: 'USER', ...tokenState } });
+  const now = Date.now();
+  const active = await prisma.subscription.create({ data: {
+    userId: actor.id, plan: 'ULTRA', status: 'active',
+    currentPeriodStart: new Date(now - 60_000), currentPeriodEnd: new Date(now + 2_678_400_000),
+  } });
+  const status = await json('/api/payments/status', { cookie });
+  assert.equal(status.plan, 'ULTRA');
+  assert.equal(status.period.currentPeriodStart, active.currentPeriodStart.toISOString());
+  assert.equal(status.period.currentPeriodEnd, active.currentPeriodEnd.toISOString());
+  assert.equal(await canChat(), true);
+  const ultraResponse = await json('/api/chat', { cookie, body: { ...trial, requestId: randomUUID() } });
+  assert.ok(ultraResponse.content.trim());
+  const ultra = await prisma.user.findUniqueOrThrow({ where: user, select });
+  assert.equal(ultra.plan, 'FREE');
+  assert.equal(ultra.tokensLimit, 50);
+  assert.ok(ultra.tokensUsed > 50);
+  await prisma.subscription.update({ where: { id: active.id }, data: { currentPeriodEnd: new Date(now - 1) } });
+  assert.equal((await json('/api/payments/status', { cookie })).plan, 'FREE');
+  assert.equal(await canChat(), false);
+
+  await prisma.user.update({ where: user, data: { plan: 'ULTRA' } });
+  assert.equal((await json('/api/payments/status', { cookie })).plan, 'ULTRA');
+  assert.equal(await canChat(), true);
+}
+
 async function run() {
   assert.deepEqual((await json('/api/chat')).messages, []);
   await json('/api/chat', { body: { message: 'unauthenticated' } }, 401);
@@ -87,6 +188,11 @@ async function run() {
   await json('/api/chat', { cookie: b.cookie, method: 'PATCH', body: { conversationId, mode: 'chat' } }, 404);
   await json('/api/chat', { cookie: a.cookie, method: 'PATCH', body: { conversationId, mode: 'chat' } });
   assert.equal((await json(`/api/chat?conversationId=${conversationId}`, { cookie: a.cookie })).conversationMode, 'chat');
+  const followUp = await json('/api/chat', { cookie: a.cookie, body: {
+    conversationId, mode: 'work', requestId: randomUUID(), toolId: 'image-properties', message: 'Измери отново',
+  } });
+  assert.equal(followUp.messages[0].imagePath, upload.uploadId);
+  assert.match(followUp.toolResult.text, /12\s*[×x]\s*8/i);
 
   const branch = { ...first, mode: 'work', conversationId: randomUUID(), requestId: randomUUID(),
     branchFrom: { conversationId, messageId: turn.messages[0].id }, message: 'Провери отново' };
@@ -135,9 +241,11 @@ async function run() {
     assert.equal(chunks.filter(({ type }) => type === 'delta').map(({ text }) => text).join(''), done.content);
     const history = await json(`/api/chat?conversationId=${done.conversationId}`, { cookie: a.cookie });
     assert.equal(history.messages.at(-1).content, done.content);
+    await verifyStreamingAbort(a);
+    await verifyEntitlements(b);
   }
 
-  console.log(`Workspace API passed: two accounts, legacy and conversation isolation, private files, tools, mode, branch, project, preview, ZIP${process.env.SHARKAI_TEST_CHAT_PROVIDER === '1' ? ', real provider stream' : ''}.`);
+  console.log(`Workspace API passed: two accounts, legacy and conversation isolation, private files, retained attachment, tools, mode, branch, project, preview, ZIP${process.env.SHARKAI_TEST_CHAT_PROVIDER === '1' ? ', real provider stream, cancellation and plan entitlements' : ''}.`);
 }
 
 run().catch((error) => { console.error(error); process.exitCode = 1; }).finally(async () => {
