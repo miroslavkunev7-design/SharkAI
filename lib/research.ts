@@ -5,6 +5,7 @@ import { getAccountSession } from './auth';
 import { remainingChatTokens } from './ai/workspace-chat';
 import { prisma } from './db';
 import { getHostedOpenAI, HostedWebSearchError, runHostedWebSearch, type HostedOpenAI, type HostedWebSearchResult } from './hosted-web-search';
+import { searchNews, wantsNewsCoverage, type NewsHit } from './research-news';
 import {
   readWikiArticles, researchTopic, searchCrossref, searchWiki,
   type ResearchSource, type ScholarlyHit, type WikiHit,
@@ -19,7 +20,7 @@ const stageLabels = [
 ];
 
 type WebEvidence = { status: 'attempted' | 'interrupted' | 'failed' } | { status: 'done'; result: HostedWebSearchResult };
-type Evidence = { wiki: WikiHit[]; papers: ScholarlyHit[]; web?: WebEvidence };
+type Evidence = { wiki: WikiHit[]; papers: ScholarlyHit[]; news?: NewsHit[]; web?: WebEvidence };
 type ResolveHostedSearch = () => Promise<HostedOpenAI | null>;
 
 export class ResearchInputError extends Error {
@@ -56,7 +57,7 @@ function webWarning(evidence: Evidence) {
 
 function sourcesFor(evidence: Evidence) {
   const hosted = evidence.web?.status === 'done' ? evidence.web.result.sources : [];
-  return [...new Map([...evidence.wiki, ...evidence.papers, ...hosted].map((source) => [source.url, { title: source.title, url: source.url }])).values()];
+  return [...new Map([...evidence.wiki, ...evidence.papers, ...(evidence.news ?? []), ...hosted].map((source) => [source.url, { title: source.title, url: source.url }])).values()];
 }
 
 function hostedParagraphs(result: HostedWebSearchResult, sourceIds: Map<string, number>, escape: (value: string) => string) {
@@ -96,6 +97,16 @@ function reportMarkdown(topic: string, evidence: Evidence, warnings: string[], f
     lines.push('## Публично уеб търсене чрез OpenAI', '',
       'Този раздел съдържа синтеза на доставчика и връзките от неговите цитати.', '',
       ...hostedParagraphs(result, sourceIds, escape));
+  }
+  if (evidence.news?.length) {
+    lines.push('## Медийни заглавия от Google Новини', '',
+      'Публичният индекс предоставя заглавия, издания и време на публикация. Връзките се отварят през индекса.', '');
+    for (const article of evidence.news) {
+      const sourceId = sourceIds.get(article.url);
+      const published = article.publishedAt.slice(0, 16).replace('T', ' ');
+      lines.push(`- ${escape(article.title)} · ${escape(article.publisher)} · ${published} UTC [${sourceId}](${markdownUrl(article.url)})`);
+    }
+    lines.push('');
   }
   if (findings.length) {
     lines.push('## Синтез по източниците', '');
@@ -195,7 +206,14 @@ export async function executeResearchJob(jobId: string, userId: string, resolveH
       if (!(await save(1))) return;
     }
     if (stage < 2) {
-      evidence.papers = await fromSource(searchCrossref(topic, controller.signal), [], 'Търсенето в Crossref временно не отговори.');
+      const lookupNews = () => fromSource(searchNews(topic, controller.signal), [], 'Индексът на Google Новини временно не отговори.');
+      const [papers, news] = await Promise.all([
+        fromSource(searchCrossref(topic, controller.signal), [], 'Търсенето в Crossref временно не отговори.'),
+        wantsNewsCoverage(topic) ? lookupNews() : undefined,
+      ]);
+      evidence.papers = papers;
+      if (news) evidence.news = news;
+      else if (!evidence.wiki.length && !papers.length && evidence.web?.status !== 'done') evidence.news = await lookupNews();
       if (!(await save(2))) return;
     }
     if (stage < 3) {
@@ -283,11 +301,15 @@ function describeResearch(job: ResearchJob) {
   const { wiki, papers, web } = evidence;
   const sources = sourcesFor(evidence);
   const webCount = web?.status === 'done' ? web.result.sources.length : 0;
+  const newsCount = evidence.news?.length ?? 0;
+  const stageLabel = job.stage === 0 && web?.status === 'attempted' ? 'Публично уеб търсене чрез OpenAI'
+    : job.stage === 1 && wantsNewsCoverage(job.topic) ? 'Търсене на публикации и медийни заглавия'
+      : stageLabels[job.stage];
   return {
     id: job.id, topic: job.topic, status: job.status, stage: job.stage, totalStages: TOTAL_STAGES,
-    stageLabel: job.stage === 0 && web?.status === 'attempted' ? 'Публично уеб търсене чрез OpenAI' : stageLabels[job.stage], updatedAt: job.updatedAt,
+    stageLabel, updatedAt: job.updatedAt,
     error: job.error, warnings: [...job.warnings, ...webWarning(evidence)], sources,
-    summary: job.status === 'COMPLETED' ? `Справочни статии · ${wiki.length}. Библиографски записи · ${papers.length}.${webCount ? ` Цитати от уеб търсене · ${webCount}.` : ''}` : undefined,
+    summary: job.status === 'COMPLETED' ? `Справочни статии · ${wiki.length}. Библиографски записи · ${papers.length}.${newsCount ? ` Медийни заглавия · ${newsCount}.` : ''}${webCount ? ` Цитати от уеб търсене · ${webCount}.` : ''}` : undefined,
     downloadUrl: job.status === 'COMPLETED' && job.report ? `/api/chat/research/${job.id}/report` : null,
   };
 }
