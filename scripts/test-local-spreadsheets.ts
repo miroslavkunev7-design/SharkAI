@@ -4,13 +4,23 @@ import { ZipArchive } from 'archiver';
 import { parse } from 'csv-parse/sync';
 import {
   createLocalSpreadsheet, editLocalSpreadsheet, hasExplicitSpreadsheetData, isLocalSpreadsheetEdit,
-  spreadsheetInputSchema, SpreadsheetInputError,
+  spreadsheetInputSchema, SpreadsheetInputError, validateSpreadsheetDraft,
 } from '../lib/chat-spreadsheets.server';
 import { readZipEntries } from '../lib/document-archive.server';
 
 const sheetFile = 'xl/worksheets/sheet1.xml';
 const bookFile = 'xl/workbook.xml';
 const workbookRels = 'xl/_rels/workbook.xml.rels';
+
+test('validates model workbook columns without changing identifiers or accepting invalid numeric data', () => {
+  const draft = { headers: ['SKU', 'Quantity'], numericColumns: [1], rows: [['0042', '2.5'], ['0043', null], ['0044', 3]] };
+  assert.deepEqual(validateSpreadsheetDraft(draft)?.rows, [['0042', 2.5], ['0043', null], ['0044', 3]]);
+  for (const value of ['003', 'about 4', '9007199254740992', true]) {
+    assert.equal(validateSpreadsheetDraft({ ...draft, rows: [['0042', value]] }), undefined);
+  }
+  assert.equal(validateSpreadsheetDraft({ ...draft, numericColumns: [2] }), undefined);
+  assert.equal(validateSpreadsheetDraft({ ...draft, rows: [['0042']] }), undefined);
+});
 
 function archive(entries: Map<string, Buffer>) {
   return new Promise<Buffer>((resolve, reject) => {

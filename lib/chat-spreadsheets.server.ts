@@ -28,6 +28,10 @@ export const spreadsheetInputSchema = z.object({
   sheetName: z.string().min(1).max(31).nullable().optional(),
 }).strict();
 
+const spreadsheetDraftSchema = spreadsheetInputSchema.extend({
+  numericColumns: z.array(z.number().int().nonnegative()).max(maxColumns),
+});
+
 export type SpreadsheetInput = z.infer<typeof spreadsheetInputSchema>;
 type Cell = z.infer<typeof spreadsheetCellSchema>;
 type SpreadsheetFormat = 'csv' | 'xlsx';
@@ -38,11 +42,36 @@ export class SpreadsheetInputError extends Error {
   constructor(message: string, readonly status = 422) { super(message); }
 }
 
+export function validateSpreadsheetDraft(value: unknown): SpreadsheetInput | undefined {
+  const parsed = spreadsheetDraftSchema.safeParse(value);
+  if (!parsed.success) return;
+  const { headers, rows, sheetName, numericColumns } = parsed.data;
+  const numeric = new Set(numericColumns);
+  if ([...numeric].some((index) => index >= headers.length) || rows.some((row) => row.length !== headers.length)) return;
+
+  const normalized: SpreadsheetInput['rows'] = [];
+  for (const row of rows) {
+    const cells: Cell[] = [];
+    for (const [index, cell] of row.entries()) {
+      if (!numeric.has(index) || cell === null) {
+        cells.push(cell);
+        continue;
+      }
+      const number = typeof cell === 'number' ? cell : typeof cell === 'string' && decimal.test(cell) ? Number(cell) : NaN;
+      if (!Number.isFinite(number) || Number.isInteger(number) && !Number.isSafeInteger(number)) return;
+      cells.push(number);
+    }
+    normalized.push(cells);
+  }
+  return { headers, rows: normalized, sheetName };
+}
+
 const explicitData = /(?:^|\s)(?:с данни|със съдържание|със следните данни|with data|with content|with the following data)\s*:[ \t]*(?:\r?\n)?([\s\S]*)$/iu;
 const editPrefix = /^(?:(?:редактирай|поправи)(?: прикачената)?|(?:edit|revise)(?: the)?(?: attached)?)\s+(?:csv|xlsx|excel|таблицата)\s*[:—–-]\s*/iu;
 const updateCell = /^(?:промени|задай|поправи|смени|set|change)\s+(?:клетка(?:та)?|cell)\s+([a-z]{1,3}[1-9]\d{0,4})(?:\s+(?:в лист|in sheet)\s+["„“]([^"“”]+)["“”])?\s+(?:на|to|=)\s*([\s\S]+)$/iu;
 const clearCell = /^(?:изчисти|clear)\s+(?:клетка(?:та)?|cell)\s+([a-z]{1,3}[1-9]\d{0,4})(?:\s+(?:в лист|in sheet)\s+["„“]([^"“”]+)["“”])?\s*[.!]?$/iu;
 const illegalXml = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uD800-\uDFFF\uFFFE\uFFFF]/u;
+const decimal = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?$/iu;
 
 export function hasExplicitSpreadsheetData(prompt: string) { return explicitData.test(prompt); }
 
@@ -104,7 +133,7 @@ function requestedEdit(prompt: string): CellEdit {
 }
 
 function csvScalar(value: string): string | number {
-  if (/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?$/iu.test(value)) {
+  if (decimal.test(value)) {
     const number = Number(value);
     if (Number.isFinite(number) && String(number) === value && (!Number.isInteger(number) || Number.isSafeInteger(number))) return number;
   }
