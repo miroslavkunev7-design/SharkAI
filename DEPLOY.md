@@ -52,8 +52,9 @@ https://mm-auto-nadq-jeleva-s-projects.vercel.app
 
 ## Installer за download страницата
 
-Качи `release/SharkAI-Setup-*.exe` на GitHub Releases и добави в Vercel:
+Качи `release/SharkAI-Setup-1.0.2.exe` на GitHub Releases. Във Vercel замени примерния хост с действителния HTTPS адрес на публикувания файл.
+
 ```
-INSTALLER_DOWNLOAD_URL=https://github.com/.../releases/download/.../SharkAI-Setup.exe
-INSTALLER_SIZE_MB=120
+INSTALLER_DOWNLOAD_URL=https://downloads.example.com/SharkAI-Setup-1.0.2.exe
+INSTALLER_SIZE_MB=116.135466
 ```

@@ -16,6 +16,9 @@ if ($Windows11Acceptance) {
   if (!$env:SHARKAI_WINDOWS_TEST_ORIGIN -or !$env:SHARKAI_WINDOWS_TEST_EMAIL -or !$env:SHARKAI_WINDOWS_TEST_PASSWORD) {
     throw 'An authorized staging server and existing ULTRA test credentials are required for client acceptance.'
   }
+  if ($env:SHARKAI_WINDOWS_TEST_COMMIT -cnotmatch '^[0-9a-f]{40}$') {
+    throw 'Set SHARKAI_WINDOWS_TEST_COMMIT to the 40-character lowercase SHA of the staged candidate.'
+  }
 }
 
 $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
@@ -24,7 +27,9 @@ $target = Join-Path $env:LOCALAPPDATA 'Programs\SharkAI Windows Smoke'
 $executable = Join-Path $target 'SharkAI.exe'
 $uninstaller = Join-Path $target 'Uninstall SharkAI.exe'
 $runnerTemp = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
-$previous = Join-Path $runnerTemp 'SharkAI-Setup-1.0.0.exe'
+$legacyVersion = if ($Windows11Acceptance) { '1.0.1' } else { '1.0.0' }
+$legacyFilename = "SharkAI-Setup-$legacyVersion.exe"
+$previous = if ($Windows11Acceptance) { (Resolve-Path "release/legacy/$legacyFilename").Path } else { Join-Path $runnerTemp $legacyFilename }
 $state = Join-Path $runnerTemp "SharkAI-windows-session-$([Guid]::NewGuid()).json"
 $shortcut = Join-Path ([Environment]::GetFolderPath('Programs')) 'SharkAI.lnk'
 $desktopShortcut = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'SharkAI.lnk'
@@ -33,14 +38,24 @@ $marker = Join-Path $profile 'upgrade-smoke-marker.txt'
 $registry = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\*'
 $setupHash = (Get-FileHash -Algorithm SHA256 $installer).Hash.ToLowerInvariant()
 $setupBytes = (Get-Item $installer).Length
+$sourceCommit = git rev-parse HEAD
+if ($LASTEXITCODE -ne 0 -or $sourceCommit -cnotmatch '^[0-9a-f]{40}$') { throw 'The Windows test checkout must identify an exact source commit.' }
 $signature = Get-AuthenticodeSignature -FilePath $installer
 if ($signature.Status.ToString() -notin @('Valid', 'NotSigned')) {
   throw "The installer Authenticode check failed with $($signature.Status)."
 }
 if ($Windows11Acceptance) {
   $build = Get-Content release/windows-installer.json -Raw | ConvertFrom-Json
-  if ($build.sha256 -ne $setupHash -or $build.sizeBytes -ne $setupBytes -or $build.version -ne $version) {
+  if ($build.sha256 -ne $setupHash -or $build.sizeBytes -ne $setupBytes -or $build.version -ne $version -or
+      $build.sourceCommit -cne $sourceCommit -or $sourceCommit -cne $env:SHARKAI_WINDOWS_TEST_COMMIT) {
     throw 'The downloaded installer does not match the Windows build metadata.'
+  }
+  $baseline = Get-Content release/legacy/windows-baseline.json -Raw | ConvertFrom-Json
+  if ($baseline.sourceCommit -ne '6a0fa596dc6fe0a59f264993f3be89aeaed6b16a' -or
+      $baseline.filename -ne $legacyFilename -or $baseline.version -ne $legacyVersion -or
+      $baseline.sizeBytes -ne (Get-Item -LiteralPath $previous).Length -or
+      $baseline.sha256 -ne (Get-FileHash -Algorithm SHA256 -LiteralPath $previous).Hash.ToLowerInvariant()) {
+    throw 'The downloaded staging baseline does not match its pinned source and build metadata.'
   }
 }
 
@@ -49,9 +64,19 @@ function Invoke-Setup($Path, $Arguments) {
   if ($process.ExitCode -ne 0) { throw "Setup or uninstall exited with $($process.ExitCode)." }
 }
 
+function Assert-NoAppProcesses {
+  for ($attempt = 0; $attempt -lt 20; $attempt++) {
+    $remaining = Get-CimInstance Win32_Process -Filter "Name = 'SharkAI.exe'" | Where-Object { $_.ExecutablePath -eq $executable }
+    if (!$remaining) { return }
+    Start-Sleep -Milliseconds 250
+  }
+  throw 'SharkAI still has installed application processes after closing.'
+}
+
 function Invoke-Desktop($Mode) {
   node scripts/test-windows-desktop.cjs $executable $Mode $state
   if ($LASTEXITCODE -ne 0) { throw "Installed application check failed in $Mode mode." }
+  Assert-NoAppProcesses
 }
 
 function Get-Registration {
@@ -60,14 +85,34 @@ function Get-Registration {
   }
 }
 
-function Assert-Installed {
+function Assert-Installed($ExpectedVersion) {
   if (!(Test-Path $executable) -or !(Test-Path $uninstaller)) { throw 'Setup did not preserve the installation path containing spaces.' }
   $registered = Get-Registration
-  if ($registered.DisplayVersion -ne $version) { throw 'The expected per-user Windows uninstall registration is missing.' }
+  if ($registered.DisplayVersion -ne $ExpectedVersion) { throw 'The expected per-user Windows uninstall registration is missing.' }
   $comShell = New-Object -ComObject WScript.Shell
   foreach ($link in @($shortcut, $desktopShortcut)) {
     if (!(Test-Path $link) -or $comShell.CreateShortcut($link).TargetPath -ne $executable) { throw 'A required Start Menu or desktop shortcut target is missing.' }
   }
+}
+
+function Assert-StartsFromShortcut {
+  $client = Start-Process -FilePath $shortcut -PassThru
+  if (!$client) { throw 'Windows did not start a process from the installed Start Menu shortcut.' }
+  try {
+    for ($attempt = 0; $attempt -lt 40; $attempt++) {
+      $client.Refresh()
+      if ($client.HasExited) { throw 'SharkAI exited before opening a window from the Start Menu shortcut.' }
+      if ($client.Path -eq $executable -and $client.MainWindowHandle -ne [IntPtr]::Zero -and $client.MainWindowTitle -like '*SharkAI*') { break }
+      Start-Sleep -Milliseconds 500
+    }
+    if ($attempt -ge 40) { throw 'The Start Menu shortcut did not open the installed SharkAI window.' }
+    if (!$client.CloseMainWindow() -or !$client.WaitForExit(10000) -or $client.ExitCode -ne 0) {
+      throw 'The SharkAI window opened from Start Menu did not close cleanly.'
+    }
+  } finally {
+    if (!$client.HasExited -and $client.Path -eq $executable) { Stop-Process -Id $client.Id -Force }
+  }
+  Assert-NoAppProcesses
 }
 
 function Assert-Uninstalled {
@@ -81,34 +126,49 @@ if ((Test-Path $target) -or (Test-Path $shortcut) -or (Test-Path $desktopShortcu
   throw 'Use a clean disposable Windows machine with no installed SharkAI or SharkAI profile.'
 }
 
-Invoke-WebRequest 'https://github.com/miroslavkunev7-design/SharkAI/releases/download/v1.0.0/SharkAI-Setup-1.0.0.exe' -OutFile $previous
-if ((Get-FileHash -Algorithm SHA256 $previous).Hash.ToLowerInvariant() -ne '58de24e43683ec80781cbb7ac664b9f06fea8353c770cb68288e68dabb4b8150') {
-  throw 'The previous version does not match the repository release asset.'
+if (!$Windows11Acceptance) {
+  Invoke-WebRequest 'https://github.com/miroslavkunev7-design/SharkAI/releases/download/v1.0.0/SharkAI-Setup-1.0.0.exe' -OutFile $previous
+  if ((Get-FileHash -Algorithm SHA256 $previous).Hash.ToLowerInvariant() -ne '58de24e43683ec80781cbb7ac664b9f06fea8353c770cb68288e68dabb4b8150') {
+    throw 'The previous version does not match the repository release asset.'
+  }
 }
 
 try {
-  Invoke-Setup $installer "/S /currentuser /D=$target"
-  Assert-Installed
-  Invoke-Desktop 'offline'
   if ($Windows11Acceptance) {
-    Invoke-Desktop 'online-new'
+    Invoke-Setup $previous "/S /currentuser /D=$target"
+    Assert-Installed $legacyVersion
+    Invoke-Desktop 'online-seed'
     Invoke-Desktop 'online-resume'
+  } else {
+    Invoke-Setup $installer "/S /currentuser /D=$target"
+    Assert-Installed $version
+    Invoke-Desktop 'offline'
   }
   New-Item -ItemType Directory -Force -Path $profile | Out-Null
   Set-Content -LiteralPath $marker -Value 'retained'
-  Invoke-Setup $uninstaller '/S /currentuser'
-  Assert-Uninstalled
 
-  Invoke-Setup $previous "/S /D=$target"
-  if (!(Test-Path $executable)) { throw 'Previous version did not install.' }
+  if (!$Windows11Acceptance) {
+    Invoke-Setup $uninstaller '/S /currentuser'
+    Assert-Uninstalled
+    Invoke-Setup $previous "/S /D=$target"
+    if (!(Test-Path $executable)) { throw 'Previous version did not install.' }
+  }
+
   Invoke-Setup $installer '/S /currentuser'
-  Assert-Installed
+  Assert-Installed $version
   if ((Get-Content -LiteralPath $marker -Raw).Trim() -ne 'retained') { throw 'Upgrade discarded the existing profile.' }
-  if ($Windows11Acceptance) { Invoke-Desktop 'online-resume' } else { Invoke-Desktop 'offline' }
+  Invoke-Desktop 'offline'
+  if ($Windows11Acceptance) {
+    Assert-StartsFromShortcut
+    Invoke-Desktop 'online-recover'
+    Invoke-Desktop 'online-resume'
+  }
   Invoke-Setup $uninstaller '/S /currentuser'
   Assert-Uninstalled
 } finally {
-  foreach ($file in @($marker, $state, $previous)) {
+  $temporaryFiles = @($marker, $state)
+  if (!$Windows11Acceptance) { $temporaryFiles += $previous }
+  foreach ($file in $temporaryFiles) {
     if (Test-Path $file) { Remove-Item -LiteralPath $file }
   }
 }
@@ -117,21 +177,26 @@ $report = if ($Windows11Acceptance) { 'release/windows-client-acceptance.json' }
 [ordered]@{
   filename = [IO.Path]::GetFileName($installer)
   version = $version
+  sourceCommit = $sourceCommit
   sizeBytes = $setupBytes
   sha256 = $setupHash
   signature = $signature.Status.ToString()
   os = $system.Caption
   osBuild = $system.BuildNumber
   architecture = 'x64'
-  freshSetup = 'automated per-user setup'
+  freshSetup = if ($Windows11Acceptance) { 'automated per-user setup of the staging baseline' } else { 'automated per-user setup of the candidate' }
   offlineStartup = 'passed'
   restartAndOccupiedPort = 'passed'
-  previousVersion = '1.0.0'
+  previousVersion = $legacyVersion
+  previousInstallerSha256 = if ($Windows11Acceptance) { $baseline.sha256 } else { '58de24e43683ec80781cbb7ac664b9f06fea8353c770cb68288e68dabb4b8150' }
+  previousSourceCommit = if ($Windows11Acceptance) { $baseline.sourceCommit } else { $null }
   upgradeAndProfile = 'passed'
   uninstall = 'passed'
   standardWindows11Account = if ($Windows11Acceptance) { 'verified' } else { 'not checked' }
   stagedUltraLogin = if ($Windows11Acceptance) { 'passed' } else { 'not checked' }
   realChatAndRestart = if ($Windows11Acceptance) { 'passed' } else { 'not checked' }
-  stagedSessionAfterInstallUpgrade = if ($Windows11Acceptance) { 'passed' } else { 'not checked' }
+  stagedSessionHistoryAndChatModeAfterDirectUpgrade = if ($Windows11Acceptance) { 'passed' } else { 'not checked' }
+  startMenuLaunch = if ($Windows11Acceptance) { 'passed' } else { 'shortcut target checked' }
+  offlineRetryRecovery = if ($Windows11Acceptance) { 'passed' } else { 'offline view checked' }
   interactiveWizard = 'awaiting manual verification'
 } | ConvertTo-Json | Tee-Object -FilePath $report

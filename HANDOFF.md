@@ -1,4 +1,6 @@
-# SharkAI — Handoff (актуален)
+# SharkAI — архив на локалното предаване
+
+Актуалните стъпки за работния клон, съществуващата база и Windows пакета са в [README](README.md) и [приемателния отчет](docs/SHARKAI_ACCEPTANCE_BG.md). Описаният по-долу локален статус е от 14 юни 2026 г.
 
 **Дата:** 2026-06-14  
 **Проект:** `c:\Users\milena\mm-auto`  
@@ -17,7 +19,7 @@
 | Test suite UI + pipeline graph | ✓ |
 | Windows installer + Desktop shortcut | ✓ |
 | Download страница + SEO + sitemap | ✓ |
-| Admin: `mkunev77@abv.bg` | ✓ |
+| Администраторски достъп | ✓ |
 
 ---
 
@@ -61,16 +63,16 @@ vercel --prod
 NEXT_PUBLIC_APP_URL=https://твоят-домейн.com
 JWT_SECRET=...
 DATABASE_URL=postgresql://...   # SQLite НЕ работи на Vercel
-ADMIN_EMAIL=mkunev77@abv.bg
+ADMIN_EMAIL=<existing-admin-email>
 ADMIN_PASSWORD=...
-INSTALLER_DOWNLOAD_URL=https://github.com/.../releases/download/.../SharkAI-Setup.exe
-INSTALLER_SIZE_MB=120
+INSTALLER_DOWNLOAD_URL=https://downloads.example.com/SharkAI-Setup-1.0.2.exe
+INSTALLER_SIZE_MB=116.135466
 ```
 
 ### Стъпка 3 — Installer
 - Локално: `npm run electron:build` → `release/SharkAI-Setup-*.exe`
 - Качи .exe на **GitHub Releases** или Cloudinary Blob
-- Задай `INSTALLER_DOWNLOAD_URL` в Vercel
+- Във Vercel замени примерния хост в `INSTALLER_DOWNLOAD_URL` с действителния HTTPS адрес на публикувания файл. Името за версия 1.0.2 е `SharkAI-Setup-1.0.2.exe`.
 
 ### Стъпка 4 — Домейн + Google
 1. Свържи домейн в Vercel

@@ -15,7 +15,7 @@ export function getActiveBillingPeriod(userId: string, now = new Date()) {
         { OR: [{ currentPeriodEnd: null }, { currentPeriodEnd: { gt: now } }] },
       ],
     },
-    orderBy: [{ plan: 'desc' }, { currentPeriodEnd: { sort: 'desc', nulls: 'last' } }],
+    orderBy: [{ plan: 'desc' }, { currentPeriodEnd: { sort: 'desc', nulls: 'last' } }, { currentPeriodStart: { sort: 'desc', nulls: 'last' } }],
     select: { plan: true, currentPeriodStart: true, currentPeriodEnd: true },
   });
 }

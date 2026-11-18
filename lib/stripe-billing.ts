@@ -38,10 +38,10 @@ async function findSubscriber(stripe: Stripe, subscriptionId: string, customerId
   return stripeId(session?.customer) === customerId ? session.metadata?.userId : null;
 }
 
-export async function recordStripeInvoice(stripe: Stripe, invoice: Stripe.Invoice, revoked = false) {
+export async function paidStripeInvoicePeriod(stripe: Stripe, invoice: Stripe.Invoice) {
   const subscriptionId = stripeId(invoice.subscription);
   const customerId = stripeId(invoice.customer);
-  if (!invoice.id || !subscriptionId || !customerId || !invoice.paid || invoice.paid_out_of_band || invoice.amount_paid <= 0) return;
+  if (!invoice.id || !subscriptionId || !customerId || !invoice.paid || invoice.paid_out_of_band || invoice.amount_paid <= 0) return null;
 
   const lines = invoice.lines.has_more
     ? await stripe.invoices.listLineItems(invoice.id).autoPagingToArray({ limit: 100 })
@@ -50,16 +50,20 @@ export async function recordStripeInvoice(stripe: Stripe, invoice: Stripe.Invoic
     if (!line.price || line.proration || line.type !== 'subscription' || line.amount <= 0
       || line.period.end <= line.period.start || !isMonthlyPrice(line.price)) return [];
     const plans = (['ULTRA', 'PRO'] as const).filter((item) => stripePriceId(item) === line.price?.id);
-    return plans.length === 1 ? [{ plan: plans[0], start: line.period.start, end: line.period.end }] : [];
+    return plans.length === 1 ? [{ plan: plans[0], start: line.period.start, end: line.period.end, usage: line.price.recurring?.usage_type }] : [];
   });
-  if (periods.length !== 1) return;
+  return periods.length === 1 ? { period: periods[0], subscriptionId, customerId } : null;
+}
 
+export async function recordStripeInvoice(stripe: Stripe, invoice: Stripe.Invoice, revoked = false) {
+  const paid = await paidStripeInvoicePeriod(stripe, invoice);
+  if (!paid) return;
+  const { period, subscriptionId, customerId } = paid;
   const userId = await findSubscriber(stripe, subscriptionId, customerId);
   if (!userId) return;
   const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true, stripeId: true } });
   if (!user || user.role === 'ADMIN' || (user.stripeId && user.stripeId !== customerId)) return;
 
-  const period = periods[0];
   const periodId = `stripe-invoice:${invoice.id}`;
   await prisma.subscription.upsert({
     where: { id: periodId },

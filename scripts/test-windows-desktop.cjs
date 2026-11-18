@@ -2,7 +2,8 @@ const assert = require('node:assert/strict');
 const { spawn } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const { readFile, writeFile } = require('node:fs/promises');
-const { createServer } = require('node:net');
+const { createServer: createHTTPServer } = require('node:http');
+const { createConnection, createServer } = require('node:net');
 const { once } = require('node:events');
 const { setTimeout: delay } = require('node:timers/promises');
 const { version } = require('../package.json');
@@ -90,13 +91,14 @@ async function enterText(page, selector, value) {
   await page.send('Input.insertText', { text: value });
 }
 
-async function openAndClose(executable, mode, check, origin) {
+async function openAndClose(executable, mode, check, origin, restoreProxy) {
   const reserved = await listen(0);
   const port = reserved.address().port;
   await new Promise((resolve) => reserved.close(resolve));
   const debuggerURL = `http://127.0.0.1:${port}`;
   const args = [`--remote-debugging-port=${port}`];
-  if (mode === 'offline') args.push('--proxy-server=http://127.0.0.1:9');
+  const offline = mode === 'offline' || mode === 'online-recover';
+  if (offline) args.push(`--proxy-server=${restoreProxy || 'http://127.0.0.1:9'}`, '--proxy-bypass-list=<-loopback>');
   const child = spawn(executable, args, { stdio: 'ignore' });
   const exited = once(child, 'exit').catch(() => [null]);
   let browser;
@@ -111,12 +113,13 @@ async function openAndClose(executable, mode, check, origin) {
       ]);
       const tab = tabs.find((item) => {
         if (item.type !== 'page') return false;
-        if (mode === 'offline') return item.title === 'SharkAI — Няма връзка' && item.url.includes('/offline.html');
+        if (offline) return item.title === 'SharkAI — Няма връзка' && item.url.includes('/offline.html');
+        if (!URL.canParse(item.url)) return false;
         const url = new URL(item.url);
         return url.origin === origin && ['/chat', '/login'].includes(url.pathname);
       });
       return tab?.webSocketDebuggerUrl && info?.webSocketDebuggerUrl ? { tab, info } : null;
-    }, mode === 'offline' ? 'The bundled SharkAI offline page did not load.' : 'The installed app did not open the approved SharkAI staging chat.');
+    }, offline ? 'The bundled SharkAI offline page did not load.' : 'The installed app did not open the approved SharkAI staging chat.');
     browser = await connect(info.webSocketDebuggerUrl);
     page = await connect(tab.webSocketDebuggerUrl);
     await check(page);
@@ -159,6 +162,50 @@ function approvedOrigin() {
   return url.origin;
 }
 
+async function recoveryProxy(origin) {
+  const destination = new URL(origin);
+  const port = Number(destination.port || 443);
+  const authority = `${destination.hostname}:${port}`;
+  const hostname = destination.hostname.replace(/^\[|\]$/g, '');
+  const sockets = new Set();
+  let open = false;
+  const server = createHTTPServer((_request, response) => response.writeHead(403).end());
+
+  function track(socket) {
+    sockets.add(socket);
+    socket.on('error', () => socket.destroy());
+    socket.once('close', () => sockets.delete(socket));
+  }
+
+  server.on('connection', track);
+  server.on('connect', (request, client, firstBytes) => {
+    if (!open || request.url !== authority) {
+      client.end('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
+      return;
+    }
+    const upstream = createConnection({ host: hostname, port });
+    track(upstream);
+    upstream.setTimeout(30_000, () => upstream.destroy());
+    client.once('close', () => upstream.destroy());
+    upstream.once('close', () => client.destroy());
+    upstream.once('connect', () => {
+      client.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+      if (firstBytes.length) upstream.write(firstBytes);
+      client.pipe(upstream).pipe(client);
+    });
+  });
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  return {
+    url: `http://127.0.0.1:${server.address().port}`,
+    restore() { open = true; },
+    async close() {
+      for (const socket of sockets) socket.destroy();
+      await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    },
+  };
+}
+
 const sessionExpression = `(async () => {
   const response = await fetch('/api/chat', { cache: 'no-store' });
   if (!response.ok) return null;
@@ -177,14 +224,55 @@ function assertSession(account) {
   assert.ok(account?.plan === 'ULTRA' && account.email === process.env.SHARKAI_WINDOWS_TEST_EMAIL, 'Staging session does not belong to the supplied ULTRA test account.');
 }
 
+async function sessionHash(page, origin) {
+  const result = await page.send('Network.getCookies', { urls: [origin + '/chat'] });
+  const cookie = result.cookies.find(({ name, httpOnly, secure }) => name === 'sharkai_token' && httpOnly && secure);
+  assert.ok(cookie?.value, 'A secure SharkAI authentication cookie was not saved in the desktop profile.');
+  return digest(cookie.value);
+}
+
+async function assertStagedRevision(page, origin) {
+  const commit = process.env.SHARKAI_WINDOWS_TEST_COMMIT;
+  assert.ok(/^[0-9a-f]{40}$/.test(commit || ''), 'Supply the lowercase 40-character revision of the staged Web application.');
+  await waitExpression(page, `location.origin === ${JSON.stringify(origin)} && ['/chat', '/login'].includes(location.pathname) && document.readyState === 'complete'`, 'The approved staging page did not finish loading.');
+  const activeVersion = await evaluate(page, `fetch('/api/status', {cache:'no-store'}).then(r => r.ok ? r.json() : null)`);
+  assert.ok(activeVersion?.ok && activeVersion.version === version && activeVersion.commit === commit,
+    'Staging does not serve the exact candidate version and revision under test.');
+}
+
+async function openSavedChat(page, origin, state) {
+  assertSession(await evaluate(page, sessionExpression));
+  assert.equal(await sessionHash(page, origin), state.sessionHash, 'The authenticated desktop session cookie changed.');
+  const snapshot = await conversation(page, state.id);
+  assert.ok(snapshot?.conversationMode === 'work', 'The saved conversation or its Work mode preference did not survive.');
+  assert.ok(snapshot.messages.at(-2)?.content === prompt, 'The saved user message changed.');
+  const answer = snapshot.messages.at(-1);
+  assert.ok(answer?.role === 'assistant' && digest(answer.content) === state.answerHash, 'The saved Chat reply changed.');
+  await evaluate(page, `location.assign('/chat?conversationId=' + encodeURIComponent(${JSON.stringify(state.id)}))`);
+  await waitExpression(page, `document.querySelector('.shark-chat-workspace')?.dataset.mode === 'work' &&
+    Array.from(document.querySelectorAll('.shark-chat-message-assistant .shark-chat-message-text')).at(-1)?.textContent === ${JSON.stringify(answer.content)}`,
+  'The desktop did not display the same reply and saved Work mode.');
+}
+
 async function online(executable, mode, statePath) {
   assert.ok(statePath && process.env.SHARKAI_WINDOWS_TEST_EMAIL, 'Authorized staging test account and temporary state path are required.');
   const origin = approvedOrigin();
-  await openAndClose(executable, mode, async (page) => {
-    await waitExpression(page, `location.origin === ${JSON.stringify(origin)} && ['/chat', '/login'].includes(location.pathname) && document.readyState === 'complete'`, 'The approved staging page did not finish loading.');
-    const activeVersion = await evaluate(page, `fetch('/api/status', {cache:'no-store'}).then(r => r.ok ? r.json() : null)`);
-    assert.ok(activeVersion?.ok && activeVersion.version === version, 'Staging does not serve the installed SharkAI version.');
-    if (mode === 'online-new') {
+  const proxy = mode === 'online-recover' ? await recoveryProxy(origin) : null;
+  try {
+    await openAndClose(executable, mode, async (page) => {
+      if (proxy) {
+        const retryURL = JSON.stringify(new URL('/chat', origin).href);
+        await waitExpression(page, `document.querySelector('#retry')?.href === ${retryURL}`, 'The offline screen did not offer a Retry link to the approved staging chat.');
+        proxy.restore();
+        await evaluate(page, `document.querySelector('#retry').click()`);
+      }
+      await assertStagedRevision(page, origin);
+      if (mode !== 'online-seed') {
+        await openSavedChat(page, origin, JSON.parse(await readFile(statePath, 'utf8')));
+        console.log(proxy ? 'Retry restored the connection and opened the saved ULTRA Chat.' : 'The desktop kept the existing ULTRA session, Work mode and Chat reply.');
+        return;
+      }
+
       const password = process.env.SHARKAI_WINDOWS_TEST_PASSWORD;
       assert.ok(password, 'Authorized staging test password is required.');
       assert.equal(await evaluate(page, sessionExpression), null, 'A clean Windows installation was already signed in.');
@@ -209,23 +297,23 @@ async function online(executable, mode, statePath) {
       const answer = state.messages.at(-1);
       assert.match(answer.content, /sofia|софия/iu, 'Assistant answer did not contain the expected result.');
       assert.equal(answer.toolResult, null, 'The smoke request unexpectedly used a tool.');
-      await writeFile(statePath, JSON.stringify({ id, answerHash: digest(answer.content) }), { mode: 0o600 });
-      console.log('Installed client login form, server ULTRA entitlement and real Chat reply passed.');
-    } else {
-      assertSession(await evaluate(page, sessionExpression));
-      const { id, answerHash } = JSON.parse(await readFile(statePath, 'utf8'));
-      const state = await conversation(page, id);
-      assert.ok(state, 'The saved Chat conversation did not reopen.');
-      assert.equal(digest(state.messages.at(-1).content), answerHash, 'Saved Chat reply changed.');
-      console.log('The installed client retained its ULTRA session and saved Chat reply.');
-    }
-  }, origin);
+      const modeButton = `Array.from(document.querySelectorAll('.shark-chat-mode-switch button')).find(button => button.textContent.trim() === 'Работа')`;
+      await waitExpression(page, `${modeButton}?.disabled === false`, 'The Work mode control was unavailable.');
+      await evaluate(page, `${modeButton}.click()`);
+      await until(async () => (await conversation(page, id))?.conversationMode === 'work', 'Work mode was not saved for the test conversation.');
+      const existingSession = await sessionHash(page, origin);
+      await writeFile(statePath, JSON.stringify({ id, answerHash: digest(answer.content), sessionHash: existingSession }), { mode: 0o600 });
+      console.log('The staged baseline signed in, validated server ULTRA entitlement, saved a real Chat reply and switched that conversation to Work mode.');
+    }, origin, proxy?.url);
+  } finally {
+    await proxy?.close();
+  }
 }
 
 const [executable, mode = 'offline', statePath] = process.argv.slice(2);
 (async () => {
   assert.ok(executable, 'Supply the executable installed by the NSIS setup.');
-  assert.ok(['offline', 'online-new', 'online-resume'].includes(mode), 'Unknown Windows test mode.');
+  assert.ok(['offline', 'online-seed', 'online-resume', 'online-recover'].includes(mode), 'Unknown Windows test mode.');
   if (mode === 'offline') await offline(executable);
   else await online(executable, mode, statePath);
 })().catch((error) => {

@@ -19,9 +19,11 @@ permissions:
 jobs:
   windows-x64:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -56,6 +58,19 @@ jobs:
             release/SharkAI-Setup-*.exe
             release/windows-installer.json
           if-no-files-found: error
+      - name: Build the previous 1.0.1 desktop client for the same staging origin
+        if: inputs.run_windows_11_acceptance
+        shell: pwsh
+        env:
+          SHARKAI_WINDOWS_TEST_ORIGIN: ${{ vars.SHARKAI_WINDOWS_TEST_ORIGIN }}
+        run: ./scripts/windows-build-baseline.ps1
+      - name: Upload the staging baseline and its provenance
+        if: inputs.run_windows_11_acceptance
+        uses: actions/upload-artifact@v4
+        with:
+          name: SharkAI-windows-staging-baseline
+          path: release/legacy/
+          if-no-files-found: error
 
   windows-11-acceptance:
     if: github.event_name == 'workflow_dispatch' && inputs.run_windows_11_acceptance
@@ -72,11 +87,17 @@ jobs:
         with:
           name: SharkAI-windows-x64
           path: release
-      - name: Verify Windows 11 install, existing ULTRA test account, real chat and reuse after upgrade
+      - name: Download the verified 1.0.1 staging baseline
+        uses: actions/download-artifact@v4
+        with:
+          name: SharkAI-windows-staging-baseline
+          path: release/legacy
+      - name: Create an Ultra session in 1.0.1 and verify it after upgrading
         shell: pwsh
         run: ./scripts/test-windows-installer.ps1 -Windows11Acceptance
         env:
           SHARKAI_WINDOWS_TEST_ORIGIN: ${{ vars.SHARKAI_WINDOWS_TEST_ORIGIN }}
+          SHARKAI_WINDOWS_TEST_COMMIT: ${{ github.sha }}
           SHARKAI_WINDOWS_TEST_EMAIL: ${{ secrets.SHARKAI_WINDOWS_TEST_EMAIL }}
           SHARKAI_WINDOWS_TEST_PASSWORD: ${{ secrets.SHARKAI_WINDOWS_TEST_PASSWORD }}
       - name: Upload Windows 11 acceptance metadata

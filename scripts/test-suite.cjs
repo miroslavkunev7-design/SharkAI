@@ -65,7 +65,9 @@ const checks = {
     assert.ok(agents.includes('agent-'), 'Agent registry is missing');
   },
   'api-status': async () => {
-    assert.equal((await json('/api/status')).ok, true);
+    const status = await json('/api/status');
+    assert.equal(status.ok, true);
+    if (process.env.SHARKAI_TEST_COMMIT) assert.equal(status.commit, process.env.SHARKAI_TEST_COMMIT);
   },
   'api-chat-private': async () => {
     const history = await json('/api/chat');
