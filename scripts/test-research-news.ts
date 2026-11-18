@@ -58,7 +58,11 @@ async function live() {
     email: `public-news-${randomUUID()}@example.test`, passwordHash: 'fixture', tokensLimit: 0,
   } });
   try {
+    const saveReceipt = (job: { id: string; requestId: string }) => prisma.chatMessage.create({ data: {
+      userId: account.id, requestId: job.requestId, role: 'assistant', content: 'Research fixture', toolResult: { researchId: job.id },
+    } });
     const job = await prisma.researchJob.create({ data: { id: randomUUID(), userId: account.id, requestId: randomUUID(), topic } });
+    await saveReceipt(job);
     const noHosted = async () => { throw new Error('A public-news test must not call a paid provider.'); };
     await executeResearchJob(job.id, account.id, noHosted);
     const stored = await prisma.researchJob.findUniqueOrThrow({ where: { id: job.id } });
@@ -82,6 +86,7 @@ async function live() {
       id: randomUUID(), userId: account.id, requestId: randomUUID(), topic, stage: 2, status: 'RUNNING',
       evidence: stored.evidence as Prisma.InputJsonValue, leaseUntil: new Date(Date.now() - 1000),
     } });
+    await saveReceipt(checkpoint);
     await executeResearchJob(checkpoint.id, account.id, noHosted);
     const recovered = await prisma.researchJob.findUniqueOrThrow({ where: { id: checkpoint.id } });
     assert.equal(recovered.status, 'COMPLETED');

@@ -123,39 +123,47 @@ async function run() {
   await citation('Покажи източник 1 от предишния доклад', b.cookie, 404);
   await citation('Покажи източник 1 от предишния доклад', a.cookie, 400, randomUUID());
 
-  const pendingConversation = randomUUID();
   const pendingId = randomUUID();
-  await prisma.$transaction([
-    prisma.chatConversation.create({ data: { id: pendingConversation, userId: a.id, title: 'Доклад в подготовка' } }),
-    prisma.researchJob.create({ data: {
-      id: pendingId, userId: a.id, requestId: randomUUID(), topic: 'marine heatwave',
-      status: 'RUNNING', leaseUntil: new Date(Date.now() + 30_000),
-    } }),
-    prisma.chatMessage.create({ data: {
-      userId: a.id, conversationId: pendingConversation, role: 'assistant', content: 'Задачата за проучване е записана.',
-      toolResult: { toolId: 'deep-research', researchId: pendingId },
-    } }),
-  ]);
+  async function seedCommittedResearch(jobData) {
+    const conversationId = randomUUID();
+    const requestId = randomUUID();
+    const now = Date.now();
+    await prisma.$transaction([
+      prisma.chatConversation.create({ data: { id: conversationId, userId: a.id, title: 'Доклад за проверка' } }),
+      prisma.researchJob.create({ data: { ...jobData, userId: a.id, requestId } }),
+      prisma.chatMessage.createMany({ data: [
+        { userId: a.id, conversationId, requestId, role: 'user', content: `Deep research: ${jobData.topic}`, createdAt: new Date(now) },
+        { userId: a.id, conversationId, requestId, role: 'assistant', content: 'Задачата за проучване е записана.',
+          createdAt: new Date(now + 1), toolResult: { id: jobData.id, toolId: 'deep-research', researchId: jobData.id,
+            label: 'Задълбочено проучване', status: 'started' } },
+      ] }),
+    ]);
+    return conversationId;
+  }
+
+  const pendingConversation = await seedCommittedResearch({
+    id: pendingId, topic: 'marine heatwave', status: 'RUNNING', leaseUntil: new Date(Date.now() + 30_000),
+  });
   assert.match(await reportExport('Запази Markdown с предишния отговор', pendingConversation, a.cookie, 409), /още се подготвя/u);
   await prisma.researchJob.update({ where: { id: pendingId }, data: { status: 'FAILED' } });
   assert.match(await reportExport('Запази предишния доклад като Markdown', pendingConversation, a.cookie, 409), /Повтори проучването/u);
 
   const liveRecord = await prisma.researchJob.findUniqueOrThrow({ where: { id: researchId } });
   const interruptedId = randomUUID();
-  await prisma.researchJob.create({ data: {
-    id: interruptedId, userId: a.id, requestId: randomUUID(), topic: liveRecord.topic,
+  await seedCommittedResearch({
+    id: interruptedId, topic: liveRecord.topic,
     status: 'RUNNING', stage: 3, evidence: liveRecord.evidence, leaseUntil: new Date(Date.now() - 1000),
-  } });
+  });
   const recovered = await waitForJob(`/api/chat/research/${interruptedId}`, a.cookie);
   assert.equal(recovered.job.status, 'COMPLETED', recovered.job.error);
   assert.equal(recovered.stages[0], 3);
   assert.deepEqual(recovered.job.sources, job.sources);
 
   const cancelledId = randomUUID();
-  await prisma.researchJob.create({ data: {
-    id: cancelledId, userId: a.id, requestId: randomUUID(), topic: liveRecord.topic,
+  await seedCommittedResearch({
+    id: cancelledId, topic: liveRecord.topic,
     status: 'RUNNING', stage: 2, evidence: liveRecord.evidence, leaseUntil: new Date(Date.now() + 30_000),
-  } });
+  });
   const cancelledPath = `/api/chat/research/${cancelledId}`;
   assert.equal((await call(cancelledPath, a.cookie, 'PATCH', { action: 'cancel' })).job.status, 'CANCELLED');
   assert.equal((await call(cancelledPath, a.cookie)).job.downloadUrl, null);

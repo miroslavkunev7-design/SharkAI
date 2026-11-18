@@ -15,9 +15,12 @@ const topic = 'marine heatwave';
 async function run() {
   const account = await prisma.user.create({ data: { email: `hosted-research-${randomUUID()}@example.test`, passwordHash: 'fixture', tokensLimit: 5000 } });
   try {
-    const makeJob = (extra: Partial<Prisma.ResearchJobUncheckedCreateInput> = {}) => prisma.researchJob.create({ data: {
-      id: randomUUID(), userId: account.id, requestId: randomUUID(), topic, ...extra,
-    } });
+    const makeJob = async (extra: Partial<Prisma.ResearchJobUncheckedCreateInput> = {}) => {
+      const job = await prisma.researchJob.create({ data: { id: randomUUID(), userId: account.id, requestId: randomUUID(), topic, ...extra } });
+      await prisma.chatMessage.create({ data: { userId: job.userId, requestId: job.requestId,
+        role: 'assistant', content: 'Research fixture', toolResult: { researchId: job.id } } });
+      return job;
+    };
     const finished = await makeJob();
     let searches = 0;
     let wireFailure: unknown;

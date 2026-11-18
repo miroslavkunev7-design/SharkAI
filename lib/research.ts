@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { getAccountSession } from './auth';
 import { remainingChatTokens } from './ai/workspace-chat';
 import { prisma } from './db';
+import { jobAttemptId, sameJobAttempt } from './job-attempt';
 import { getHostedOpenAI, HostedWebSearchError, runHostedWebSearch, type HostedOpenAI, type HostedWebSearchResult } from './hosted-web-search';
 import { describeNewsPeriod, isInNewsPeriod, requestedNewsPeriod, searchNews, wantsNewsCoverage, type NewsHit, type NewsPeriod } from './research-news';
 import {
@@ -14,6 +15,7 @@ import { synthesizeResearch, type ResearchFinding } from './research-synthesis';
 
 const TOTAL_STAGES = 4;
 const LEASE_TIME = 35_000;
+const CANCEL_CHECK_MS = 2_000;
 const running = new Map<string, AbortController>();
 const stageLabels = [
   'Търсене в Wikipedia', 'Търсене на публикации в Crossref', 'Извличане на текст от източниците', 'Подготовка на отчета', 'Отчетът е готов',
@@ -152,17 +154,34 @@ function reportMarkdown(topic: string, evidence: Evidence, warnings: string[], f
   return lines.join('\n');
 }
 
+function canRun(job: ResearchJob, now = new Date()) {
+  return job.status === 'QUEUED' || (job.status === 'RUNNING' && !!job.leaseUntil && job.leaseUntil <= now);
+}
+
 export async function executeResearchJob(jobId: string, userId: string, resolveHosted: ResolveHostedSearch = getHostedOpenAI) {
+  const candidate = await getResearch(jobId, userId);
+  if (!candidate || !canRun(candidate)) return;
+
   const now = new Date();
-  const runnerId = randomUUID();
+  const attemptId = jobAttemptId(candidate);
+  const runnerId = `${attemptId}:${randomUUID()}`;
   const claim = await prisma.researchJob.updateMany({
-    where: { id: jobId, userId, OR: [{ status: 'QUEUED' }, { status: 'RUNNING', leaseUntil: { lte: now } }] },
+    where: { id: jobId, userId, runnerId: candidate.runnerId, OR: [{ status: 'QUEUED' }, { status: 'RUNNING', leaseUntil: { lte: now } }] },
     data: { status: 'RUNNING', runnerId, leaseUntil: new Date(now.getTime() + LEASE_TIME) },
   });
   if (!claim.count) return;
   const controller = new AbortController();
-  running.set(jobId, controller);
+  running.set(attemptId, controller);
   const where = { id: jobId, userId, runnerId, status: 'RUNNING' as const };
+  let checkingLease = false;
+  const watchCancellation = setInterval(() => {
+    if (checkingLease || controller.signal.aborted) return;
+    checkingLease = true;
+    void prisma.researchJob.count({ where }).then((active) => {
+      if (!active) controller.abort();
+    }).catch(() => {}).finally(() => { checkingLease = false; });
+  }, CANCEL_CHECK_MS);
+  watchCancellation.unref();
   const update = async (data: Prisma.ResearchJobUpdateManyMutationInput) => {
     const previous = await prisma.researchJob.updateMany({ where, data: { leaseUntil: new Date(Date.now() + LEASE_TIME), ...data } });
     return previous.count > 0;
@@ -245,7 +264,7 @@ export async function executeResearchJob(jobId: string, userId: string, resolveH
     if (!sourcesFor(evidence).length) {
       const error = newsPeriod ? `Няма източници или потвърдени новини за периода ${describeNewsPeriod(newsPeriod)}.`
         : 'Няма достъпни източници за темата. Опитай отново или използвай по-точна тема.';
-      await update({ status: 'FAILED', error, evidence: evidenceJson(), runnerId: null, leaseUntil: null });
+      await update({ status: 'FAILED', error, evidence: evidenceJson(), runnerId: attemptId, leaseUntil: null });
       return;
     }
     const synthesis = evidence.web ? { findings: [], tokens: 0 }
@@ -254,7 +273,7 @@ export async function executeResearchJob(jobId: string, userId: string, resolveH
     const report = reportMarkdown(topic, evidence, warnings, synthesis.findings, newsPeriod);
     await prisma.$transaction(async (tx) => {
       const finished = await tx.researchJob.updateMany({
-        where, data: { status: 'COMPLETED', stage: TOTAL_STAGES, report, evidence: evidenceJson(), runnerId: null, leaseUntil: null },
+        where, data: { status: 'COMPLETED', stage: TOTAL_STAGES, report, evidence: evidenceJson(), runnerId: attemptId, leaseUntil: null },
       });
       if (finished.count && synthesis.tokens > 0) {
         await tx.user.update({ where: { id: userId }, data: { tokensUsed: { increment: synthesis.tokens } } });
@@ -262,58 +281,68 @@ export async function executeResearchJob(jobId: string, userId: string, resolveH
     });
   } catch {
     if (!controller.signal.aborted) {
-      await update({ status: 'FAILED', error: 'Проучването бе прекъснато. Можеш да го продължиш с повторен опит.', runnerId: null, leaseUntil: null });
+      await update({ status: 'FAILED', error: 'Проучването бе прекъснато. Можеш да го продължиш с повторен опит.', runnerId: attemptId, leaseUntil: null });
     }
   } finally {
-    if (running.get(jobId) === controller) running.delete(jobId);
+    clearInterval(watchCancellation);
+    if (running.get(attemptId) === controller) running.delete(attemptId);
   }
 }
 
-function resume(job: ResearchJob) {
-  if (job.status !== 'QUEUED' && !(job.status === 'RUNNING' && job.leaseUntil && job.leaseUntil.getTime() <= Date.now())) return;
-  waitUntil(executeResearchJob(job.id, job.userId).catch((error: unknown) => {
+export function kickResearchJob(id: string, userId: string) {
+  waitUntil(executeResearchJob(id, userId).catch((error: unknown) => {
     console.error('Research execution failed:', error instanceof Error ? error.name : 'UnknownError');
   }));
 }
 
-export async function startResearch(userId: string, raw: string, requestId: string) {
+export async function stageResearch(userId: string, raw: string, requestId: string) {
   const topic = getTopic(raw);
   const job = await prisma.researchJob.upsert({
     where: { userId_requestId: { userId, requestId } },
     create: { id: randomUUID(), userId, requestId, topic },
     update: {},
   });
-  resume(job);
+  if (job.topic !== topic) {
+    throw new ResearchInputError('Този идентификатор вече е използван за друга тема на проучване.', 409);
+  }
   return job;
 }
 
-export function getResearch(id: string, userId: string) {
-  return prisma.researchJob.findFirst({ where: { id, userId } });
+export async function getResearch(id: string, userId: string) {
+  const job = await prisma.researchJob.findFirst({ where: { id, userId } });
+  if (!job) return null;
+  const receipt = await prisma.chatMessage.findFirst({
+    where: { userId, requestId: job.requestId, role: 'assistant', toolResult: { path: ['researchId'], equals: id } },
+    select: { id: true },
+  });
+  return receipt ? job : null;
 }
 
 export async function getResearchStatus(id: string, userId: string) {
   const job = await getResearch(id, userId);
   if (!job) throw new ResearchInputError('Проучването не е намерено.', 404);
-  resume(job);
+  if (canRun(job)) kickResearchJob(job.id, job.userId);
   return describeResearch(job);
 }
 
 export async function updateResearch(id: string, userId: string, action: 'cancel' | 'retry') {
   const job = await getResearch(id, userId);
   if (!job) throw new ResearchInputError('Проучването не е намерено.', 404);
-  if (action === 'cancel') {
+  const attemptId = jobAttemptId(job);
+  const attempt = sameJobAttempt(job, attemptId);
+  if (action === 'cancel' && (job.status === 'QUEUED' || job.status === 'RUNNING')) {
     const changed = await prisma.researchJob.updateMany({
-      where: { id, userId, status: { in: ['QUEUED', 'RUNNING'] } },
-      data: { status: 'CANCELLED', runnerId: null, leaseUntil: null },
+      where: { ...attempt, status: { in: ['QUEUED', 'RUNNING'] } },
+      data: { status: 'CANCELLED', runnerId: attemptId, leaseUntil: null },
     });
-    if (changed.count) running.get(id)?.abort();
-  } else {
+    if (changed.count) running.get(attemptId)?.abort();
+  } else if (action === 'retry' && (job.status === 'FAILED' || job.status === 'CANCELLED')) {
     const evidence = evidenceFor(job);
     const reset = job.stage === 3 && !sourcesFor(evidence).length;
     const retained = evidence.web ? { wiki: [], papers: [], web: evidence.web } as unknown as Prisma.InputJsonValue : Prisma.DbNull;
     await prisma.researchJob.updateMany({
-      where: { id, userId, status: { in: ['FAILED', 'CANCELLED'] } },
-      data: { status: 'QUEUED', error: null, ...(reset ? { stage: 0, warnings: [], evidence: retained } : {}) },
+      where: { ...attempt, status: job.status },
+      data: { status: 'QUEUED', runnerId: randomUUID(), error: null, ...(reset ? { stage: 0, warnings: [], evidence: retained } : {}) },
     });
   }
   return getResearchStatus(id, userId);

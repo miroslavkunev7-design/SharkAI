@@ -4,10 +4,20 @@ import { useEffect, useRef, useState } from 'react';
 
 export type ChatJobStatus = 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 type JobAction = 'cancel' | 'retry';
+const POLL_INTERVAL = 2400;
+const MAX_RETRY_INTERVAL = 20_000;
 
 export const CHAT_JOB_STATUS: Record<ChatJobStatus, string> = {
   QUEUED: 'В опашката', RUNNING: 'В ход', COMPLETED: 'Завършено', FAILED: 'Неуспешно', CANCELLED: 'Отменено',
 };
+
+function isActive(status?: ChatJobStatus) {
+  return status === 'QUEUED' || status === 'RUNNING';
+}
+
+class ChatJobRequestError extends Error {
+  constructor(message: string, readonly retryable: boolean) { super(message); }
+}
 
 export function useChatJob<Job extends { status: ChatJobStatus }>(endpoint: string, loadError: string, method: 'PATCH' | 'POST' = 'PATCH') {
   const [job, setJob] = useState<Job | null>(null);
@@ -17,6 +27,7 @@ export function useChatJob<Job extends { status: ChatJobStatus }>(endpoint: stri
   const [reload, setReload] = useState(0);
   const sequence = useRef(0);
   const inFlight = useRef<AbortController | null>(null);
+  const observedStatus = useRef<{ endpoint: string; status: ChatJobStatus } | null>(null);
 
   useEffect(() => () => inFlight.current?.abort(), []);
 
@@ -24,17 +35,25 @@ export function useChatJob<Job extends { status: ChatJobStatus }>(endpoint: stri
     const controller = new AbortController();
     const version = sequence.current;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let retryInterval = POLL_INTERVAL;
 
     async function poll() {
+      if (controller.signal.aborted || version !== sequence.current) return;
       try {
         const latest = await fetchChatJob<Job>(endpoint, loadError, { signal: controller.signal });
         if (controller.signal.aborted || version !== sequence.current) return;
+        observedStatus.current = { endpoint, status: latest.status };
         setJob(latest);
         setProblem('');
-        if (latest.status === 'QUEUED' || latest.status === 'RUNNING') timer = setTimeout(poll, 2400);
+        retryInterval = POLL_INTERVAL;
+        if (isActive(latest.status)) timer = setTimeout(poll, POLL_INTERVAL);
       } catch (cause) {
-        if (!controller.signal.aborted && version === sequence.current) {
-          setProblem(cause instanceof Error ? cause.message : loadError);
+        if (controller.signal.aborted || version !== sequence.current) return;
+        setProblem(cause instanceof Error ? cause.message : loadError);
+        const observed = observedStatus.current;
+        if (cause instanceof ChatJobRequestError && cause.retryable && observed?.endpoint === endpoint && isActive(observed.status)) {
+          timer = setTimeout(poll, retryInterval);
+          retryInterval = Math.min(retryInterval * 2, MAX_RETRY_INTERVAL);
         }
       }
     }
@@ -60,7 +79,10 @@ export function useChatJob<Job extends { status: ChatJobStatus }>(endpoint: stri
         method, headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: next }), signal: controller.signal,
       });
-      if (!controller.signal.aborted) setJob(latest);
+      if (!controller.signal.aborted) {
+        observedStatus.current = { endpoint, status: latest.status };
+        setJob(latest);
+      }
     } catch (cause) {
       if (!controller.signal.aborted) setActionError(cause instanceof Error ? cause.message : 'Действието не успя.');
     } finally {
@@ -73,8 +95,10 @@ export function useChatJob<Job extends { status: ChatJobStatus }>(endpoint: stri
 }
 
 async function fetchChatJob<Job>(url: string, fallback: string, options?: RequestInit) {
-  const response = await fetch(url, { cache: 'no-store', ...options });
+  const response = await fetch(url, { cache: 'no-store', ...options }).catch(() => {
+    throw new ChatJobRequestError(fallback, true);
+  });
   const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.job) throw new Error(data?.error || fallback);
+  if (!response.ok || !data?.job) throw new ChatJobRequestError(data?.error || fallback, response.status === 429 || response.status >= 500);
   return data.job as Job;
 }

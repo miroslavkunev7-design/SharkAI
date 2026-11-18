@@ -20,6 +20,7 @@ import {
 import type { ChatToolResult } from '@/lib/chat-tools';
 import { prisma } from '@/lib/db';
 import { kickImageJob } from '@/lib/image-jobs';
+import { kickResearchJob } from '@/lib/research';
 import { MemoryError, readChatMemory } from '@/lib/personal-memory.server';
 import { reminderInputSchema } from '@/lib/reminder-input';
 import { readOwnedUpload } from '@/lib/uploads';
@@ -280,6 +281,7 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
     });
     const savedTool = saved.toolResult as ChatToolResult | null;
     if (savedTool?.imageJobId) kickImageJob(savedTool.imageJobId, userId);
+    if (savedTool?.researchId) kickResearchJob(savedTool.researchId, userId);
     return saved;
   } finally {
     await releaseChatLease(userId, requestId, lease).catch(() => console.error('Chat lease cleanup failed'));

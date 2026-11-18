@@ -22,7 +22,7 @@ import { LocalImageError, hasLocalImageProvider, runLocalImage } from './local-i
 import { localBulgarianTranslatorReady } from './local-translation.server';
 import { createReminder, createReminderFromPrompt, ReminderInputError } from './reminders';
 import type { ReminderInput } from './reminder-input';
-import { ResearchInputError, quickPublicSearch, startResearch } from './research';
+import { ResearchInputError, quickPublicSearch, stageResearch } from './research';
 import { requestedNewsPeriod } from './research-news';
 import type { ChatTool, ChatToolResult } from './chat-tools';
 import { voiceCapabilities, VoiceError, voiceMimes } from './chat-voice.server';
@@ -282,7 +282,7 @@ async function scheduleReminder({ session, requestId, reminder, prompt }: ToolEx
 const coreTools: ToolRegistration[] = [
   { id: 'web-search', label: 'Търси в интернет', description: 'Търси в Wikipedia и Crossref, в Google Новини за посочен период или чрез конфигуриран OpenAI доставчик.', group: 'Проучване', input: 'prompt', optionalOpenAI: true, execute: webSearch },
   { id: 'deep-research', label: 'Задълбочено проучване', description: 'Връща доклад със справочни източници, научни публикации и датирани медийни заглавия по актуални теми.', group: 'Проучване', input: 'prompt', execute: async ({ session, prompt, requestId }) => {
-    const job = await startResearch(session.id, prompt, requestId);
+    const job = await stageResearch(session.id, prompt, requestId);
     return { id: job.id, researchId: job.id, status: 'started', text: 'Задачата за проучване е записана.' };
   } },
   { id: 'image-generate', label: 'Създай изображение', description: 'Генерира и прикачва изображение към разговора.', group: 'Изображения', input: 'prompt', imageProvider: true, execute: createImage },

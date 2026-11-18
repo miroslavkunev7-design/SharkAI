@@ -4,6 +4,7 @@ import { waitUntil } from '@vercel/functions';
 import { getAccountSession, type AccountSession } from './auth';
 import { remainingChatTokens } from './ai/workspace-chat';
 import { prisma } from './db';
+import { jobAttemptId, sameJobAttempt } from './job-attempt';
 import { LocalImageError, runLocalImage } from './local-image.server';
 import { readOwnedUpload } from './uploads';
 
@@ -91,22 +92,6 @@ function isRunnable(job: ImageJob, now = new Date()) {
     || (job.status === 'RUNNING' && !!job.leaseUntil && job.leaseUntil <= now);
 }
 
-// A lease stores <attempt>:<runner>. Between leases the attempt alone remains,
-// so a delayed mutation cannot affect a retry, even if it reaches the same status.
-function attemptIdFor(job: ImageJob) {
-  return job.runnerId?.split(':', 1)[0] ?? job.id;
-}
-
-function attemptWhere(job: ImageJob, attemptId: string): Prisma.ImageJobWhereInput {
-  return {
-    id: job.id, userId: job.userId,
-    OR: [
-      { runnerId: attemptId }, { runnerId: { startsWith: `${attemptId}:` } },
-      ...(attemptId === job.id ? [{ runnerId: null }] : []),
-    ],
-  };
-}
-
 export async function executeImageJob(id: string, userId: string) {
   const job = await prisma.imageJob.findFirst({ where: { id, userId } });
   if (!job || !isRunnable(job)) return;
@@ -114,7 +99,7 @@ export async function executeImageJob(id: string, userId: string) {
   if (!receipt) return;
 
   const now = new Date();
-  const attemptId = attemptIdFor(job);
+  const attemptId = jobAttemptId(job);
   const runnerId = `${attemptId}:${randomUUID()}`;
   const claimed = await prisma.imageJob.updateMany({
     where: { id, userId, runnerId: job.runnerId, OR: [{ status: 'QUEUED', runAfter: { lte: now } }, { status: 'RUNNING', leaseUntil: { lte: now } }] },
@@ -212,8 +197,8 @@ export async function getImageJobStatus(id: string, userId: string) {
 
 export async function updateImageJob(id: string, userId: string, action: 'cancel' | 'retry') {
   const job = await ownedJob(id, userId);
-  const attemptId = attemptIdFor(job);
-  const attempt = attemptWhere(job, attemptId);
+  const attemptId = jobAttemptId(job);
+  const attempt = sameJobAttempt(job, attemptId);
   if (action === 'cancel' && (job.status === 'QUEUED' || job.status === 'RUNNING')) {
     const changed = await prisma.imageJob.updateMany({
       where: { ...attempt, status: { in: ['QUEUED', 'RUNNING'] } },
