@@ -1,14 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import '../entry.css';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,6 +16,7 @@ export default function LoginPage() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError('');
 
@@ -25,15 +24,25 @@ export default function LoginPage() {
       const response = await fetch(`/api/auth/${isRegister ? 'register' : 'login'}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email: email.trim(), password, name }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Входът не беше успешен.');
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        if (response.status === 401) setError('Имейлът или паролата са неправилни.');
+        else if (response.status === 429) setError('Твърде много опити. Опитай след малко.');
+        else if (data?.error === 'Email already registered') setError('Вече има акаунт с този имейл. Избери „Влез“.');
+        else setError(isRegister ? 'Регистрацията не беше успешна. Опитай отново.' : 'Входът временно е недостъпен. Опитай отново.');
+        return;
+      }
+      if (typeof data?.user?.id !== 'string') {
+        setError('SharkAI не потвърди входа. Опитай отново.');
+        return;
+      }
       const next = new URLSearchParams(window.location.search).get('next');
       const allowedReturn = next && /^\/(chat|dashboard|pricing)(\?|$)/.test(next);
-      router.push(allowedReturn ? next : '/chat');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Връзката със SharkAI прекъсна.');
+      window.location.replace(allowedReturn ? next : '/chat');
+    } catch {
+      setError('Връзката със SharkAI прекъсна. Опитай отново.');
     } finally {
       setLoading(false);
     }
@@ -71,7 +80,7 @@ export default function LoginPage() {
             {error && <p role="alert" className="shark-entry-error">{error}</p>}
             <button type="submit" disabled={loading} className="shark-action w-full">
               {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-              {isRegister ? 'Регистрация' : 'Влез'}
+              {loading ? (isRegister ? 'Създаване на акаунта…' : 'Влизане…') : (isRegister ? 'Регистрация' : 'Влез')}
             </button>
           </form>
           <button type="button" onClick={toggleRegistration} disabled={loading} className="shark-entry-text-button">

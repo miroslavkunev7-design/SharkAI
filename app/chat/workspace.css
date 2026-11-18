@@ -156,6 +156,7 @@
 .shark-chat-welcome h1 { color: #071b36; font-weight: 800; font-size: clamp(1.8rem, 3.2vw, 2.95rem); letter-spacing: -.048em; line-height: 1.08; text-wrap: balance; text-shadow: 0 1px 6px #ebfcff9c; }
 .shark-chat-center-state { align-self: center; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; padding: 20px; color: #d2e0f7; text-align: center; }
 .shark-chat-center-state :is(button, a), .shark-chat-notice button { text-decoration: underline; color: #9adffe; }
+.shark-chat-center-state .shark-chat-new { color: #fff; text-decoration: none; }
 .shark-chat-thread-scroll { overflow: auto; overscroll-behavior: contain; min-height: 0; }
 .shark-chat-thread { width: min(100%, 850px); margin: auto; padding: 26px 21px 12px; display: flex; flex-direction: column; gap: 15px; }
 .shark-chat-message { min-width: 0; max-width: min(100%, 765px); padding: 12px 15px; border-radius: 18px; background: var(--chat-glass); border: 1px solid #91c9ee63; box-shadow: inset 0 1px #d3efff5c, inset 0 -1px #aca7fc32, 0 10px 24px #01061444; }
@@ -183,6 +184,9 @@
 .shark-chat-receipt ol li { font-size: .82rem; }
 
 .shark-chat-compose-area { display: flex; flex-direction: column; gap: 7px; padding: 8px 20px max(9px, env(safe-area-inset-bottom)); width: min(100%, 850px); min-width: 0; margin: 0 auto; }
+.shark-chat-sign-in { --ice-art-extent: 55%; --ice-art-position: right center; --ice-radius: 20px; padding: clamp(12px, 2vw, 21px); }
+.shark-chat-sign-in p { max-width: 55%; color: #102643; font-size: .9rem; font-weight: 650; }
+.shark-chat-sign-in .shark-chat-new { width: fit-content; min-height: 44px; margin-top: 7px; }
 .shark-chat-composer.ice-section {
   --ice-radius: 23px;
   --ice-art-extent: 58%;

@@ -1,30 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db';
-import { verifyPassword, createToken, setAuthCookie, LEGACY_GUEST_EMAIL } from '@/lib/auth';
-import { getEffectivePlan } from '@/lib/billing';
+import { authenticatePassword, createToken, requireSessionConfiguration, SessionConfigurationError, setAuthCookie } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
-  try {
-    const { email, password } = await req.json();
+  const { email, password } = await req.json().catch(() => null) ?? {};
+  if (typeof email !== 'string' || !email || email.includes('\0') || typeof password !== 'string') {
+    return NextResponse.json({ error: 'Въведи имейл и парола.' }, { status: 400 });
+  }
 
-    const user = await prisma.user.findUnique({ where: { email } });
-    if (!user || user.email === LEGACY_GUEST_EMAIL || !(await verifyPassword(password, user.passwordHash))) {
+  try {
+    requireSessionConfiguration();
+    const user = await authenticatePassword(email, password);
+    if (!user) {
       return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
     }
-
-    const sessionUser = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      plan: await getEffectivePlan(user),
-    };
-
-    const token = await createToken(sessionUser);
-    await setAuthCookie(token);
-
-    return NextResponse.json({ user: sessionUser });
-  } catch {
-    return NextResponse.json({ error: 'Login failed' }, { status: 500 });
+    await setAuthCookie(await createToken(user));
+    return NextResponse.json({ user });
+  } catch (error) {
+    const configMissing = error instanceof SessionConfigurationError;
+    console.error('Login unavailable:', configMissing ? 'session configuration' : error instanceof Error ? error.name : 'unknown failure');
+    return NextResponse.json({ error: 'Входът временно е недостъпен. Опитай отново.', code: configMissing ? 'SESSION_UNAVAILABLE' : 'AUTH_UNAVAILABLE' }, { status: 503 });
   }
 }

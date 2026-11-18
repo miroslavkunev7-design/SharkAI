@@ -42,6 +42,10 @@ async function main() {
       select: userSelect,
     });
     ids.push(secondAdmin.id);
+    const legacyAdmin = await prisma.user.create({
+      data: { email: `legacy-admin-${suffix}@example.invalid`, passwordHash: 'test-user', role: 'ADMIN', plan: 'ULTRA', tokensLimit: 10, tokensUsed: 10 },
+    });
+    ids.push(legacyAdmin.id);
     process.env.ADMIN_EMAIL = ` ${admin.email} `;
     const manual = await prisma.user.create({
       data: { email: `manual-billing-${suffix}@example.invalid`, passwordHash: 'test-user', plan: 'ULTRA' },
@@ -100,6 +104,13 @@ async function main() {
     const secondAdminSession = await getAccountSession(secondAdmin.id);
     assert.equal(secondAdminSession?.plan, 'FREE');
     assert.equal(secondAdminSession?.lifetime, undefined);
+    delete process.env.ADMIN_EMAIL;
+    const legacyAdminSession = await getAccountSession(legacyAdmin.id);
+    assert(legacyAdminSession);
+    assert.equal(legacyAdminSession.plan, 'ULTRA');
+    assert.equal(legacyAdminSession.lifetime, true);
+    assert.equal(remainingChatTokens(legacyAdminSession), Infinity);
+    assert.deepEqual(await prisma.user.findUniqueOrThrow({ where: { id: legacyAdmin.id } }), legacyAdmin);
     process.env.ADMIN_EMAIL = free.email;
     const freeSession = await getAccountSession(free.id);
     assert.equal(freeSession?.plan, 'FREE');
@@ -108,6 +119,7 @@ async function main() {
     process.env.ADMIN_EMAIL = admin.email;
     assert.deepEqual(await prisma.user.findUniqueOrThrow({ where: { id: admin.id } }), admin);
     assert.equal(await getEffectivePlan(manual, new Date(end + 1)), 'ULTRA');
+    assert.equal((await getAccountSession(manual.id))?.lifetime, undefined);
 
     const stripe = stripeSubscription(free.id);
     const completed = signedEvent('checkout.session.completed', {

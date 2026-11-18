@@ -22,7 +22,7 @@ npm run dev
 
 ## Месечни абонаменти в SharkAI
 
-- Задайте `ADMIN_EMAIL` с точния адрес на съществуващия профил на собственика с роля `ADMIN`. Сървърът дава на този профил безсрочен Ultra достъп без плащане. Данните на профила и записаният план се запазват.
+- Съществуващ профил с роля `ADMIN` и записан план `ULTRA` запазва безсрочния си достъп. Ако записаният план на собственика е друг, настройте `ADMIN_EMAIL` с точния адрес на съществуващия му администраторски профил. Достъпът се определя на сървъра без плащане или промяна в профила.
 - Приложете `prisma/upgrade/subscription-periods.sql` върху съществуваща PostgreSQL база преди обновяване на приложението. При чисто инсталиране полето идва от Prisma схемата.
 - Настройте `NEXT_PUBLIC_APP_URL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID` и `STRIPE_ULTRA_PRICE_ID`. Използвайте отделни месечни Stripe цени за Pro (€12) и Ultra (€28).
 - Насочете Stripe webhooks към `/api/payments/webhook` за `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `invoice.paid`, `charge.refunded`, `charge.dispute.created` и `radar.early_fraud_warning.created`. Достъп се предоставя за потвърдения платен период. Отказаното подновяване и обичайното прекратяване оставят вече платения период валиден до крайната му дата.
