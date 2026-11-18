@@ -27,15 +27,23 @@ function outputFormat(prompt: string, file?: InputFile): Extension {
   return 'txt';
 }
 
+const exactSave = /^(?:Запиши съдържание|Save content):\r?\n([\s\S]*)$/iu;
+const exactReplacement = /(?:замени|замен[ия]й|replace)\s+["„“«]([^"“”»]+)["“”»]\s+(?:с|with)\s+["„“«]([^"“”»]*)["“”»]\s*[.!]?$/iu;
+const exactAppend = /(?:добави (?:накрая|в края)|append)\s*:\s*([\s\S]+)$/iu;
+
+export function isExactTextFileEdit(instruction: string) {
+  return exactSave.test(instruction) || exactReplacement.test(instruction) || exactAppend.test(instruction);
+}
+
 function editExactly(source: string, instruction: string): string | undefined {
-  const save = instruction.match(/^(?:Запиши съдържание|Save content):\r?\n([\s\S]*)$/iu);
+  const save = instruction.match(exactSave);
   if (save) return save[1];
-  const replace = instruction.match(/(?:замени|замен[ия]й|replace)\s+["„“«]([^"“”»]+)["“”»]\s+(?:с|with)\s+["„“«]([^"“”»]*)["“”»]\s*[.!]?$/iu);
+  const replace = instruction.match(exactReplacement);
   if (replace) {
     if (!source.includes(replace[1])) throw new TextFileError('Посоченият текст липсва в избрания файл.');
     return source.split(replace[1]).join(replace[2]);
   }
-  const append = instruction.match(/(?:добави (?:накрая|в края)|append)\s*:\s*([\s\S]+)$/iu);
+  const append = instruction.match(exactAppend);
   if (append) return `${source}${source.endsWith('\n') ? '' : '\n'}${append[1]}`;
 }
 

@@ -6,11 +6,14 @@ import { z } from 'zod';
 import { getSession, type AccountSession } from '@/lib/auth';
 import { remainingChatTokens, workspaceModels } from '@/lib/ai/workspace-chat';
 import { createNativeToolRouter, NativeToolSelectionError, streamWorkspaceReply } from '@/lib/ai/workspace-tool-routing';
+import { chatFileReference, isFileFollowUp, rememberedChatFiles, specifiesParticularChatFile, type ChatFile } from '@/lib/chat-file-context';
 import {
   acquireChatLease, ChatError, getCompletedTurn, LEGACY_CHAT, loadChat,
   loadTurnContext, recordChatTurn, releaseChatLease,
 } from '@/lib/chat-history';
-import { ChatToolError, dispatchChatTool, getChatToolIntent, listChatTools } from '@/lib/chat-tools.server';
+import {
+  ChatToolError, dispatchChatTool, getChatToolIntent, isExactRememberedFileCommand, listChatTools, matchesRememberedToolFile,
+} from '@/lib/chat-tools.server';
 import type { ChatToolResult } from '@/lib/chat-tools';
 import { prisma } from '@/lib/db';
 import { kickImageJob } from '@/lib/image-jobs';
@@ -122,19 +125,37 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
     const context = await loadTurnContext(userId, { ...input, projectId: input.projectId ?? undefined });
     let uploadId = input.uploadId ?? undefined;
     const lastReply = context.recent.at(-1);
-    const artifact = lastReply?.role === 'assistant' ? z.object({ artifact: z.object({
-      url: z.string().regex(/^\/api\/upload\/[0-9a-f-]{36}(?:\?|$)/i), mimeType: z.string(),
-    }) }).safeParse(lastReply.toolResult) : null;
-    const previousUser = context.recent.at(-2);
-    const priorFile = artifact?.success
-      ? { id: artifact.data.artifact.url.split('?')[0].split('/').pop(), mime: artifact.data.artifact.mimeType }
-      : previousUser?.role === 'user' && previousUser.imagePath ? { id: previousUser.imagePath, mime: previousUser.attachmentMime } : null;
-    const contextualIntent = !uploadId && priorFile?.id ? getChatToolIntent(toolId ?? undefined, message, true, priorFile.mime ?? undefined) : null;
-    if (priorFile?.id && contextualIntent?.needsFile && !contextualIntent.id.startsWith('screenshot-')) {
-      uploadId = priorFile.id;
+    const directIntent = getChatToolIntent(toolId ?? undefined, message, false);
+    const reference = chatFileReference(message);
+    const referencesFile = Boolean(reference && isFileFollowUp(message));
+    if (!uploadId && (!directIntent || directIntent.needsFile) && (referencesFile || directIntent?.needsFile)
+      && specifiesParticularChatFile(message)) {
+      throw new ChatError('Избери посочения файл чрез „Прикачи отново“ в разговора или го качи.', 400);
+    }
+    const files = uploadId || (directIntent && !directIntent.needsFile) ? [] : rememberedChatFiles(context.recentFiles);
+    const compatibleFiles = files.filter(({ mime }) => mime && (!reference || reference.matches(mime)));
+    let historicalMatch: { file: ChatFile; intent: NonNullable<typeof directIntent> } | undefined;
+    for (const file of compatibleFiles) {
+      if (!file.mime || (!directIntent && !referencesFile && !isExactRememberedFileCommand(message, file.mime))) continue;
+      const intent = directIntent ?? getChatToolIntent(toolId ?? undefined, message, true, file.mime);
+      if (intent?.needsFile && matchesRememberedToolFile(intent.id, message, file.mime)) {
+        historicalMatch = { file, intent };
+        break;
+      }
+    }
+    const legacyFile = directIntent?.needsFile && !directIntent.id.startsWith('screenshot-')
+      ? files.find(({ mime }) => !mime) : undefined;
+    const priorFile = referencesFile ? compatibleFiles[0] : undefined;
+    if (!uploadId) {
+      uploadId = historicalMatch?.file.id ?? legacyFile?.id;
     }
     let upload = uploadId ? await readOwnedUpload(uploadId, userId) : null;
     if (uploadId && !upload) throw new ChatError('Прикаченият файл не е намерен.', 404);
+    const implicitIntent = historicalMatch?.intent ?? (!input.uploadId && uploadId ? directIntent : null);
+    if (implicitIntent && upload && ((reference && !reference.matches(upload.mimeType))
+      || !matchesRememberedToolFile(implicitIntent.id, message, upload.mimeType))) {
+      throw new ChatError('Избери файл с подходящ формат от разговора.', 415);
+    }
     signal.throwIfAborted();
     let toolResult: Omit<ChatToolResult, 'usageTokens'> | null = null;
     let tokens = 0;
@@ -153,7 +174,7 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
       content = receipt.text || `${receipt.label} е стартиран.`;
     }
 
-    const toolIntent = getChatToolIntent(toolId ?? undefined, message, Boolean(uploadId), upload?.mimeType);
+    const toolIntent = implicitIntent ?? getChatToolIntent(toolId ?? undefined, message, Boolean(uploadId), upload?.mimeType);
     if (toolIntent?.metered && remainingChatTokens(account) === 0) {
       throw new ChatError('Достигнат е лимитът на текущия план.', 429);
     }

@@ -1,0 +1,4 @@
+ctranslate2==4.9.0
+sentencepiece==0.2.3
+langdetect==1.0.9
+six==1.17.0

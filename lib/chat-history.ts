@@ -131,10 +131,10 @@ export async function loadTurnContext(userId: string, input: ContextInput) {
     where: { id: projectId, userId }, select: { id: true, name: true, description: true },
   }) : null;
   if (projectId && !project) throw new ChatError('Проектът не е намерен.', 404);
-  const recent = input.branchFrom ? branch.slice(-30) : (await prisma.chatMessage.findMany({
-    where: messageScope(userId, input.conversationId), select: messageSelect, take: 30, orderBy: messageOrder,
+  const recentFiles = input.branchFrom ? branch.slice(-48) : (await prisma.chatMessage.findMany({
+    where: messageScope(userId, input.conversationId), select: messageSelect, take: 48, orderBy: messageOrder,
   })).reverse();
-  return { previous, project, branch, recent };
+  return { previous, project, branch, recent: recentFiles.slice(-30), recentFiles };
 }
 
 interface CompletedTurn {

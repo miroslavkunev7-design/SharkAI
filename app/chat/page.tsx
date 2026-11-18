@@ -685,12 +685,19 @@ export default function ChatPage() {
   function attachArtifact(file: Attachment, edit: boolean) {
     if (pending) return;
     const editor = edit ? artifactEditor(file) : undefined;
+    const requiredFile = selectedTool && INPUT_FILES[selectedTool.input];
+    const incompatibleTool = requiredFile && !requiredFile.types.includes(file.mimeType || '');
     setBranchFrom(null);
     setAttachment(file);
-    setSelectedTool(editor ?? null);
-    setMode('work');
+    if (editor) {
+      setSelectedTool(editor);
+      setMode('work');
+    } else if (incompatibleTool) {
+      setSelectedTool(null);
+    }
     setProblem('');
-    setNotice(editor ? 'Опиши желаните промени.' : 'Резултатът е прикачен към този разговор.');
+    setNotice(editor ? 'Опиши желаните промени.' : incompatibleTool
+      ? 'Файлът е прикачен. Избери инструмент за този тип файл.' : 'Файлът е прикачен към следващата заявка.');
     failedRequest.current = null;
     requestAnimationFrame(() => inputRef.current?.focus());
   }
@@ -725,16 +732,19 @@ export default function ChatPage() {
     const regenerateLabel = regenerate ? 'Прегенерирай резултата в клон' : 'Поискай нов отговор в клон';
     const attached = messageAttachment(message);
     const preview = attached ? attachmentInspection(attached) : null;
-    const canReuse = !local && attached?.mimeType && !CANVAS_MIME_TYPES.includes(attached.mimeType) && !!artifactEditor(attached);
+    const canEditFile = !local && preview?.type !== 'image' && attached?.mimeType
+      && !CANVAS_MIME_TYPES.includes(attached.mimeType) && !!artifactEditor(attached);
     return (
       <article className={`shark-chat-message shark-chat-message-${message.role}`} key={message.id} aria-label={message.role === 'assistant' ? 'SharkAI' : 'Ти'}>
         {message.role === 'assistant' && <div className="shark-chat-message-author"><Logo size="sm" /> SharkAI</div>}
-        {preview?.type === 'image' ? (
+        {preview?.type === 'image' && (
           <button type="button" className="shark-chat-image" onClick={() => openInspector(preview)}><img src={preview.url} alt="Прикачено изображение" /></button>
-        ) : attached && <div className="shark-chat-message-attachments">
-          {preview && <button type="button" className="shark-chat-attachment-link" onClick={() => openInspector(preview)}><FileText size={16} /> Преглед на прикачения файл</button>}
-          <a className="shark-chat-attachment-link" href={artifactDownloadUrl(uploadUrl(attached.id), attached)} download={attached.name}><Download size={16} /> Изтегли прикачения файл</a>
-          {canReuse && <button type="button" disabled={pending} className="shark-chat-attachment-link" onClick={() => attachArtifact(attached, true)}><Pencil size={16} /> Използвай файла за редакция</button>}
+        )}
+        {attached && !local && <div className="shark-chat-message-attachments">
+          {preview?.type === 'text' && <button type="button" className="shark-chat-attachment-link" onClick={() => openInspector(preview)}><FileText size={16} /> Преглед на прикачения файл</button>}
+          {preview?.type !== 'image' && <a className="shark-chat-attachment-link" href={artifactDownloadUrl(uploadUrl(attached.id), attached)} download={attached.name}><Download size={16} /> Изтегли прикачения файл</a>}
+          <button type="button" disabled={pending} className="shark-chat-attachment-link" onClick={() => attachArtifact(attached, false)}><Paperclip size={16} /> Прикачи файла</button>
+          {canEditFile && <button type="button" disabled={pending} className="shark-chat-attachment-link" onClick={() => attachArtifact(attached, true)}><Pencil size={16} /> Използвай файла за редакция</button>}
         </div>}
         {(!message.toolResult?.imageJobId || message.toolResult.status === 'completed') && <div className="shark-chat-message-text">{message.content}</div>}
         {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} reuse={attachArtifact} editable={(file) => !!artifactEditor(file)} disabled={pending} projectStatus={project && projectStatusLabel(project)} reminder={reminderId ? reminders.reminders.find(({ id }) => id === reminderId) : undefined} reminderDue={!!reminderId && reminders.notifications.some(({ reminderId: id }) => id === reminderId)} />}

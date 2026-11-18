@@ -81,9 +81,8 @@ function ArtifactFields({ result, open, reuse, editable, disabled }: ArtifactPro
       <footer className="shark-chat-result-actions">
         {isTextArtifact(artifact.mimeType) && <button type="button" onClick={() => open({ type: 'text', url, title, attachment: attached || undefined })}><FileText size={15} /> Преглед на файла</button>}
         <a href={artifactDownloadUrl(url, attached || undefined)} download={attached?.name || true}><Download size={15} /> Изтегли резултата</a>
-        {attached && (editable(attached)
-          ? <button type="button" disabled={disabled} onClick={() => reuse(attached, true)}><Pencil size={15} /> Редактирай резултата</button>
-          : <button type="button" disabled={disabled} onClick={() => reuse(attached, false)}><Paperclip size={15} /> Прикачи резултата</button>)}
+        {attached && <button type="button" disabled={disabled} onClick={() => reuse(attached, false)}><Paperclip size={15} /> Прикачи резултата</button>}
+        {attached && editable(attached) && <button type="button" disabled={disabled} onClick={() => reuse(attached, true)}><Pencil size={15} /> Редактирай резултата</button>}
       </footer>
     </>
   );

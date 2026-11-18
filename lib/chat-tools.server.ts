@@ -6,6 +6,7 @@ import { ImageJobError, stageImageJob } from './image-jobs';
 import { remainingChatTokens, workspaceModels } from './ai/workspace-chat';
 import type { AccountSession } from './auth';
 import { DataToolError, runOpenAIDataTool } from './chat-data-tools.server';
+import { parseDocumentTranslationRequest, translateChatDocument } from './chat-document-translation.server';
 import { LocalDocumentError, isLocalDocumentEdit, runLocalDocumentTool } from './chat-documents.server';
 import { LocalImageEditError, parseLocalImageEdit, runLocalImageEdit } from './chat-image-edits.server';
 import { LocalTableError, hasIsolatedTableWorker, runLocalTableAnalysis, supportsLocalTableAnalysis } from './chat-tables.server';
@@ -13,8 +14,9 @@ import { LocalDocumentError as OcrError, getLocalDocumentTools, isLocalExtractio
 import {
   hasExplicitSpreadsheetData, isLocalSpreadsheetEdit, runLocalSpreadsheetTool, validateSpreadsheetDraft, SpreadsheetInputError,
 } from './chat-spreadsheets.server';
-import { TextFileError, textFileFormats, writeChatTextFile } from './chat-text-files.server';
+import { isExactTextFileEdit, TextFileError, textFileFormats, writeChatTextFile } from './chat-text-files.server';
 import { LocalImageError, hasLocalImageProvider, runLocalImage } from './local-image.server';
+import { localBulgarianTranslatorReady } from './local-translation.server';
 import { createReminder, createReminderFromPrompt, ReminderInputError } from './reminders';
 import type { ReminderInput } from './reminder-input';
 import { ResearchInputError, quickPublicSearch, startResearch } from './research';
@@ -285,6 +287,8 @@ const coreTools: ToolRegistration[] = [
   { id: 'image-ocr', label: 'Разчети текст от снимка', description: 'Извлича видимия текст от прикаченото изображение.', group: 'Документи и данни', input: 'image', extraction: 'ocr', optionalOpenAI: true, execute: readDocument },
   { id: 'pdf-read', label: 'Прочети PDF', description: 'Разчита, извлича и превежда съдържание от прикачен PDF.', group: 'Документи и данни', input: 'pdf', extraction: 'pdf', optionalOpenAI: true, execute: readDocument },
   { id: 'document-read', label: 'Прочети DOCX', description: 'Извлича или превежда съдържание на документ.', group: 'Документи и данни', input: 'document', optionalOpenAI: true, execute: executeDataTool('read-document') },
+  { id: 'document-translate', label: 'Преведи документ и запази файл', description: 'Превежда текст от PDF или DOCX и връща нов PDF или DOCX. Например „Преведи документа на английски и запази като DOCX“.', group: 'Документи и данни', input: 'document',
+    execute: async (input) => ({ status: 'completed', ...await translateChatDocument(input) }) },
   { id: 'document-export', label: 'Създай PDF или DOCX', description: 'Създава и прикачва документ към разговора.', group: 'Документи и данни', input: 'prompt', optionalOpenAI: true, execute: executeDataTool('create-document') },
   { id: 'document-edit', label: 'Редактирай PDF или DOCX', description: 'Връща коригирано копие. За PDF може да добавиш надпис, завъртиш или премахнеш страница.', group: 'Документи и данни', input: 'document', optionalOpenAI: true, execute: executeDataTool('edit-document') },
   { id: 'spreadsheet-export', label: 'Създай CSV или Excel таблица', description: 'Прикачва таблица от описаните колони и редове или от въведени CSV или JSON данни.', group: 'Документи и данни', input: 'prompt', execute: createSpreadsheet },
@@ -336,11 +340,16 @@ interface LocalCapabilities {
   images?: boolean;
   tables?: boolean;
   documents?: Awaited<ReturnType<typeof getLocalDocumentTools>>;
+  textUnavailable?: string | null;
 }
 
 function unavailableReason(tool: ToolRegistration, session: AccountSession | null, hasOpenAI: boolean, local: LocalCapabilities) {
   if (!session) return 'Влез в SharkAI, за да използваш инструмента.';
   if (tool.unavailable) return tool.unavailable;
+  if (tool.id === 'document-translate') {
+    if (remainingChatTokens(session) <= 0) return quotaReached;
+    if (local.textUnavailable) return local.textUnavailable;
+  }
   if ((tool.requiresOpenAI || tool.imageProvider) && remainingChatTokens(session) <= 0) return quotaReached;
   if (tool.id === 'dataset-analysis' && !hasOpenAI && !local.tables) return 'Необходим е изолиран работник за таблици в Linux или разрешен OpenAI Code Interpreter.';
   if (tool.extraction && !hasOpenAI && !(tool.extraction === 'pdf' ? local.documents?.pdfText : local.documents?.ocrLanguages.length)) {
@@ -352,12 +361,13 @@ function unavailableReason(tool: ToolRegistration, session: AccountSession | nul
 }
 
 export async function listChatTools(session: AccountSession | null): Promise<ChatTool[]> {
-  const [hosted, images, tables, documents] = session
-    ? await Promise.all([getHostedOpenAI(), hasLocalImageProvider(), hasIsolatedTableWorker(), getLocalDocumentTools()])
-    : [null, false, false, undefined] as const;
+  const [hosted, images, tables, documents, text] = session
+    ? await Promise.all([getHostedOpenAI(), hasLocalImageProvider(), hasIsolatedTableWorker(), getLocalDocumentTools(), workspaceModels(session)])
+    : [null, false, false, undefined, undefined] as const;
   const hasOpenAI = !!session && !!hosted && remainingChatTokens(session) > 0;
+  const textUnavailable = text?.reason && !(await localBulgarianTranslatorReady()) ? text.reason : null;
   return registry().map((tool) => {
-    const reason = unavailableReason(tool, session, hasOpenAI, { images, tables, documents });
+    const reason = unavailableReason(tool, session, hasOpenAI, { images, tables, documents, textUnavailable });
     const { id, label, description, group, input } = tool;
     return { id, label, description, group, input, platforms, available: !reason, reason };
   });
@@ -370,6 +380,8 @@ const intentMatchers: Array<[string, RegExp]> = [
   ['text-file-create', /^(?:създай|направи|напиши|запази|експортирай|create|save|write|export)\s+(?:(?:ми|като|a|an|as)\s+)*(?:txt|md|markdown|json|текстов файл|text file|файл(?:а)?|file)(?=\s|[:.,!?]|$)/iu],
   ['deep-research', /^(?:направи задълбочено проучване|задълбочено проучване|deep research)(?=\s|[:.,!?]|$)/iu],
   ['web-search', /^(?:потърси (?:в интернет|онлайн)|търси (?:в интернет|онлайн)|search the web|search online|look up online)(?=\s|[:.,!?]|$)/iu],
+  ['pdf-read', /^(?:разчети текста от (?:прикачения )?pdf|извлечи текста от (?:прикачения )?pdf|extract (?:the )?text from (?:the )?(?:attached )?pdf)(?=\s|[:.,!?]|$)/iu],
+  ['document-read', /^(?:разчети текста от (?:прикачения )?docx|извлечи текста от (?:прикачения )?docx|extract (?:the )?text from (?:the )?(?:attached )?docx)(?=\s|[:.,!?]|$)/iu],
   ['image-ocr', /^(?:разчети текста|извлечи текста от (?:снимката|изображението)|ocr|read text from the image)(?=\s|[:.,!?]|$)/iu],
   ['pdf-read', /^(?:(?:прочети|преведи|обобщи|разчети) (?:ми )?(?:прикачения )?pdf|(?:read|translate|summarize) (?:the )?(?:attached )?pdf)(?=\s|[:.,!?]|$)/iu],
   ['document-read', /^(?:(?:прочети|преведи|обобщи|разчети) (?:ми )?(?:прикачения )?docx|(?:read|translate|summarize) (?:the )?(?:attached )?docx)(?=\s|[:.,!?]|$)/iu],
@@ -396,6 +408,7 @@ export function inferChatTool(prompt: string, hasUpload: boolean, mimeType?: str
   const request = prompt.trim()
     .replace(/^(?:моля|please)[,\s]+/iu, '')
     .replace(/^(?:можеш ли да|би ли|can you|could you|would you)\s+/iu, '');
+  if (parseDocumentTranslationRequest(request)) return 'document-translate';
   if ((!mimeType || mimeType.startsWith('image/')) && parseLocalImageEdit(request)) return 'image-transform';
   if (mimeType?.startsWith('image/') && /^(?:(?:смени|промени)\s+(?:фона|осветлението|стила)|(?:прерисувай|преобразувай)\s|превърни\s+(?:я|го|изображението|снимката)\s+в|(?:change|replace)\s+(?:(?:the|its)\s+)?(?:background|lighting|style)\b|(?:restyle|redraw|reimagine)\s|(?:turn|transform|convert)\s+(?:(?:the|this)\s+)?(?:image|photo|picture|it)\s+into\b)/iu.test(request)) return 'image-edit';
   if (/^(?:създай|създадеш|направи|направиш|генерирай|генерираш|запази|запазиш|експортирай|експортираш|create|make|generate|export|save)\s+(?:(?:ми|a|an|as|като)\s+)*(?:(?:файл|таблица|file|spreadsheet|table)\s+)?(?:(?:в|in|като|as)\s+)?(?:[\p{L}\p{N}_.-]+\.)?(?:csv|xlsx|excel)\b/iu.test(request)) return 'spreadsheet-export';
@@ -406,6 +419,10 @@ export function inferChatTool(prompt: string, hasUpload: boolean, mimeType?: str
   if (mimeType && isLocalDocumentEdit(request, mimeType)) return 'document-edit';
   const matched = intentMatchers.find(([, pattern]) => pattern.test(request));
   if (matched) return matched[0];
+  if (/^(?:прочети|разчети|извлечи|обобщи|преведи|read|extract|summari[sz]e|translate)\s+.*(?:документа|този документ|\bdocument\b)/iu.test(request)) {
+    if (mimeType === 'application/pdf') return 'pdf-read';
+    if (mimeType?.endsWith('wordprocessingml.document')) return 'document-read';
+  }
   if (mimeType && /^(?:замени|добави накрая|добави в края|редактирай|поправи|промени|replace|append|edit|revise|correct|remove page|rotate page|премахни страниц|завърти страниц)/iu.test(request)) {
     if (Object.values(textFileFormats).includes(mimeType)) return 'text-file-edit';
     if (['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(mimeType)) return 'document-edit';
@@ -428,19 +445,40 @@ export function getChatToolIntent(toolId: string | undefined, prompt: string, ha
   const id = localEdit ? 'image-transform' : toolId ?? inferChatTool(prompt, hasUpload, mimeType);
   if (!id) return null;
   const tool = registry().find((entry) => entry.id === id);
-  return { id, metered: !!tool?.requiresOpenAI || !!tool?.imageProvider, needsFile: !!tool && !['none', 'prompt'].includes(tool.input) };
+  const previousAnswer = id === 'document-translate' && parseDocumentTranslationRequest(prompt)?.source === 'previous-answer';
+  return { id, metered: !!tool?.requiresOpenAI || !!tool?.imageProvider, needsFile: !!tool && !previousAnswer && !['none', 'prompt'].includes(tool.input) };
 }
 
-async function resolveInputFile(tool: ToolRegistration, request: ToolRequest) {
-  const requirements = {
+const fileRequirements = {
     image: { label: 'изображение', matches: (mime: string) => mime.startsWith('image/') },
     pdf: { label: 'PDF', matches: (mime: string) => mime === 'application/pdf' },
     document: { label: 'PDF или DOCX', matches: (mime: string) => ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(mime) },
     textfile: { label: 'TXT, Markdown или JSON', matches: (mime: string) => Object.values(textFileFormats).includes(mime) },
     dataset: { label: 'CSV или XLSX', matches: (mime: string) => ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(mime) },
-  };
+};
+
+export function matchesRememberedToolFile(toolId: string, prompt: string, mime: string) {
+  if (toolId.startsWith('screenshot-')) return false;
+  const input = registry().find((entry) => entry.id === toolId)?.input;
+  if (!input || input === 'none' || input === 'prompt' || !fileRequirements[input].matches(mime)) return false;
+  if (toolId === 'document-read') return mime.endsWith('wordprocessingml.document');
+  if (toolId === 'document-edit' && isLocalDocumentEdit(prompt)) return isLocalDocumentEdit(prompt, mime);
+  return true;
+}
+
+export function isExactRememberedFileCommand(prompt: string, mime?: string) {
+  if (!mime) return false;
+  if (isLocalDocumentEdit(prompt, mime)) return true;
+  if (fileRequirements.textfile.matches(mime) && isExactTextFileEdit(prompt)
+    && /^(?:замени|добави|replace|append)\s*[:\s]/iu.test(prompt.trim())) return true;
+  return fileRequirements.dataset.matches(mime) && supportsLocalTableAnalysis(prompt)
+    && /^(?:анализирай|обобщи|сметни|изчисли|начертай|analy[sz]e|summari[sz]e|calculate|plot|chart)\s/iu.test(prompt.trim());
+}
+
+async function resolveInputFile(tool: ToolRegistration, request: ToolRequest) {
   if (tool.input === 'none' || tool.input === 'prompt') return;
-  const { label: expected, matches } = requirements[tool.input];
+  if (tool.id === 'document-translate' && parseDocumentTranslationRequest(request.prompt)?.source === 'previous-answer') return;
+  const { label: expected, matches } = fileRequirements[tool.input];
   if (!request.uploadId) throw new ChatToolError(`Прикачи ${expected}.`);
   const upload = request.file ?? await readOwnedUpload(request.uploadId, request.session.id);
   if (!upload) throw new ChatToolError('Прикаченият файл не е намерен.', 404);
