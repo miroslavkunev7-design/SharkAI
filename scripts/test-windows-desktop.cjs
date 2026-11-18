@@ -9,6 +9,7 @@ const { setTimeout: delay } = require('node:timers/promises');
 const { version } = require('../package.json');
 
 const prompt = 'What is the capital of Bulgaria? Reply in one short sentence.';
+const desktopEntryPaths = ['/', '/chat', '/login'];
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 
 async function listen(port) {
@@ -116,10 +117,10 @@ async function openAndClose(executable, mode, check, origin, restoreProxy) {
         if (offline) return item.title === 'SharkAI — Няма връзка' && item.url.includes('/offline.html');
         if (!URL.canParse(item.url)) return false;
         const url = new URL(item.url);
-        return url.origin === origin && ['/chat', '/login'].includes(url.pathname);
+        return url.origin === origin && desktopEntryPaths.includes(url.pathname);
       });
       return tab?.webSocketDebuggerUrl && info?.webSocketDebuggerUrl ? { tab, info } : null;
-    }, offline ? 'The bundled SharkAI offline page did not load.' : 'The installed app did not open the approved SharkAI staging chat.');
+    }, offline ? 'The bundled SharkAI offline page did not load.' : 'The installed app did not open the approved SharkAI staging site.');
     browser = await connect(info.webSocketDebuggerUrl);
     page = await connect(tab.webSocketDebuggerUrl);
     await check(page);
@@ -235,7 +236,7 @@ async function sessionHash(page, origin) {
 async function assertStagedRevision(page, origin) {
   const commit = process.env.SHARKAI_WINDOWS_TEST_COMMIT;
   assert.ok(/^[0-9a-f]{40}$/.test(commit || ''), 'Supply the lowercase 40-character revision of the staged Web application.');
-  await waitExpression(page, `location.origin === ${JSON.stringify(origin)} && ['/chat', '/login'].includes(location.pathname) && document.readyState === 'complete'`, 'The approved staging page did not finish loading.');
+  await waitExpression(page, `location.origin === ${JSON.stringify(origin)} && ${JSON.stringify(desktopEntryPaths)}.includes(location.pathname) && document.readyState === 'complete'`, 'The approved staging page did not finish loading.');
   const activeVersion = await evaluate(page, `fetch('/api/status', {cache:'no-store'}).then(r => r.ok ? r.json() : null)`);
   assert.ok(activeVersion?.ok && activeVersion.version === version && activeVersion.commit === commit,
     'Staging does not serve the exact candidate version and revision under test.');
@@ -262,10 +263,11 @@ async function online(executable, mode, statePath) {
   try {
     await openAndClose(executable, mode, async (page) => {
       if (proxy) {
-        const retryURL = JSON.stringify(new URL('/chat', origin).href);
-        await waitExpression(page, `document.querySelector('#retry')?.href === ${retryURL}`, 'The offline screen did not offer a Retry link to the approved staging chat.');
+        const retryURL = JSON.stringify(new URL('/', origin).href);
+        await waitExpression(page, `document.querySelector('#retry')?.href === ${retryURL}`, 'The offline screen did not offer a Retry link to the approved staging homepage.');
         proxy.restore();
         await evaluate(page, `document.querySelector('#retry').click()`);
+        await waitExpression(page, `location.href === ${retryURL}`, 'Retry did not return to the approved staging homepage.');
       }
       await assertStagedRevision(page, origin);
       if (mode !== 'online-seed') {

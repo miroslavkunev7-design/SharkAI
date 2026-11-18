@@ -378,6 +378,9 @@
 .module-file-list { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
 
 .module-brain, .module-role-heading { display: flex; align-items: center; gap: 9px; }
+.module-content :is(#supreme-brain, #agent-roles) { scroll-margin-top: 76px; }
+.module-brain-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.module-brain-actions .module-link { min-height: 44px; }
 .module-agents { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .module-agent-icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border: 1px solid #d0f5ff; border-radius: 9px; background: linear-gradient(145deg, #92d5f0, #477fcd); color: #f2fbff; }
 .module-agents li:nth-child(3n) .module-agent-icon { background: linear-gradient(145deg, #bcabef, #7655c8); color: #f7f2ff; }
@@ -395,6 +398,7 @@
 .module-role-heading .module-link { flex-wrap: wrap; gap: 4px; }
 .module-agents .module-link { margin-top: 6px; }
 .module-agents-status { margin-bottom: 10px; color: #b8cbea; font-size: .84rem; }
+.module-agents-status a { text-decoration: underline; text-underline-offset: 3px; }
 .module-agent-receipt { margin-top: 9px; border-top: 1px solid var(--workspace-line); padding-top: 8px; font-size: .8rem; }
 .module-agent-receipt > .module-link { display: flex; width: fit-content; }
 .module-receipt-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }

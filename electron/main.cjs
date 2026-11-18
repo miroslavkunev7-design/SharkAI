@@ -4,7 +4,7 @@ const path = require('node:path');
 const origin = app.isPackaged
   ? require('./service.json').origin
   : 'http://localhost:3847';
-const chatURL = new URL('/chat', origin).href;
+const landingURL = new URL('/', origin).href;
 let mainWindow;
 
 function isServiceURL(url) {
@@ -131,7 +131,7 @@ function createWindow() {
   webContents.on('did-navigate', (_event, url, httpResponseCode) => {
     if (isServiceURL(url) && httpResponseCode >= 500) showOffline();
   });
-  void window.loadURL(chatURL).catch(() => {}); // did-fail-load handles main-frame network errors.
+  void window.loadURL(landingURL).catch(() => {}); // did-fail-load handles main-frame network errors.
 
   function showOffline() {
     if (window.isDestroyed()) return;

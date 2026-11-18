@@ -484,10 +484,16 @@ type AgentReceipt = {
   output: string | null; startedAt: string | null; createdAt: string; project: { id: string; name: string };
 };
 
-function Agents({ user }: { user: User | null }) {
+function Agents({ user, loading }: { user: User | null; loading: boolean }) {
   const [runs, setRuns] = useState<AgentReceipt[] | null>(null);
   const [error, setError] = useState('');
   const [reload, setReload] = useState(0);
+  useEffect(() => {
+    const section = window.location.hash.slice(1);
+    if (section === 'supreme-brain' || section === 'agent-roles') {
+      document.getElementById(section)?.scrollIntoView();
+    }
+  }, []);
   useEffect(() => {
     if (!user) return;
     const controller = new AbortController();
@@ -524,19 +530,24 @@ function Agents({ user }: { user: User | null }) {
   return (
     <>
       <Banner view="agents">Задачи в Студиото и последни резултати от твоите проекти.</Banner>
-      <section className="ice-section module-panel module-brain-panel" data-ice-art="agent">
+      <section className="ice-section module-panel module-brain-panel" id="supreme-brain" data-ice-art="agent" aria-labelledby="supreme-brain-title">
         <div className="module-heading">
-          <div className="module-brain"><Logo size="md" /><div><h2>{SUPREME_BRAIN.name}</h2><p>{SUPREME_BRAIN.description}</p></div></div>
-          <Link className="module-link" href={VIEWS.studio.href}>Студио <ArrowRight size={16} /></Link>
+          <div className="module-brain"><Logo size="md" /><div><h2 id="supreme-brain-title">{SUPREME_BRAIN.name}</h2><p>{SUPREME_BRAIN.description}</p></div></div>
+        </div>
+        <div className="module-brain-actions">
+          <Link className="shark-action" href="/dashboard?feature=screenshot-website">Проект по скрийншот <ArrowRight size={16} aria-hidden="true" /></Link>
+          <Link className="module-link" href="/dashboard?feature=prompt-software">Проект от описание <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
         {receipt(SUPREME_BRAIN.id)}
       </section>
-      <section aria-labelledby="module-agents-title">
+      <section id="agent-roles" aria-labelledby="module-agents-title">
         <div className="module-heading">
           <h2 id="module-agents-title">Специализирани роли</h2>
           {user && <button type="button" className="module-link" onClick={() => setReload((value) => value + 1)}>Обнови резултатите</button>}
         </div>
         {user && !runs && !error && <p className="module-agents-status" role="status">Зареждане на изпълненията…</p>}
+        {user && runs?.length === 0 && !error && <p className="module-agents-status">Резултатите от изпълнените роли ще се появят тук след стартиране на проект.</p>}
+        {!user && !loading && <p className="module-agents-status"><Link href={signIn(VIEWS.agents.href)}>Влез, за да видиш изпълненията от твоите проекти.</Link></p>}
         {error && <p className="module-agents-status module-error" role="alert">{error}</p>}
         <ul className="module-agents">
           {AGENTS.map((agent) => {
@@ -755,7 +766,7 @@ function DashboardContent() {
             <StudioForm key={featureParam ?? 'screenshot-website'} featureParam={featureParam ?? 'screenshot-website'} user={data?.user ?? null} loading={loading} onCreated={created} />
             {data?.user && <ProjectList projects={data.projects} onRetry={() => void fetchProjects()} />}
           </>}
-          {view === 'agents' && <Agents user={data?.user ?? null} />}
+          {view === 'agents' && <Agents user={data?.user ?? null} loading={loading} />}
           {view === 'automotive' && <Automotive />}
           {view === 'investments' && <>
             <Banner view="investments">Състояние на свързания портфейл.</Banner>
