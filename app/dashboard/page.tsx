@@ -15,6 +15,7 @@ import {
   SUPREME_BRAIN, getFeature, getStudioFeatureAvailability,
 } from '@/lib/agents';
 import { isTerminalStudioStatus, TRACKED_STUDIO_RUNS, type AgentRunActivity } from '@/lib/studio-activity';
+import { MemorySettings } from './memory-settings';
 import './workspace.css';
 
 const VIEWS = {
@@ -539,6 +540,7 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
             </>
           )}
       </section>
+      {user && <MemorySettings />}
     </>
   );
 }
@@ -606,10 +608,13 @@ function DashboardContent() {
     return () => { request.abort(); clearInterval(timer); };
   }, [view, data?.summary?.active, fetchProjects]);
 
+  const hasUser = Boolean(data?.user);
+  const userEmail = data?.user?.email;
+
   useEffect(() => {
     setDetails(null);
     setProjectError('');
-    if (!projectId || !data?.user) return;
+    if (!projectId || !hasUser) return;
 
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
@@ -629,7 +634,7 @@ function DashboardContent() {
     }
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
-  }, [projectId, data?.user?.email, !!data?.user, reload, fetchProjects]);
+  }, [projectId, userEmail, hasUser, reload, fetchProjects]);
 
   function created(id: string) {
     router.push(`/dashboard?project=${encodeURIComponent(id)}`);

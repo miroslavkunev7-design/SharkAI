@@ -5,7 +5,7 @@ export function isVercel(): boolean {
   return process.env.VERCEL === '1';
 }
 
-export function useDbUploads(): boolean {
+export function storesUploadsInDatabase(): boolean {
   return isVercel() || process.env.USE_DB_UPLOADS === 'true';
 }
 

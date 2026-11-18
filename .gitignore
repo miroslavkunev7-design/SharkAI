@@ -17,3 +17,5 @@ Thumbs.db
 .desktop-app/
 
 *.tsbuildinfo
+
+__pycache__/

@@ -7,10 +7,12 @@ import type { AccountSession } from './auth';
 import { DataToolError, runOpenAIDataTool } from './chat-data-tools.server';
 import { LocalDocumentError, isLocalDocumentEdit, runLocalDocumentTool } from './chat-documents.server';
 import { LocalImageEditError, parseLocalImageEdit, runLocalImageEdit } from './chat-image-edits.server';
-import { LocalTableError, runLocalTableAnalysis, supportsLocalTableAnalysis } from './chat-tables.server';
+import { LocalTableError, hasIsolatedTableWorker, runLocalTableAnalysis, supportsLocalTableAnalysis } from './chat-tables.server';
 import { LocalDocumentError as OcrError, getLocalDocumentTools, isLocalExtractionRequest, readLocalDocument } from './chat-ocr.server';
 import { TextFileError, textFileFormats, writeChatTextFile } from './chat-text-files.server';
 import { LocalImageError, hasLocalImageProvider, runLocalImage } from './local-image.server';
+import { createReminder, createReminderFromPrompt, ReminderInputError } from './reminders';
+import type { ReminderInput } from './reminder-input';
 import { ResearchInputError, quickPublicSearch, startResearch } from './research';
 import type { ChatTool, ChatToolResult } from './chat-tools';
 import { ProjectInputError, startProject } from './projects';
@@ -35,6 +37,7 @@ interface ToolRequest {
   uploadId?: string;
   requestId: string;
   contextText?: string;
+  reminder?: ReminderInput;
   file?: { data: Buffer; mimeType: string };
   signal?: AbortSignal;
 }
@@ -185,7 +188,7 @@ async function createImage({ openai, prompt, file, session, signal }: ToolExecut
 function executeDataTool(operation: Parameters<typeof runOpenAIDataTool>[0]) {
   return async (input: ToolExecution): Promise<ToolOutput> => {
     const { prompt, file, session, signal, openai } = input;
-    if (operation === 'dataset' && file && supportsLocalTableAnalysis(prompt)) {
+    if (operation === 'dataset' && file && supportsLocalTableAnalysis(prompt) && await hasIsolatedTableWorker()) {
       const local = await runLocalTableAnalysis({ prompt, file, userId: session.id, signal });
       if (local) return { ...local, status: 'completed' };
     }
@@ -208,6 +211,17 @@ function executeDataTool(operation: Parameters<typeof runOpenAIDataTool>[0]) {
       throw error;
     }
   };
+}
+
+async function scheduleReminder({ session, requestId, reminder, prompt }: ToolExecution): Promise<ToolOutput> {
+  const record = reminder
+    ? await createReminder(session.id, requestId, reminder)
+    : await createReminderFromPrompt(session.id, requestId, prompt);
+  const due = record.nextAt && new Intl.DateTimeFormat('bg-BG', {
+    timeZone: record.timeZone, dateStyle: 'long', timeStyle: 'short',
+  }).format(record.nextAt);
+  const text = due ? 'Напомнянето е записано за ' + due + ' (' + record.timeZone + ').' : 'Напомнянето е записано.';
+  return { id: record.id, reminderId: record.id, status: 'completed', text };
 }
 
 const coreTools: ToolRegistration[] = [
@@ -234,7 +248,7 @@ const coreTools: ToolRegistration[] = [
   { id: 'text-file-edit', label: 'Редактирай текстов файл', description: 'Запазва коригирано копие в същия формат.', group: 'Документи и данни', input: 'textfile', execute: writeChatTextFile },
   { id: 'dataset-advanced', label: 'Разширен анализ на таблица', description: 'Изпълнява заявеното изчисление с OpenAI Code Interpreter и връща резултата в разговора.', group: 'Документи и данни', input: 'dataset', requiresOpenAI: true, execute: async ({ prompt, file, session, signal }) => ({ status: 'completed', ...await runOpenAIDataTool('dataset', { prompt, file, userId: session.id, signal }) }) },
   { id: 'canvas', label: 'Платно', description: 'Създава текст, Markdown или JSON, който можеш да редактираш и изтеглиш в разговора.', group: 'Работно пространство', input: 'prompt', execute: writeChatTextFile },
-  { id: 'scheduled-task', label: 'Планирай задача', description: 'Напомняния и периодични задачи.', group: 'Работно пространство', input: 'prompt', unavailable: 'Липсват планировчик и услуга за известия.' },
+  { id: 'scheduled-task', label: 'Планирай задача', description: 'Записва еднократни и периодични напомняния по часова зона. Известията се получават в отворения чат или при връщане.', group: 'Работно пространство', input: 'prompt', execute: scheduleReminder },
   { id: 'integrations', label: 'Интеграции', description: 'Инструменти от свързани приложения.', group: 'Работно пространство', input: 'none', unavailable: 'Няма свързани приложения или конфигурирани OAuth връзки.' },
   { id: 'investment-data', label: 'Инвестиции', description: 'Справка за портфейл или движения.', group: 'Работно пространство', input: 'none', unavailable: 'Няма свързан източник за портфейл.' },
   { id: 'automotive-data', label: 'Автомобилна справка', description: 'Проверка по VIN или диагностика.', group: 'Работно пространство', input: 'prompt', unavailable: 'Няма свързан VIN или диагностичен източник.' },
@@ -271,23 +285,32 @@ function registry(): ToolRegistration[] {
   ];
 }
 
-function unavailableReason(tool: ToolRegistration, session: AccountSession | null, hasOpenAI: boolean, localImages: boolean, localDocs?: Awaited<ReturnType<typeof getLocalDocumentTools>>) {
+interface LocalCapabilities {
+  images?: boolean;
+  tables?: boolean;
+  documents?: Awaited<ReturnType<typeof getLocalDocumentTools>>;
+}
+
+function unavailableReason(tool: ToolRegistration, session: AccountSession | null, hasOpenAI: boolean, local: LocalCapabilities) {
   if (!session) return 'Влез в SharkAI, за да използваш инструмента.';
   if (tool.unavailable) return tool.unavailable;
   if ((tool.requiresOpenAI || tool.imageProvider) && remainingChatTokens(session) <= 0) return quotaReached;
-  if (tool.extraction && !hasOpenAI && !(tool.extraction === 'pdf' ? localDocs?.pdfText : localDocs?.ocrLanguages.length)) {
+  if (tool.id === 'dataset-analysis' && !hasOpenAI && !local.tables) return 'Необходим е изолиран работник за таблици в Linux или разрешен OpenAI Code Interpreter.';
+  if (tool.extraction && !hasOpenAI && !(tool.extraction === 'pdf' ? local.documents?.pdfText : local.documents?.ocrLanguages.length)) {
     return tool.extraction === 'pdf' ? 'Необходим е Poppler в изолирана Linux среда или OpenAI.' : 'Необходим е Tesseract с езиков пакет в изолирана Linux среда или OpenAI.';
   }
   if (tool.requiresOpenAI && !hasOpenAI) return providerMissing;
-  if (tool.imageProvider && !hasOpenAI && !localImages) return 'Необходим е OpenAI за изображения или свързан SharkAI работник за изображения.';
+  if (tool.imageProvider && !hasOpenAI && !local.images) return 'Необходим е OpenAI за изображения или свързан SharkAI работник за изображения.';
   return undefined;
 }
 
 export async function listChatTools(session: AccountSession | null): Promise<ChatTool[]> {
-  const [hosted, localImages, localDocs] = session ? await Promise.all([getHostedOpenAI(), hasLocalImageProvider(), getLocalDocumentTools()]) : [null, false, undefined] as const;
+  const [hosted, images, tables, documents] = session
+    ? await Promise.all([getHostedOpenAI(), hasLocalImageProvider(), hasIsolatedTableWorker(), getLocalDocumentTools()])
+    : [null, false, false, undefined] as const;
   const hasOpenAI = !!session && !!hosted && remainingChatTokens(session) > 0;
   return registry().map((tool) => {
-    const reason = unavailableReason(tool, session, hasOpenAI, localImages, localDocs);
+    const reason = unavailableReason(tool, session, hasOpenAI, { images, tables, documents });
     const { id, label, description, group, input } = tool;
     return { id, label, description, group, input, platforms, available: !reason, reason };
   });
@@ -309,7 +332,7 @@ const intentMatchers: Array<[string, RegExp]> = [
   ['image-properties', /^(?:свойства на изображение|размери на снимката|покажи цветовете на снимката|image properties)(?=\s|[:.,!?]|$)/iu],
   ['dataset-analysis', /^(?:анализирай (?:прикачения )?(?:csv|xlsx)|направи графика от (?:csv|xlsx)|analyze (?:the )?(?:csv|xlsx)|chart (?:the )?(?:csv|xlsx))(?=\s|[:.,!?]|$)/iu],
   ['document-export', /^(?:(?:създай|направи|запази|експортирай) (?:ми )?(?:pdf|docx)|(?:create|export) (?:a )?(?:pdf|docx))(?=\s|[:.,!?]|$)/iu],
-  ['scheduled-task', /^(?:напомни ми|планирай задача|remind me|schedule a task)(?=\s|[:.,!?]|$)/iu],
+  ['scheduled-task', /^(?:напомни ми|планирай задача|планирай напомняне|създай напомняне|remind me|schedule a task)(?=\s|[:.,!?]|$)/iu],
   ['automotive-data', /^(?:провери vin|проверка по vin|диагностика на автомобил|check vin|look up vin)(?=\s|[:.,!?]|$)/iu],
   ['investment-data', /^(?:покажи портфейла ми|справка за инвестиции|show my investment portfolio)(?=\s|[:.,!?]|$)/iu],
 ];
@@ -384,7 +407,8 @@ export async function dispatchChatTool(request: ToolRequest): Promise<ChatToolRe
   const openai = canUseModel && (tool.requiresOpenAI || tool.optionalOpenAI || tool.imageProvider) ? await getHostedOpenAI() : null;
   const localImages = !!tool.imageProvider && !openai && await hasLocalImageProvider();
   const localDocs = tool.extraction && !openai ? await getLocalDocumentTools() : undefined;
-  const reason = unavailableReason(tool, request.session, !!openai, localImages, localDocs);
+  const tables = tool.id === 'dataset-analysis' && !openai && await hasIsolatedTableWorker();
+  const reason = unavailableReason(tool, request.session, !!openai, { images: localImages, tables, documents: localDocs });
   if (reason || !tool.execute) throw new ChatToolError(reason || 'Инструментът не е наличен.', reason === quotaReached ? 429 : 503);
   if (!request.prompt.trim()) throw new ChatToolError('Въведи заявка за инструмента.');
   const file = await resolveInputFile(tool, request);
@@ -397,7 +421,7 @@ export async function dispatchChatTool(request: ToolRequest): Promise<ChatToolRe
     if (request.signal?.aborted || error instanceof ChatToolError) throw error;
     if (error instanceof LocalDocumentError || error instanceof LocalImageError || error instanceof LocalImageEditError
       || error instanceof OcrError || error instanceof TextFileError || error instanceof LocalTableError
-      || error instanceof ResearchInputError || error instanceof DataToolError) {
+      || error instanceof ResearchInputError || error instanceof ReminderInputError || error instanceof DataToolError) {
       throw new ChatToolError(error.message, error.status);
     }
     if (tool.requiresOpenAI || tool.imageProvider || APICallError.isInstance(error)) {

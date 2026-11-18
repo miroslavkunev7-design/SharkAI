@@ -3,7 +3,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import { TextDecoder } from 'node:util';
 import { prisma } from './db';
-import { getUploadDir, useDbUploads } from './storage-paths';
+import { getUploadDir, storesUploadsInDatabase } from './storage-paths';
 
 const EXTENSIONS: Record<string, string> = {
   'image/png': 'png',
@@ -35,6 +35,7 @@ export function mimeFromExt(ext: string): string {
 export function resolveUploadMime(mime: string, name: string): string {
   const ext = path.extname(name).slice(1).toLowerCase();
   const type = mime.split(';', 1)[0].trim().toLowerCase();
+  if (ext === 'json' && ['', 'application/octet-stream', 'text/plain', 'text/json'].includes(type)) return 'application/json';
   if (ext === 'csv' && ['', 'application/octet-stream', 'application/vnd.ms-excel', 'text/plain'].includes(type)) return 'text/csv';
   if (['txt', 'md', 'markdown'].includes(ext) && ['', 'application/octet-stream', 'text/plain', 'text/markdown'].includes(type)) {
     return ext === 'txt' ? 'text/plain' : 'text/markdown';
@@ -83,7 +84,7 @@ export async function saveUpload(buffer: Buffer, mimeType: string, userId: strin
   const ext = EXTENSIONS[mimeType];
   if (!ext) throw new Error('Unsupported upload MIME type');
   const id = randomUUID();
-  const inDatabase = useDbUploads();
+  const inDatabase = storesUploadsInDatabase();
   const filePath = inDatabase ? null : await writeDiskUpload(id, ext, buffer);
   try {
     await prisma.fileUpload.create({

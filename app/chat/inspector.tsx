@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { Download, ExternalLink, LoaderCircle, MessageSquare, Pencil, Save, X } from 'lucide-react';
-import { artifactDownloadUrl, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, projectInProgress, PROJECT_STATUS, type Attachment, type InspectorItem, type Project } from './workspace-types';
+import { artifactDownloadUrl, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, projectInProgress, projectStatusLabel, type Attachment, type InspectorItem, type Project } from './workspace-types';
+
+import { ReminderPanel, type ReminderInput, type ReminderStore } from './reminders';
 
 type SaveCanvas = (file: Attachment, content: string) => Promise<void>;
 
@@ -34,7 +36,7 @@ function ProjectInspector({ id, talk }: { id: string; talk?: (project: string) =
         if (controller.signal.aborted) return;
         setDetails(data);
         setError('');
-        if (projectInProgress(data.project.status)) {
+        if (projectInProgress(data.project)) {
           timeout = setTimeout(load, 2500);
         }
       } catch (cause) {
@@ -53,7 +55,7 @@ function ProjectInspector({ id, talk }: { id: string; talk?: (project: string) =
       {details && (
         <div className="shark-chat-inspector-card">
           <strong>{details.project.name}</strong>
-          <span role="status">{PROJECT_STATUS[details.project.status] || details.project.status}</span>
+          <span role="status">{projectStatusLabel(details.project)}</span>
           {details.project.description && <p>{details.project.description}</p>}
           {done && <span>Файлове · {details.fileCount}</span>}
           {details.project.status === 'FAILED' && <p>Изпълнението е неуспешно. Подробностите за проекта са в Студио.</p>}
@@ -61,6 +63,7 @@ function ProjectInspector({ id, talk }: { id: string; talk?: (project: string) =
       )}
       {error && <div className="shark-chat-notice" role="alert">{error} <button type="button" onClick={() => { setError(''); setRetry((value) => value + 1); }}>Опитай отново</button></div>}
       <div className="shark-chat-inspector-links">
+        {details?.project.statusUnknown && <button type="button" onClick={() => setRetry((value) => value + 1)}>Провери статуса</button>}
         {details && talk && <button type="button" onClick={() => talk(id)}><MessageSquare size={16} /> Обсъди проекта</button>}
         <Link href={`/dashboard?project=${encodeURIComponent(id)}`}><ExternalLink size={16} /> Отвори в Студио</Link>
         {done && details?.previewUrl && <button type="button" aria-expanded={showPreview} onClick={() => setShowPreview((shown) => !shown)}>{showPreview ? 'Затвори прегледа' : 'Преглед'}</button>}
@@ -166,14 +169,19 @@ function TextInspector({ item, save, disabled }: { item: Extract<InspectorItem, 
   );
 }
 
-export function Inspector({ item, close, talk, save, disabled }: { item: InspectorItem; close: () => void; talk?: (project: string) => void; save?: SaveCanvas; disabled?: boolean }) {
+export function Inspector({ item, close, talk, save, disabled, reminders, createReminder }: {
+  item: InspectorItem; close: () => void; talk?: (project: string) => void; save?: SaveCanvas; disabled?: boolean;
+  reminders: ReminderStore; createReminder?: (input: ReminderInput) => Promise<void>;
+}) {
   return (
     <aside className="shark-chat-inspector" aria-label={item.title}>
       <header>
         <h2>{item.title}</h2>
         <button className="shark-chat-icon" type="button" aria-label="Затвори прегледа" onClick={close}><X size={19} /></button>
       </header>
-      {item.type === 'project' ? <ProjectInspector key={item.id} id={item.id} talk={talk} /> : (
+      {item.type === 'project' ? <ProjectInspector key={item.id} id={item.id} talk={talk} /> : item.type === 'reminders' ? (
+        <ReminderPanel store={reminders} create={createReminder} writable={!disabled} />
+      ) : (
         <>
           {item.type === 'text' ? <TextInspector key={item.url} item={item} save={save} disabled={disabled} /> : <img className="shark-chat-inspector-image" src={item.url} alt={item.title} />}
           <div className="shark-chat-inspector-links">

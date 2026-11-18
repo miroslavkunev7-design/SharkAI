@@ -1,8 +1,7 @@
 import { z } from 'zod';
 
 const contact = 'SharkAI/1.0 (+https://github.com/miroslavkunev7-design/SharkAI)';
-const wikiLanguages = ['bg', 'en'] as const;
-type WikiLanguage = (typeof wikiLanguages)[number];
+type WikiLanguage = 'bg' | 'en';
 
 export interface ResearchSource {
   title: string;

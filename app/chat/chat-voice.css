@@ -1,0 +1,18 @@
+.shark-chat-voice-language {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.shark-chat-voice-language select {
+  color: #ecf5ff;
+  background: #132039;
+  border: 1px solid #456087;
+  border-radius: 0.7rem;
+  min-height: 2.4rem;
+  padding-inline: 0.65rem;
+}

@@ -21,6 +21,7 @@ export interface ChatToolResult {
   text?: string;
   projectId?: string;
   researchId?: string;
+  reminderId?: string;
   url?: string;
   artifact?: { url: string; mimeType: string; filename?: string };
   sources?: Array<{ title: string; url: string }>;

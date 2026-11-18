@@ -332,3 +332,22 @@
 }
 .shark-chat-canvas textarea[aria-invalid='true'] { border-color: #efadbc; }
 .shark-chat-inspector-links button:disabled { opacity: .65; }
+
+.shark-chat-topbar-actions { display: flex; align-items: center; gap: 4px; }
+.shark-chat-reminder-trigger { position: relative; }
+.shark-chat-reminder-trigger span { position: absolute; right: 0; top: 0; padding: 0 4px; border: 1px solid #f8dcff; border-radius: 12px; background: #523891; color: white; font-size: .68rem; min-width: 17px; }
+.shark-chat-rail-row small { flex: 0 0 86px; color: #ffe0b9; font-size: .65rem; line-height: 1.2; }
+.shark-chat-reminders { display: grid; gap: 13px; min-width: 0; }
+.shark-chat-reminders h3, .shark-chat-reminder-form label { color: #e5eeff; font-size: .85rem; font-weight: 680; }
+.shark-chat-reminders section > p, .shark-chat-reminders li span { color: #c2d7f3; font-size: .78rem; }
+.shark-chat-reminder-form, .shark-chat-reminder-form label, .shark-chat-reminder-field, .shark-chat-reminders section, .shark-chat-reminders ul { display: grid; gap: 5px; min-width: 0; }
+.shark-chat-reminder-form input, .shark-chat-reminder-form select { min-width: 0; width: 100%; min-height: 42px; border: 1px solid var(--chat-line); border-radius: 9px; padding: 6px 8px; background: #0b1930; color: #edf6ff; font-size: .86rem; }
+.shark-chat-reminder-form .shark-chat-new { margin-top: 4px; }
+.shark-chat-reminders li { display: grid; gap: 4px; border: 1px solid #81a6df4d; border-radius: 10px; padding: 7px; background: #0b17317d; font-size: .84rem; overflow-wrap: anywhere; }
+.shark-chat-reminders section button, .shark-chat-reminders .shark-chat-notice button { display: flex; align-items: center; gap: 6px; text-align: left; width: fit-content; min-height: 38px; color: #a6dcff; }
+.shark-chat-reminders button:hover:not(:disabled) { color: #fff; }
+.shark-chat-reminders button:disabled { opacity: .6; }
+@media (max-width: 820px) {
+  .shark-chat-reminder-form input, .shark-chat-reminder-form select { min-height: 44px; font-size: 1rem; }
+  .shark-chat-reminders section button { min-height: 44px; }
+}

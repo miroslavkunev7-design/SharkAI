@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { ZipArchive } from 'archiver';
 import sharp from 'sharp';
-import { LocalTableError, runLocalTableAnalysis, supportsLocalTableAnalysis } from '../lib/chat-tables.server';
+import { hasIsolatedTableWorker, LocalTableError, runLocalTableAnalysis, supportsLocalTableAnalysis } from '../lib/chat-tables.server';
 import { prisma } from '../lib/db';
 import { readOwnedUpload } from '../lib/uploads';
 
@@ -23,6 +23,9 @@ function workbookFixture() {
 }
 
 async function main() {
+  const database = new URL(process.env.POSTGRES_PRISMA_URL ?? '');
+  assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(database.hostname), 'Use a disposable local PostgreSQL database.');
+  assert.equal(await hasIsolatedTableWorker(), true, 'A working Linux table sandbox is required.');
   const userId = 'local-table-test-' + randomUUID();
   const xlsx = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   assert.ok(supportsLocalTableAnalysis('Обобщи CSV'));
@@ -68,12 +71,21 @@ async function main() {
       prompt: 'Направи прогноза за продажби',
       userId,
     }), LocalTableError);
+
+    const stopped = new AbortController();
+    stopped.abort();
+    await assert.rejects(runLocalTableAnalysis({
+      file: { data: workbook, mimeType: xlsx },
+      prompt: 'Обобщи XLSX',
+      userId,
+      signal: stopped.signal,
+    }), { name: 'AbortError' });
   } finally {
     await prisma.fileUpload.deleteMany({ where: { userId } });
     await prisma.user.delete({ where: { id: userId } });
     await prisma.$disconnect();
   }
-  console.log('CSV totals, missing cells, formula-safe export, XLSX sheet selection, cached formulas, PNG output, ownership and unsupported prompt passed.');
+  console.log('Isolated CSV/XLSX analysis passed: sandbox probe, totals, missing cells, formula-safe export, sheet selection, cached formulas, PNG output, ownership, abort and unsupported prompt.');
 }
 
 main().catch((error) => { console.error(error); process.exitCode = 1; });

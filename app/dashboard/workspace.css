@@ -202,6 +202,19 @@
 .module-account > div { display: grid; gap: 8px; grid-template-columns: minmax(100px, 145px) minmax(0, 1fr); padding: 9px 0; border-bottom: 1px solid #8fb2e128; }
 .module-account dt { color: var(--shark-muted); font-size: .85rem; }
 .module-account dd { font-weight: 650; }
+.module-memory { display: grid; gap: 12px; }
+.module-memory .module-heading { margin-bottom: 0; }
+.module-memory-toggle { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.module-memory-toggle > span { font-weight: 650; font-size: .9rem; }
+.module-memory-notes { display: grid; gap: 8px; }
+.module-memory-notes > li { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 8px; padding: 11px; border: 1px solid #8fb2e132; border-radius: 12px; }
+.module-memory-notes p { white-space: pre-wrap; color: #e0edff; }
+.module-memory-notes > li > div, .module-memory-form-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.module-memory-form { width: min(100%, 700px); }
+.module-memory-form-actions > small { color: var(--shark-muted); margin-right: auto; }
+.module-memory-clear { border-top: 1px solid #8fb2e132; padding-top: 11px; }
+.module-memory .module-memory-status { color: #abf7de; }
+.module-memory .module-memory-danger { color: #ffc3d8; }
 
 .module-banner-automotive { --art: url('/assets/image-3.png'); justify-content: space-between; gap: 16px; }
 .module-banner-automotive .module-car { width: clamp(160px, 30%, 280px); height: auto; border: 1px solid #adcafa5c; border-radius: 14px; }

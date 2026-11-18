@@ -5,9 +5,13 @@ on:
   workflow_dispatch:
     inputs:
       service_origin:
-        description: Approved SharkAI HTTPS origin for this build
+        description: Approved SharkAI HTTPS origin for the installer
         type: string
         required: false
+      run_windows_11_acceptance:
+        description: Run on the configured clean Windows 11 x64 runner under a standard user
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -22,21 +26,62 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      - name: Check Windows 11 staging configuration
+        if: inputs.run_windows_11_acceptance
+        shell: pwsh
+        env:
+          SHARKAI_WINDOWS_TEST_ORIGIN: ${{ vars.SHARKAI_WINDOWS_TEST_ORIGIN }}
+        run: |
+          $uri = $null
+          if (![Uri]::TryCreate($env:SHARKAI_WINDOWS_TEST_ORIGIN, [UriKind]::Absolute, [ref]$uri) -or
+              $uri.Scheme -ne 'https' -or $uri.UserInfo -or $uri.AbsolutePath -ne '/' -or $uri.Query -or $uri.Fragment -or
+              $uri.Host -eq 'mm-auto-nadq-jeleva-s-projects.vercel.app') {
+            throw 'Set SHARKAI_WINDOWS_TEST_ORIGIN to the approved, existing HTTPS staging origin.'
+          }
       - run: npm ci
       - name: Build NSIS installer
         run: npm run electron:build
         env:
-          SHARKAI_DESKTOP_ORIGIN: ${{ inputs.service_origin || vars.SHARKAI_DESKTOP_ORIGIN }}
+          SHARKAI_DESKTOP_ORIGIN: ${{ (inputs.run_windows_11_acceptance && vars.SHARKAI_WINDOWS_TEST_ORIGIN) || inputs.service_origin || vars.SHARKAI_DESKTOP_ORIGIN }}
           CSC_LINK: ${{ github.event_name == 'workflow_dispatch' && secrets.CSC_LINK || '' }}
           CSC_KEY_PASSWORD: ${{ github.event_name == 'workflow_dispatch' && secrets.CSC_KEY_PASSWORD || '' }}
-      - name: Verify installer, desktop startup, upgrade and uninstall
+      - name: Verify installer, offline startup, upgrade and uninstall
         shell: pwsh
         run: ./scripts/test-windows-installer.ps1
-      - name: Upload installer and verification metadata
+      - name: Upload the Windows-built installer and verification metadata
         uses: actions/upload-artifact@v4
         with:
           name: SharkAI-windows-x64
           path: |
             release/SharkAI-Setup-*.exe
             release/windows-installer.json
+          if-no-files-found: error
+
+  windows-11-acceptance:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_windows_11_acceptance
+    needs: windows-x64
+    runs-on: [self-hosted, Windows, X64, sharkai-win11-clean]
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Download the Windows-built installer
+        uses: actions/download-artifact@v4
+        with:
+          name: SharkAI-windows-x64
+          path: release
+      - name: Verify Windows 11 install, existing ULTRA test account, real chat and reuse after upgrade
+        shell: pwsh
+        run: ./scripts/test-windows-installer.ps1 -Windows11Acceptance
+        env:
+          SHARKAI_WINDOWS_TEST_ORIGIN: ${{ vars.SHARKAI_WINDOWS_TEST_ORIGIN }}
+          SHARKAI_WINDOWS_TEST_EMAIL: ${{ secrets.SHARKAI_WINDOWS_TEST_EMAIL }}
+          SHARKAI_WINDOWS_TEST_PASSWORD: ${{ secrets.SHARKAI_WINDOWS_TEST_PASSWORD }}
+      - name: Upload Windows 11 acceptance metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: SharkAI-windows-11-acceptance
+          path: release/windows-client-acceptance.json
           if-no-files-found: error

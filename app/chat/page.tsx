@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import type { ChatTool } from '@/lib/chat-tools';
 import {
-  AppWindow, ArrowUp, AudioLines, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, ExternalLink,
+  AppWindow, ArrowUp, AudioLines, Bell, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, ExternalLink,
   FileText, Folder, Globe2, Image as ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare,
   Mic, PanelLeftClose, PanelLeftOpen, Paperclip, Pencil, Plus, RotateCcw, ScanLine, ScreenShare,
   Search, Settings, Shield, Sparkles, Square, Table2, X,
@@ -13,12 +13,14 @@ import {
 import { captureFrame, useChatMedia } from './chat-media';
 import { readChatResponse } from './chat-response';
 import { Inspector } from './inspector';
+import { useReminders, type ReminderInput } from './reminders';
 import { ToolReceipt } from './tool-receipt';
 import {
-  artifactAttachment, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, CANVAS_SAVE_PREFIX, imageUrl, projectInProgress, type Account, type Attachment, type Conversation,
+  artifactAttachment, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, CANVAS_SAVE_PREFIX, imageUrl, projectInProgress, projectStatusLabel, type Account, type Attachment, type Conversation,
   type InspectorItem, type Message, type Mode, type Model, type Project,
 } from './workspace-types';
 import './workspace.css';
+import './chat-voice.css';
 
 type Popup = 'tools' | 'model' | 'mode' | 'profile';
 type BranchFrom = { conversationId: string; messageId: string };
@@ -45,6 +47,7 @@ interface ChatRequest {
   toolId?: string;
   projectId?: string;
   branchFrom?: BranchFrom;
+  reminder?: ReminderInput;
 }
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -123,6 +126,7 @@ export default function ChatPage() {
   const loadController = useRef<AbortController | null>(null);
   const failedRequest = useRef<ChatRequest | null>(null);
   const failedCanvasRequest = useRef<ChatRequest | null>(null);
+  const failedReminderRequest = useRef<ChatRequest | null>(null);
   const mounted = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -137,12 +141,18 @@ export default function ChatPage() {
   const cameraStream = useRef<MediaStream | null>(null);
   const inspectorReturnFocus = useRef<HTMLElement | null>(null);
   const inspectorRegion = useRef<HTMLDivElement>(null);
-  const media = useChatMedia(setProblem);
+  const media = useChatMedia(!!account, setProblem);
 
+  const reminders = useReminders(account?.email ?? null);
+  const reminderTool = tools.find(({ id, available }) => id === 'scheduled-task' && available);
   const model = models.find((option) => option.id === modelId) ?? models[0];
+  const voiceUnavailable = media.voiceReason || (!model ? 'Няма достъпен модел за гласов отговор.' : '');
+  const dictationLabel = media.listening === 'dictation' ? (media.recordStage === 'recording' ? 'Приключи диктовката' : 'Отмени диктовката') : 'Диктовка';
+  const conversationLabel = media.speaking ? 'Спри озвучаването' : media.listening === 'conversation'
+    ? (media.recordStage === 'recording' ? 'Изпрати гласовия запис' : 'Отмени гласовия запис') : 'Гласов разговор';
   const canSend = !!account;
   const pending = loading || sending || uploading || mediaPending || modeSaving;
-  const awaitingProjects = projects.some((project) => projectInProgress(project.status));
+  const awaitingProjects = projects.some(projectInProgress);
   const showStart = !loading && !loadProblem && messages.length === 0 && !optimistic;
   const appliedReasoning = model?.reasoningLevels.includes(reasoning) ? reasoning : model?.reasoningLevels[0];
 
@@ -258,11 +268,11 @@ export default function ChatPage() {
     setPopup(id);
   }
 
-  function closeDrawer() {
+  const closeDrawer = useCallback(() => {
     setDrawerOpen(false);
     closePopup();
     requestAnimationFrame(() => railTrigger.current?.focus());
-  }
+  }, [closePopup]);
 
   function closeInspector() {
     setInspector(null);
@@ -270,7 +280,7 @@ export default function ChatPage() {
   }
 
   function openInspector(item: InspectorItem) {
-    inspectorReturnFocus.current = document.activeElement as HTMLElement | null;
+    inspectorReturnFocus.current = (popup && triggerRef.current) || document.activeElement as HTMLElement | null;
     setInspector(item);
     setDrawerOpen(false);
     setPopup(null);
@@ -304,7 +314,7 @@ export default function ChatPage() {
       }
       const modal = small ? (popup === 'tools' ? popupRef.current : inspector ? inspectorRegion.current : drawerOpen ? railRef.current : null) : null;
       if (event.key !== 'Tab' || !modal) return;
-      const entries = Array.from(modal.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not([type=hidden]):not(:disabled),textarea:not(:disabled),iframe'));
+      const entries = Array.from(modal.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not([type=hidden]):not(:disabled),textarea:not(:disabled),select:not(:disabled),iframe'));
       const first = entries[0];
       const last = entries[entries.length - 1];
       if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
@@ -316,7 +326,7 @@ export default function ChatPage() {
       document.removeEventListener('pointerdown', clickOutside);
       document.removeEventListener('keydown', onKey);
     };
-  }, [popup, small, drawerOpen, inspector, closePopup]);
+  }, [popup, small, drawerOpen, inspector, closeDrawer, closePopup]);
 
   function updateUrl(id: string | null, project: string | null = null) {
     const url = new URL(window.location.href);
@@ -337,6 +347,7 @@ export default function ChatPage() {
     setNotice('');
     failedRequest.current = null;
     failedCanvasRequest.current = null;
+    failedReminderRequest.current = null;
     media.stopListening();
     media.stopSpeaking();
   }
@@ -484,6 +495,10 @@ export default function ChatPage() {
 
   function chooseTool(tool: ChatTool) {
     if (!tool.available) return;
+    if (tool.id === 'scheduled-task') {
+      openInspector({ type: 'reminders', title: 'Напомняния' });
+      return;
+    }
     media.stopListening();
     setSelectedTool(tool);
     setMode('work');
@@ -494,11 +509,12 @@ export default function ChatPage() {
 
   async function submit(request: ChatRequest, { speak = false, canvasMime }: { speak?: boolean; canvasMime?: string } = {}) {
     if (sendController.current) return { error: 'Изчакай текущата заявка да завърши.' };
-    const retry = canvasMime ? failedCanvasRequest : failedRequest;
+    const panelAction = canvasMime || request.reminder;
+    const retry = canvasMime ? failedCanvasRequest : request.reminder ? failedReminderRequest : failedRequest;
     const controller = new AbortController();
     sendController.current = controller;
     setSending(true);
-    if (!canvasMime) {
+    if (!panelAction) {
       setProblem('');
       setNotice('');
     }
@@ -533,20 +549,21 @@ export default function ChatPage() {
         });
       }
       updateUrl(id);
-      if (!canvasMime) {
+      if (!panelAction) {
         setInput('');
         setAttachment(null);
         setSelectedTool(null);
         setBranchFrom(null);
       }
       if (result.toolResult?.projectId || result.messages?.some((message) => message.toolResult?.projectId)) void loadProjects();
+      if (result.toolResult?.reminderId || result.messages?.some((message) => message.toolResult?.reminderId)) void reminders.refresh();
       if (speak) media.speak(result.content);
       return { result };
     } catch (cause) {
       retry.current = request;
       const error = controller.signal.aborted ? 'Получаването на отговора е прекъснато.'
         : cause instanceof Error ? cause.message : 'Връзката прекъсна.';
-      if (!canvasMime) {
+      if (!panelAction) {
         if (controller.signal.aborted) setNotice(error);
         else setProblem(error);
       }
@@ -573,6 +590,7 @@ export default function ChatPage() {
       setProblem(requiredFile.required);
       return;
     }
+    if (media.listening) media.stopListening();
     const previous = failedRequest.current;
     const current = {
       message, mode: repeat ? (tool ? 'work' as const : 'chat' as const) : mode, model: model?.id, reasoning: appliedReasoning, uploadId,
@@ -584,6 +602,22 @@ export default function ChatPage() {
     if (equivalent) { void submit(previous, { speak: options.speak }); return; }
     const id = !origin && conversationId ? conversationId : crypto.randomUUID();
     void submit({ ...current, conversationId: id, requestId: crypto.randomUUID() }, { speak: options.speak });
+  }
+
+  async function createReminder(reminder: ReminderInput) {
+    if (!account || !reminderTool || pending || loadProblem) throw new Error('Записването на напомняне е недостъпно.');
+    const previous = failedReminderRequest.current;
+    const same = previous?.reminder && (!conversationId || previous.conversationId === conversationId)
+      && previous.reminder.text === reminder.text && previous.reminder.localTime === reminder.localTime
+      && previous.reminder.timeZone === reminder.timeZone && previous.reminder.repeat === reminder.repeat;
+    const request = same ? previous : {
+      message: `Напомни ми: ${reminder.text}`, reminder, conversationId: conversationId || crypto.randomUUID(),
+      mode, projectId: projectContext ?? undefined, requestId: crypto.randomUUID(), toolId: reminderTool.id,
+    };
+    const reply = await submit(request);
+    if (!reply.result) throw new Error(reply.error);
+    const receipt = reply.result.toolResult ?? reply.result.messages?.at(-1)?.toolResult;
+    if (!receipt?.reminderId) throw new Error('Сървърът не потвърди записването на напомняне.');
   }
 
   async function saveCanvas(file: Attachment, value: string) {
@@ -614,14 +648,16 @@ export default function ChatPage() {
     if (pending) return;
     media.stopSpeaking();
     setProblem('');
-    media.listen('dictation', (text) => setInput((value) => `${value.trimEnd()}${value.trim() ? ' ' : ''}${text}`));
+    setNotice('');
+    void media.listen('dictation', (text) => setInput((value) => `${value.trimEnd()}${value.trim() ? ' ' : ''}${text}`));
   }
 
   function startVoice() {
     if (media.speaking) { media.stopSpeaking(); return; }
     if (pending) return;
     setProblem('');
-    media.listen('conversation', (text) => { setInput(text); send(text, { speak: true }); });
+    setNotice('');
+    void media.listen('conversation', (text) => { setInput(text); send(text, { speak: true }); });
   }
 
   function editMessage(message: Message, toolId?: string) {
@@ -685,6 +721,8 @@ export default function ChatPage() {
 
   function renderMessage(message: Message, index: number, local = false) {
     const prior = message.role === 'assistant' ? messages[index - 1] : undefined;
+    const project = message.toolResult?.projectId ? projects.find((item) => item.id === message.toolResult?.projectId) : undefined;
+    const reminderId = message.toolResult?.reminderId;
     const regenerate = message.toolResult?.artifact ? tools.find((tool) => tool.id === message.toolResult?.toolId && tool.available) : undefined;
     const regenerateLabel = regenerate ? 'Прегенерирай резултата в клон' : 'Поискай нов отговор в клон';
     const attached = message.imagePath ? imageUrl(message.imagePath) : null;
@@ -694,7 +732,7 @@ export default function ChatPage() {
         {message.role === 'assistant' && <div className="shark-chat-message-author"><Logo size="sm" /> SharkAI</div>}
         {attached && (image ? <button type="button" className="shark-chat-image" onClick={() => openInspector({ type: 'image', url: attached, title: 'Прикачено изображение' })}><img src={attached} alt="Прикачено изображение" /></button> : <a className="shark-chat-attachment-link" href={attached} download><FileText size={16} /> Прикачен файл</a>)}
         <div className="shark-chat-message-text">{message.content}</div>
-        {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} reuse={useArtifact} editable={(file) => !!artifactEditor(file)} disabled={pending} projectStatus={projects.find((project) => project.id === message.toolResult?.projectId)?.status} />}
+        {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} reuse={useArtifact} editable={(file) => !!artifactEditor(file)} disabled={pending} projectStatus={project && projectStatusLabel(project)} reminder={reminderId ? reminders.reminders.find(({ id }) => id === reminderId) : undefined} reminderDue={!!reminderId && reminders.notifications.some(({ reminderId: id }) => id === reminderId)} />}
         {!local && (
           <div className="shark-chat-message-actions">
             <button type="button" title={copied === message.id ? 'Копирано' : 'Копирай'} aria-label={copied === message.id ? 'Копирано' : 'Копирай'} onClick={() => void copyMessage(message)}>{copied === message.id ? <Check size={15} /> : <Copy size={15} />}</button>
@@ -746,7 +784,7 @@ export default function ChatPage() {
             <h2>Проекти</h2>
             {projectError && <button type="button" className="shark-chat-rail-row" onClick={() => void loadProjects()}><RotateCcw size={16} /> <span>Повтори зареждането</span></button>}
             {!projectError && !filteredProjects.length && <p>{search ? 'Няма съвпадения.' : 'Няма проекти за показване.'}</p>}
-            {filteredProjects.map((project) => <button type="button" key={project.id} className="shark-chat-rail-row" title={project.name} onClick={() => openInspector({ type: 'project', id: project.id, title: project.name })}><Folder size={16} /><span>{project.name}</span></button>)}
+            {filteredProjects.map((project) => <button type="button" key={project.id} className="shark-chat-rail-row" title={project.name} onClick={() => openInspector({ type: 'project', id: project.id, title: project.name })}><Folder size={16} /><span>{project.name}</span>{project.statusUnknown && <small>Непотвърден статус</small>}</button>)}
           </section>
         </div>
         <nav className="shark-chat-rail-modules" aria-label="Работно пространство">
@@ -783,7 +821,10 @@ export default function ChatPage() {
           <div className="shark-chat-mode-switch" role="group" aria-label="Режим на разговора">
             {(['chat', 'work'] as const).map((item) => <button type="button" key={item} aria-pressed={mode === item} disabled={pending} onClick={() => changeMode(item)}>{item === 'chat' ? <MessageSquare size={15} /> : <BriefcaseBusiness size={15} />}{modeLabel(item)}</button>)}
           </div>
-          <Link className="shark-chat-topbar-studio" href="/dashboard?view=studio"><AppWindow size={17} /><span>Студио</span></Link>
+          <div className="shark-chat-topbar-actions">
+            {account && <button type="button" className="shark-chat-icon shark-chat-reminder-trigger" aria-label={reminders.notifications.length ? `Напомняния, ${reminders.notifications.length} непрочетени` : 'Напомняния'} title="Напомняния" aria-haspopup={small ? 'dialog' : undefined} aria-expanded={inspector?.type === 'reminders'} aria-controls="chat-reminders-panel" onClick={() => openInspector({ type: 'reminders', title: 'Напомняния' })}><Bell size={18} />{reminders.notifications.length > 0 && <span aria-hidden="true">{reminders.notifications.length}</span>}</button>}
+            <Link className="shark-chat-topbar-studio" href="/dashboard?view=studio"><AppWindow size={17} /><span>Студио</span></Link>
+          </div>
         </header>
         <main id="chat-main" tabIndex={-1} className="shark-chat-main" data-start={showStart}>
           {loading && <p className="shark-chat-center-state" role="status"><LoaderCircle size={19} className="shark-chat-spinner" /> Зареждане на разговора…</p>}
@@ -836,11 +877,15 @@ export default function ChatPage() {
                         <button type="button" disabled={!account || !media.camera || pending} onClick={() => void openCamera()}><Camera size={17} /><span><strong>Камера</strong><small>{!account ? 'Изисква вход в акаунт' : !media.camera ? 'Браузърът не предоставя камера' : 'Направи снимка'}</small></span></button>
                         <button type="button" disabled={!account || !media.screen || pending} onClick={() => void captureScreen()}><ScreenShare size={17} /><span><strong>Сподели екран</strong><small>{!account ? 'Изисква вход в акаунт' : !media.screen ? 'Браузърът не поддържа споделяне' : 'Прикачи кадър от избрания екран'}</small></span></button>
                       </section>
-                      {(!media.dictation || !media.voice) && <section>
+                      <section>
                         <h2>Глас</h2>
-                        {!media.dictation && <button type="button" disabled><Mic size={17} /><span><strong>Диктовка</strong><small>Браузърът не предоставя разпознаване на реч.</small></span></button>}
-                        {!media.voice && <button type="button" disabled><AudioLines size={17} /><span><strong>Гласов разговор</strong><small>Изисква разпознаване и озвучаване на реч в браузъра.</small></span></button>}
-                      </section>}
+                        {media.dictation ? <label className="shark-chat-voice-language"><span>Език на записа</span>
+                          <select value={media.language} disabled={!!media.listening} onChange={(event) => media.setLanguage(event.target.value === 'bg' || event.target.value === 'en' ? event.target.value : 'auto')}>
+                            <option value="auto">Автоматично</option><option value="bg">Български</option><option value="en">Английски</option>
+                          </select>
+                        </label> : <button type="button" disabled><Mic size={17} /><span><strong>Диктовка</strong><small>{media.dictationReason}</small></span></button>}
+                        {voiceUnavailable && <button type="button" disabled><AudioLines size={17} /><span><strong>Гласов разговор</strong><small>{voiceUnavailable}</small></span></button>}
+                      </section>
                       {toolsPending && <p className="shark-chat-status" role="status"><LoaderCircle size={16} className="shark-chat-spinner" /> Зареждане на инструментите…</p>}
                       {toolsError && <button type="button" onClick={() => void loadTools()}><RotateCcw size={17} /> Зареди инструментите отново</button>}
                       {toolGroups.map((group) => <section key={group}><h2>{group}</h2>{tools.filter((tool) => tool.group === group).map((tool) => (
@@ -859,8 +904,8 @@ export default function ChatPage() {
                     {!!model?.reasoningLevels.length && <section><h2>Разсъждение</h2>{model.reasoningLevels.map((item) => <button type="button" key={item} aria-pressed={appliedReasoning === item} onClick={() => { setReasoning(item); closePopup(true); }}>{item === 'deep' ? 'Дълбоко' : 'Стандартно'} {appliedReasoning === item && <Check size={16} />}</button>)}</section>}
                   </div>}
                 </div>}
-                <button type="button" className="shark-chat-compose-icon" aria-label="Диктовка" aria-pressed={media.listening === 'dictation'} title={media.dictation ? 'Диктовка' : 'Диктовката не се поддържа в този браузър'} disabled={!media.dictation || !canSend || pending} onClick={startDictation}><Mic size={20} /></button>
-                <button type="button" className="shark-chat-compose-icon shark-chat-voice" aria-label={media.speaking ? 'Спри озвучаването' : 'Гласов разговор'} aria-pressed={media.listening === 'conversation' || media.speaking} title={media.voice ? 'Гласов разговор' : 'Гласовият разговор не се поддържа в този браузър'} disabled={!media.voice || !canSend || (pending && !media.speaking)} onClick={startVoice}><AudioLines size={20} /></button>
+                <button type="button" className="shark-chat-compose-icon" aria-label={dictationLabel} aria-pressed={media.listening === 'dictation'} title={media.dictationReason || dictationLabel} disabled={!media.dictation || !canSend || pending} onClick={startDictation}><Mic size={20} /></button>
+                <button type="button" className="shark-chat-compose-icon shark-chat-voice" aria-label={conversationLabel} aria-pressed={media.listening === 'conversation' || media.speaking} title={voiceUnavailable || conversationLabel} disabled={!media.speaking && (!!voiceUnavailable || !canSend || pending)} onClick={startVoice}><AudioLines size={20} /></button>
                 {sending ? <button className="shark-chat-send" type="button" aria-label="Спри отговора" title="Спри отговора" onClick={() => sendController.current?.abort()}><Square size={16} fill="currentColor" /></button> :
                   <button className="shark-chat-send" type="submit" aria-label="Изпрати" title="Изпрати" disabled={!canSend || pending || !!loadProblem || (!input.trim() && !attachment && selectedTool?.input !== 'none')}><ArrowUp size={21} /></button>}
               </div>
@@ -868,14 +913,14 @@ export default function ChatPage() {
             <div className="shark-chat-composer-status" aria-live="polite">
               {problem && <span className="shark-chat-notice" role="alert">{problem}</span>}
               {notice && <span>{notice}</span>}
-              {!problem && !notice && (media.listening || media.speaking) && <span>{media.speaking ? 'SharkAI отговаря на глас.' : 'Слушам…'}</span>}
+              {!problem && !notice && (media.recordStage || media.speechStage) && <span>{media.speechStage === 'playing' ? 'SharkAI отговаря на глас.' : media.speechStage === 'preparing' ? 'Подготвям звук…' : media.recordStage === 'transcribing' ? 'Разпознавам записа…' : media.recordStage === 'recording' ? 'Записвам. Натисни отново, за да приключиш.' : 'Включвам микрофона…'}</span>}
               {!loading && !loadProblem && !account && <span><Link href="/login">Влез в акаунта си</Link>, за да използваш SharkAI и историята си.</span>}
               {!loading && account && !model && capabilityReason && <span>{capabilityReason}</span>}
             </div>
           </div>
         </main>
       </div>
-      {inspector && <div className="shark-chat-inspector-region" ref={inspectorRegion} role={small ? 'dialog' : undefined} aria-modal={small ? true : undefined} aria-label={inspector.title}><Inspector item={inspector} close={closeInspector} disabled={pending} save={account && tools.some(({ id, available }) => id === 'text-file-edit' && available) ? saveCanvas : undefined} talk={pending ? undefined : (project) => newConversation(project)} /></div>}
+      {inspector && <div className="shark-chat-inspector-region" id={inspector.type === 'reminders' ? 'chat-reminders-panel' : undefined} ref={inspectorRegion} role={small ? 'dialog' : undefined} aria-modal={small ? true : undefined} aria-label={inspector.title}><Inspector item={inspector} close={closeInspector} reminders={reminders} createReminder={reminderTool ? createReminder : undefined} disabled={pending} save={account && tools.some(({ id, available }) => id === 'text-file-edit' && available) ? saveCanvas : undefined} talk={pending ? undefined : (project) => newConversation(project)} /></div>}
       <dialog className="shark-chat-camera-dialog" ref={cameraDialog} onCancel={(event) => { event.preventDefault(); closeCamera(); }}>
         <header><h2>Камера</h2><button className="shark-chat-icon" type="button" aria-label="Затвори камерата" onClick={closeCamera}><X size={18} /></button></header>
         <video ref={cameraVideo} muted autoPlay playsInline onLoadedMetadata={() => setCameraReady(true)} />

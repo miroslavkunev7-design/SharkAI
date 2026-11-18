@@ -58,6 +58,17 @@ model User {
   chatRequests  ChatRequest[]
   uploads       FileUpload[]
   researchJobs  ResearchJob[]
+  personalMemory PersonalMemory?
+  reminders     Reminder[]
+}
+
+model PersonalMemory {
+  userId    String   @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled   Boolean  @default(false)
+  notes     Json     @default("[]")
+  revision  Int      @default(0)
+  updatedAt DateTime @updatedAt
 }
 
 model ResearchJob {
@@ -78,6 +89,45 @@ model ResearchJob {
   updatedAt  DateTime       @updatedAt
 
   @@unique([userId, requestId])
+}
+
+enum ReminderRepeat {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+model Reminder {
+  id           String                 @id
+  userId       String
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId    String
+  text         String
+  timeZone     String
+  localTime    String
+  repeat       ReminderRepeat         @default(NONE)
+  nextLocal    String?
+  nextAt       DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+  occurrences  ReminderOccurrence[]
+
+  @@unique([userId, requestId])
+  @@index([userId, nextAt])
+}
+
+model ReminderOccurrence {
+  id             String    @id
+  reminderId     String
+  reminder       Reminder  @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  dueAt          DateTime
+  acknowledgedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([reminderId, dueAt])
+  @@index([reminderId, acknowledgedAt])
 }
 
 model ChatConversation {

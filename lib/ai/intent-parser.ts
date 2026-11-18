@@ -96,7 +96,6 @@ function buildUnderstanding(intent: Partial<UserIntent>, lang: 'bg' | 'en' | 'mi
 
 export function parseHumanIntent(prompt: string, projectType: string): UserIntent {
   const lang = detectLanguage(prompt);
-  const lower = prompt.toLowerCase();
   const colors = extractColors(prompt);
   const sections = extractSections(prompt);
   const title = extractTitle(prompt, lang);

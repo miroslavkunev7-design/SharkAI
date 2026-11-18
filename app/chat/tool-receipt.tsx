@@ -1,9 +1,10 @@
 'use client';
 
 import type { ChatToolResult } from '@/lib/chat-tools';
-import { Download, ExternalLink, FileText, Paperclip, Pencil, Sparkles } from 'lucide-react';
+import { Bell, Download, ExternalLink, FileText, Paperclip, Pencil, Sparkles } from 'lucide-react';
+import { formatReminderTime, reminderStatus, type Reminder } from './reminders';
 import { ResearchReceipt } from './research-receipt';
-import { artifactAttachment, artifactDownloadUrl, isTextArtifact, PROJECT_STATUS, safeLink, type Attachment, type InspectorItem } from './workspace-types';
+import { artifactAttachment, artifactDownloadUrl, isTextArtifact, safeLink, type Attachment, type InspectorItem } from './workspace-types';
 
 interface ReceiptProps {
   result: ChatToolResult;
@@ -12,9 +13,18 @@ interface ReceiptProps {
   editable: (attachment: Attachment) => boolean;
   disabled: boolean;
   projectStatus?: string;
+  reminder?: Reminder;
+  reminderDue?: boolean;
 }
 
-export function ToolReceipt({ result, open, reuse, editable, disabled, projectStatus }: ReceiptProps) {
+export function ToolReceipt({ result, open, reuse, editable, disabled, projectStatus, reminder, reminderDue }: ReceiptProps) {
+  if (result.reminderId) return (
+    <div className="shark-chat-receipt">
+      <div><Bell size={16} /><strong>Напомняне</strong><span>{reminder ? reminderStatus(reminder, !!reminderDue) : 'Записано'}</span></div>
+      {reminder?.nextAt && <p>{formatReminderTime(reminder.nextAt, reminder.timeZone)} · {reminder.timeZone}</p>}
+      <button type="button" onClick={() => open({ type: 'reminders', title: 'Напомняния' })}>Виж напомнянията <ExternalLink size={15} /></button>
+    </div>
+  );
   if (result.researchId) return <ResearchReceipt id={result.researchId} label={result.label} open={open} />;
   const url = result.url ? safeLink(result.url) : null;
   const artifact = result.artifact;
@@ -27,7 +37,7 @@ export function ToolReceipt({ result, open, reuse, editable, disabled, projectSt
 
   return (
     <div className="shark-chat-receipt">
-      <div><Sparkles size={16} /><strong>{result.label}</strong><span>{projectStatus ? PROJECT_STATUS[projectStatus] || projectStatus : result.status === 'started' ? 'Стартиран' : 'Завършен'}</span></div>
+      <div><Sparkles size={16} /><strong>{result.label}</strong><span>{projectStatus || (result.status === 'started' ? 'Стартиран' : 'Завършен')}</span></div>
       {projectId && <button type="button" onClick={() => open({ type: 'project', id: projectId, title: result.label })}>Виж статуса <ExternalLink size={15} /></button>}
       {artifactUrl && isImage && (
         <button type="button" className="shark-chat-image" onClick={() => open({ type: 'image', url: artifactUrl, title })}>

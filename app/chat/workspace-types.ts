@@ -21,6 +21,7 @@ export interface Conversation {
 
 export interface Account {
   name: string | null;
+  email?: string;
   plan: string;
   role: string;
 }
@@ -43,10 +44,12 @@ export interface Project {
   id: string;
   name: string;
   status: string;
+  statusUnknown?: boolean;
 }
 
 export type InspectorItem =
   | { type: 'project'; id: string; title: string }
+  | { type: 'reminders'; title: string }
   | { type: 'image'; url: string; title: string }
   | { type: 'text'; url: string; title: string; attachment?: Attachment; saved?: boolean };
 
@@ -68,7 +71,9 @@ export const PROJECT_STATUS: Record<string, string> = {
   COMPLETED: 'Завършен', FAILED: 'Неуспешен', CANCELLED: 'Отменен',
 };
 
-export const projectInProgress = (status: string) => !['COMPLETED', 'FAILED', 'CANCELLED'].includes(status);
+export const projectInProgress = (project: Project) => !project.statusUnknown && !['COMPLETED', 'FAILED', 'CANCELLED'].includes(project.status);
+
+export const projectStatusLabel = (project: Project) => project.statusUnknown ? 'Непотвърден статус' : PROJECT_STATUS[project.status] || project.status;
 
 const ARTIFACT_EXTENSIONS: Record<string, string> = {
   'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
