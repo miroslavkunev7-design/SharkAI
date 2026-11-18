@@ -4,13 +4,14 @@ The optional Linux worker uses whisper.cpp for Bulgarian and English speech reco
 
 Install `bubblewrap`, `util-linux` and `ffmpeg` in `/usr/bin`. Unprivileged user namespaces must work for Bubblewrap. Build whisper.cpp tag `v1.7.6` with CMake and use the CPU `whisper-cli` binary. Use the multilingual quantized `ggml-small-q5_1.bin` checkpoint with SHA-256 `ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb`. [whisper.cpp release](https://github.com/ggml-org/whisper.cpp/releases/tag/v1.7.6) · [Pinned checkpoint](https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin)
 
-For speech output, install `piper-tts==1.8.0` in a Python 3.12 virtual environment. Keep each ONNX model and its matching `.onnx.json` side by side. Use `bg_BG-dimitar-medium` for Bulgarian and `en_US-amy-low` for English. Check the respective model cards for license terms. [Bulgarian voice](https://huggingface.co/rhasspy/piper-voices/tree/0ca208afc2a2ee102b1e961e72e0a7e4907be3d0/bg/bg_BG/dimitar/medium) · [English voice](https://huggingface.co/rhasspy/piper-voices/tree/0ca208afc2a2ee102b1e961e72e0a7e4907be3d0/en/en_US/amy/low)
+For speech output, install `piper-tts==1.8.0` in a Python 3.12 virtual environment. Keep each ONNX model and its matching `.onnx.json` side by side. Use `bg_BG-dimitar-medium` for Bulgarian and `en_US-amy-low` for English. The worker uses fixed synthesis noise and pacing. Recognition can mishear longer Bulgarian phrases even with clean audio. Check the respective model cards for license terms. [Bulgarian voice](https://huggingface.co/rhasspy/piper-voices/tree/0ca208afc2a2ee102b1e961e72e0a7e4907be3d0/bg/bg_BG/dimitar/medium) · [English voice](https://huggingface.co/rhasspy/piper-voices/tree/0ca208afc2a2ee102b1e961e72e0a7e4907be3d0/en/en_US/amy/low)
 
 | Worker variable | Value |
 | --- | --- |
 | `SHARKAI_VOICE_WORKER_TOKEN` | Private shared token of at least 24 characters. |
 | `SHARKAI_WHISPER_CLI` | Absolute path to `whisper-cli`. |
 | `SHARKAI_WHISPER_MODEL` | Absolute path to the multilingual checkpoint. |
+| `SHARKAI_WHISPER_SHORT_BG_MODEL` | Optional large-v3-turbo checkpoint for 2.5–5 second recordings with Bulgarian selected. |
 | `SHARKAI_WHISPER_THREADS` | Defaults to 2 and is capped at 4. |
 | `SHARKAI_PIPER_CLI` | Absolute path to the virtual environment's `piper` executable, when using speech output. |
 | `SHARKAI_PIPER_BG` | Optional absolute path to the Bulgarian ONNX voice. |
@@ -19,4 +20,6 @@ For speech output, install `piper-tts==1.8.0` in a Python 3.12 virtual environme
 
 Start with `python3 scripts/voice-worker/server.py`. On the SharkAI server set `SHARKAI_VOICE_WORKER_URL` to `http://127.0.0.1:3855` or the worker's dedicated HTTPS reverse proxy. Set `SHARKAI_VOICE_WORKER_TOKEN` to the same private token. A proxy must forward the authorization header, support the 30-second request window and close its worker connection when the caller disconnects. Browser clients use the authenticated SharkAI API.
 
-Run `node scripts/test-chat-voice.cjs` with `SHARKAI_TEST_URL` pointing to the local SharkAI app and `POSTGRES_PRISMA_URL` pointing to the same disposable test database. The test exercises both configured languages through the normal app API.
+On a CPU host with four available threads, the optional short Bulgarian profile uses `ggml-large-v3-turbo-q5_0.bin` with SHA-256 `394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2`. Set `SHARKAI_WHISPER_THREADS=4` and `SHARKAI_WHISPER_SHORT_BG_MODEL` to that file. Recordings outside 2.5–5 seconds, other languages and automatic language selection use the ordinary checkpoint. The ordinary model preserved the sampled very short Bulgarian phrase more accurately. [Pinned Turbo checkpoint](https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin)
+
+Run `node scripts/test-chat-voice.cjs` with `SHARKAI_TEST_URL` pointing to the local SharkAI app and `POSTGRES_PRISMA_URL` pointing to the same disposable test database. The test synthesizes a short sentence in each language through the normal app API and compares every recognized word. Capitalization and punctuation are normalized. Two additional Bulgarian diagnostics print the recognized texts and word error rates. Set `SHARKAI_TEST_VOICE_SHORT_BG=1` to also enforce their accuracy thresholds for the optional profile.

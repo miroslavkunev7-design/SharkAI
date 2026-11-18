@@ -73,6 +73,7 @@ class VoiceServer(ThreadingHTTPServer):
             raise ValueError('Set a private SHARKAI_VOICE_WORKER_TOKEN with at least 24 characters.')
         self.whisper = required_file('SHARKAI_WHISPER_CLI', executable=True)
         self.model = required_file('SHARKAI_WHISPER_MODEL')
+        self.short_bg_model = required_file('SHARKAI_WHISPER_SHORT_BG_MODEL') if os.environ.get('SHARKAI_WHISPER_SHORT_BG_MODEL') else None
         self.threads = min(4, max(1, int(os.environ.get('SHARKAI_WHISPER_THREADS', '2'))))
         self.piper = required_file('SHARKAI_PIPER_CLI', executable=True) if os.environ.get('SHARKAI_PIPER_CLI') else None
         self.voices = {lang: required_file(key) for lang, key in (('bg', 'SHARKAI_PIPER_BG'), ('en', 'SHARKAI_PIPER_EN')) if os.environ.get(key)}
@@ -84,23 +85,46 @@ class VoiceServer(ThreadingHTTPServer):
                 stream.writeframes(b'\0\0' * RATE)
             subprocess.run(decode_command(work, 'wav'), env=CHILD_ENV, check=True, timeout=10,
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run([str(self.whisper), '-m', str(self.model), '-f', str(work / 'decoded.wav'),
-                            '-l', 'en', '-nt', '-np', '-ng', '-t', str(self.threads)],
-                           env=CHILD_ENV, check=True, timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            probes = [('en', work / 'decoded.wav')]
+            if self.short_bg_model:
+                probe = work / 'probe-input-bg.wav'
+                with wave.open(str(probe), 'wb') as stream:
+                    stream.setparams((1, 2, RATE, 3 * RATE, 'NONE', 'not compressed'))
+                    stream.writeframes(b'\0\0' * 3 * RATE)
+                probes.append(('bg', probe))
+            for lang, input_path in probes:
+                subprocess.run(self.transcribe_command(input_path, lang, work / f'probe-{lang}'), env=CHILD_ENV,
+                               check=True, timeout=19, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if self.voices and not self.piper:
                 raise ValueError('Voice models require SHARKAI_PIPER_CLI.')
             for lang, model in self.voices.items():
                 result = work / f'{lang}.wav'
                 text = 'Здравей.' if lang == 'bg' else 'Hello.'
-                subprocess.run(self.speak_command(model, result), input=(text + '\n').encode('utf-8'), env=CHILD_ENV,
+                subprocess.run(self.speak_command(lang, model, result), input=(text + '\n').encode('utf-8'), env=CHILD_ENV,
                                check=True, timeout=15, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 if not audible(result):
                     raise ValueError(f'The {lang} voice did not synthesize audio.')
         super().__init__(('127.0.0.1', port), VoiceHandler)
 
-    def speak_command(self, model, result):
+    def transcribe_command(self, decoded, language, output):
+        short_bg = False
+        if self.short_bg_model and language == 'bg':
+            with wave.open(str(decoded), 'rb') as stream:
+                seconds = stream.getnframes() / stream.getframerate()
+                short_bg = 2.5 <= seconds <= 5
+        model = self.short_bg_model if short_bg else self.model
+        # Keep timestamp-aware decoding for the short Bulgarian model to avoid repetitive output.
+        context = ['-ac', '320'] if short_bg else ['-nt']
+        return [PRLIMIT, '--as=3221225472', '--cpu=25', '--fsize=24576', '--core=0', '--',
+                str(self.whisper), '-m', str(model), '-f', str(decoded), '-l', language,
+                '-otxt', '-of', str(output), '-np', '-ng', '-bs', '2', '-bo', '2', '-nf',
+                '-t', str(self.threads), *context]
+
+    def speak_command(self, language, model, result):
+        length_scale = '1.12' if language == 'bg' else '1.05'
         return [PRLIMIT, '--as=4294967296', '--cpu=16', '--fsize=4194304', '--core=0', '--',
-                str(self.piper), '--model', str(model), '--output_file', str(result)]
+                str(self.piper), '--model', str(model), '--output_file', str(result),
+                '--noise-scale', '0', '--noise-w-scale', '0', '--length-scale', length_scale, '--sentence-silence', '0.25']
 
 
 class VoiceHandler(BaseHTTPRequestHandler):
@@ -183,10 +207,7 @@ class VoiceHandler(BaseHTTPRequestHandler):
         if not audible(decoded):
             raise VoiceFailure(422)
         output = work / 'transcription'
-        self.invoke([PRLIMIT, '--as=3221225472', '--cpu=25', '--fsize=24576', '--core=0', '--',
-                     str(self.server.whisper), '-m', str(self.server.model), '-f', str(decoded), '-l', language,
-                     '-otxt', '-of', str(output), '-nt', '-np', '-ng', '-bs', '2', '-bo', '2', '-nf',
-                     '-t', str(self.server.threads)], 19)
+        self.invoke(self.server.transcribe_command(decoded, language, output), 19)
         text = output.with_suffix('.txt').read_text(encoding='utf-8').strip()
         if not 0 < len(text) <= 6000 or not re.sub(r'\[[^\]]*\]|\([^)]*\)|[^\w]', '', text):
             raise VoiceFailure(422)
@@ -205,7 +226,7 @@ class VoiceHandler(BaseHTTPRequestHandler):
         source = work / 'text'
         source.write_text(' '.join(text.split()) + '\n', encoding='utf-8')
         with source.open('rb') as source_file:
-            self.invoke(self.server.speak_command(model, output), 21, stdin=source_file)
+            self.invoke(self.server.speak_command(language, model, output), 21, stdin=source_file)
         if not output.is_file() or output.stat().st_size > LIMIT_WAV or not audible(output):
             raise VoiceFailure(502)
         self.reply(200, output.read_bytes(), 'audio/wav')
