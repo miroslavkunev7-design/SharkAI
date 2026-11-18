@@ -1,5 +1,8 @@
-import fs from 'fs';
-import path from 'path';
+import { statSync } from 'node:fs';
+import path from 'node:path';
+import { version } from '../package.json';
+
+export const installerFilename = `SharkAI-Setup-${version}.exe`;
 
 export interface InstallerInfo {
   source: 'local' | 'external';
@@ -11,27 +14,22 @@ export interface InstallerInfo {
 export function getInstallerInfo(): InstallerInfo | null {
   const external = process.env.INSTALLER_DOWNLOAD_URL?.trim();
   if (external) {
-    const name = process.env.INSTALLER_FILENAME?.trim() || 'SharkAI-Setup.exe';
-    const sizeMb = process.env.INSTALLER_SIZE_MB?.trim();
-    return {
-      source: 'external',
-      name,
-      size: sizeMb ? Number(sizeMb) * 1_000_000 : undefined,
-      url: external,
-    };
+    try {
+      const url = new URL(external);
+      if (url.protocol !== 'https:' || url.username || url.password || !url.pathname.endsWith(`/${installerFilename}`)) return null;
+      const sizeMb = Number(process.env.INSTALLER_SIZE_MB);
+      return {
+        source: 'external',
+        name: installerFilename,
+        size: Number.isFinite(sizeMb) && sizeMb > 0 ? Math.round(sizeMb * 1_000_000) : undefined,
+        url: url.href,
+      };
+    } catch {
+      return null;
+    }
   }
 
-  const releaseDir = path.join(process.cwd(), 'release');
-  if (!fs.existsSync(releaseDir)) return null;
-
-  const name = fs.readdirSync(releaseDir).find((f) => f.endsWith('.exe') && /setup/i.test(f));
-  if (!name) return null;
-
-  const size = fs.statSync(path.join(releaseDir, name)).size;
-  return {
-    source: 'local',
-    name,
-    size,
-    url: '/api/download/installer',
-  };
+  const file = statSync(path.join(process.cwd(), 'release', installerFilename), { throwIfNoEntry: false });
+  if (!file?.isFile() || file.size === 0) return null;
+  return { source: 'local', name: installerFilename, size: file.size, url: '/api/download/installer' };
 }

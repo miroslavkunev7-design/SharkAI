@@ -1,31 +1,26 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
+const { version } = require('../package.json');
 
-const root = path.join(__dirname, '..');
-const standalone = path.join(root, '.next', 'standalone');
-
-function copyDir(src, dest) {
-  if (!fs.existsSync(src)) return;
-  fs.mkdirSync(dest, { recursive: true });
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const s = path.join(src, entry.name);
-    const d = path.join(dest, entry.name);
-    if (entry.isDirectory()) copyDir(s, d);
-    else fs.copyFileSync(s, d);
-  }
+const root = path.resolve(__dirname, '..');
+const staging = path.join(root, '.desktop-app');
+const defaultOrigin = 'https://mm-auto-nadq-jeleva-s-projects.vercel.app';
+const service = new URL(process.env.SHARKAI_DESKTOP_ORIGIN?.trim() || defaultOrigin);
+if (service.protocol !== 'https:' || service.username || service.password || service.pathname !== '/' || service.search || service.hash) {
+  throw new Error('SHARKAI_DESKTOP_ORIGIN must be a trusted HTTPS origin with no path or credentials.');
 }
 
-copyDir(path.join(root, '.next', 'static'), path.join(standalone, '.next', 'static'));
-copyDir(path.join(root, 'public'), path.join(standalone, 'public'));
-copyDir(path.join(root, 'prisma'), path.join(standalone, 'prisma'));
-if (fs.existsSync(path.join(root, 'prisma', 'dev.db'))) {
-  fs.copyFileSync(path.join(root, 'prisma', 'dev.db'), path.join(standalone, 'prisma', 'dev.db'));
+fs.rmSync(staging, { recursive: true, force: true });
+const electron = path.join(staging, 'electron');
+const assets = path.join(electron, 'assets');
+fs.mkdirSync(assets, { recursive: true });
+for (const name of ['main.cjs', 'offline.html', 'offline.css', 'offline.js']) {
+  fs.copyFileSync(path.join(root, 'electron', name), path.join(electron, name));
 }
-
-const envContent = `DATABASE_URL="file:${path.join('%APPDATA%', 'SharkAI', 'sharkai.db').replace(/\\/g, '/')}"
-JWT_SECRET="sharkai-desktop-secret"
-NEXT_PUBLIC_APP_URL="http://127.0.0.1:3847"
-`;
-fs.writeFileSync(path.join(standalone, '.env'), envContent);
-
-console.log('Electron standalone prepared.');
+fs.copyFileSync(path.join(root, 'public', 'logo-icon.png'), path.join(assets, 'logo-icon.png'));
+fs.copyFileSync(path.join(root, 'public', 'sharkai', 'shark-hero.webp'), path.join(assets, 'shark-hero.webp'));
+fs.writeFileSync(path.join(electron, 'service.json'), JSON.stringify({ origin: service.origin }));
+fs.writeFileSync(path.join(staging, 'package.json'), JSON.stringify({
+  name: 'sharkai', version, description: 'SharkAI for Windows', author: 'SharkAI', main: 'electron/main.cjs',
+}));
+console.log('Prepared the SharkAI desktop application.');

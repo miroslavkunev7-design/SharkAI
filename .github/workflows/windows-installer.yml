@@ -1,0 +1,42 @@
+name: SharkAI Windows installer
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      service_origin:
+        description: Approved SharkAI HTTPS origin for this build
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  windows-x64:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Build NSIS installer
+        run: npm run electron:build
+        env:
+          SHARKAI_DESKTOP_ORIGIN: ${{ inputs.service_origin || vars.SHARKAI_DESKTOP_ORIGIN }}
+          CSC_LINK: ${{ github.event_name == 'workflow_dispatch' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ github.event_name == 'workflow_dispatch' && secrets.CSC_KEY_PASSWORD || '' }}
+      - name: Verify installer, desktop startup, upgrade and uninstall
+        shell: pwsh
+        run: ./scripts/test-windows-installer.ps1
+      - name: Upload installer and verification metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: SharkAI-windows-x64
+          path: |
+            release/SharkAI-Setup-*.exe
+            release/windows-installer.json
+          if-no-files-found: error

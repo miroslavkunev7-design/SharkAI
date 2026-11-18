@@ -1,99 +1,45 @@
 import Link from 'next/link';
-import { Logo } from '@/components/Logo';
-import { Download, Monitor, CheckCircle2, ArrowRight } from 'lucide-react';
-import { getInstallerInfo } from '@/lib/installer';
-import { getSiteUrl } from '@/lib/site-url';
+import { ArrowRight, Download } from 'lucide-react';
 import type { Metadata } from 'next';
+import { Logo } from '@/components/Logo';
+import { getInstallerInfo } from '@/lib/installer';
 
+export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Изтегли SharkAI — Шарк АИ | Download Free for Windows',
-  description:
-    'Shark AI / Шарк АИ — безплатно изтегляне за Windows. Autonomous AI platform: chat, screenshot to code, 15 agents, ZIP export. Download SharkAI installer.',
-  keywords: ['SharkAI', 'Shark AI', 'Шарк АИ', 'шарк аи', 'изтегли', 'download', 'Windows', 'AI software', 'безплатно'],
+  title: 'Изтегли SharkAI за Windows',
+  description: 'Настолното приложение SharkAI за Windows x64 използва същия акаунт, чат и проекти като уеб приложението.',
   alternates: { canonical: '/download' },
-  openGraph: {
-    title: 'SharkAI — Шарк АИ | Download',
-    description: 'Free Windows download — Shark AI autonomous platform',
-    type: 'website',
-  },
 };
 
 export default function DownloadPage() {
   const installer = getInstallerInfo();
-  const siteUrl = getSiteUrl();
-
-  const jsonLd = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: 'SharkAI',
-    alternateName: ['Shark AI', 'Шарк АИ', 'шарк аи'],
-    applicationCategory: 'DeveloperApplication',
-    operatingSystem: 'Windows 10, Windows 11',
-    offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR' },
-    downloadUrl: installer
-      ? (installer.url.startsWith('http') ? installer.url : `${siteUrl}${installer.url}`)
-      : `${siteUrl}/download`,
-    url: `${siteUrl}/download`,
-    description: 'Autonomous AI platform — open chat, screenshot to code, 15 agents, ZIP export.',
-  };
 
   return (
-    <div className="min-h-screen bg-shark-black circuit-bg">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
-      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
+    <main className="min-h-screen bg-shark-black circuit-bg px-4 py-20">
+      <div className="glass mx-auto max-w-2xl rounded-[30px] px-6 py-10 text-center sm:p-12">
         <Logo size="lg" variant="full" className="mx-auto mb-8 max-w-xs" />
-
-        <h1 className="font-display text-4xl sm:text-5xl font-bold mb-4">
-          <span className="gradient-text">SharkAI</span>
-          <span className="block text-2xl text-white/60 mt-2 font-normal">Шарк АИ — Изтегли безплатно</span>
-        </h1>
-
-        <p className="text-lg text-white/60 mb-10 max-w-xl mx-auto leading-relaxed">
-          Shark AI autonomous platform for Windows. Open chat for anything,
-          screenshot to code, 15 multi-agents, ZIP export — local &amp; free.
+        <h1 className="font-display text-3xl font-bold sm:text-5xl">SharkAI за Windows</h1>
+        <p className="mx-auto mb-8 mt-4 max-w-lg leading-relaxed text-white/70">
+          Влез със съществуващия си SharkAI акаунт. Чатът и проектите използват интернет връзка.
         </p>
-
         {installer ? (
-          <a
-            href={installer.url}
-            className="btn-primary inline-flex items-center gap-3 text-lg py-4 px-8 mb-6"
-          >
-            <Download className="w-6 h-6" />
-            Download for Windows
-            {installer.size && (
-              <span className="text-sm opacity-80">({Math.round(installer.size / 1_000_000)} MB)</span>
-            )}
-          </a>
+          <>
+            <a href={installer.url} className="btn-primary inline-flex items-center gap-2">
+              <Download aria-hidden="true" className="h-5 w-5" /> Изтегли за Windows
+            </a>
+            <p className="mt-3 text-sm text-white/70">
+              {installer.name} · x64{installer.size ? ` · ${Math.round(installer.size / 1_000_000)} MB` : ''}
+            </p>
+          </>
         ) : (
-          <div className="glass rounded-2xl p-6 mb-6 border border-yellow-500/20">
-            <p className="text-yellow-400/90 mb-4">Installer се компилира. Ползвай уеб версията:</p>
-            <Link href="/chat" className="btn-primary inline-flex items-center gap-2">
-              <Monitor className="w-5 h-5" /> Open SharkAI Web
-            </Link>
-          </div>
+          <p className="rounded-2xl border border-white/15 px-4 py-3 text-white/80">
+            Инсталаторът за тази версия още не е достъпен.
+          </p>
         )}
-
-        <div className="grid sm:grid-cols-3 gap-4 text-left mb-12">
-          {['Open chat — any topic', 'Screenshot → code + ZIP', '15 agents, no OpenAI fee'].map((item) => (
-            <div key={item} className="glass rounded-xl p-4 flex items-start gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
-              <span className="text-sm text-white/70">{item}</span>
-            </div>
-          ))}
-        </div>
-
-        <div className="flex flex-wrap justify-center gap-4">
-          <Link href="/chat" className="btn-secondary inline-flex items-center gap-2">
-            Try in Browser <ArrowRight className="w-4 h-4" />
-          </Link>
-          <Link href="/tests" className="btn-secondary text-sm">Test Suite ✓</Link>
-        </div>
-
-        <p className="text-xs text-white/30 mt-12">Shark AI · Шарк АИ · Windows 10/11</p>
+        <Link href="/chat" className="btn-secondary mt-8 inline-flex items-center gap-2">
+          Отвори SharkAI в браузъра <ArrowRight aria-hidden="true" className="h-4 w-4" />
+        </Link>
       </div>
-    </div>
+    </main>
   );
 }

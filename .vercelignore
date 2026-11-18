@@ -9,3 +9,5 @@ uploads/
 .env.production.local
 agent-tools/
 terminals/
+
+.desktop-app/
