@@ -1,0 +1,226 @@
+.operator-workspace {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-height: 100dvh;
+}
+
+.operator-topbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.operator-topbar .shark-wordmark {
+  gap: 8px;
+  font-size: 1.15rem;
+  letter-spacing: -.04em;
+}
+
+.operator-topbar .operator-icon-button,
+.operator-result .operator-icon-button {
+  width: 44px;
+  min-width: 44px;
+  padding-inline: 0;
+}
+
+.operator-hero {
+  --ice-radius: 18px;
+  --ice-art-extent: 57%;
+  --ice-art-mask: linear-gradient(90deg, transparent, #0002 30%, #000b 54%, #000 78%);
+  --ice-art-position: 64% center;
+  min-height: clamp(132px, 15vw, 182px);
+  display: grid;
+  align-items: center;
+}
+
+.operator-hero-copy {
+  width: min(68%, 470px);
+  padding: clamp(16px, 4vw, 30px);
+}
+
+.operator-hero-copy h1 {
+  font-size: clamp(1.55rem, 4.6vw, 2.55rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -.05em;
+  overflow-wrap: anywhere;
+}
+
+.operator-hero-copy p {
+  font-size: clamp(.83rem, 1.5vw, .96rem);
+  line-height: 1.42;
+  margin-top: .5rem;
+  font-weight: 580;
+}
+
+.operator-plan {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: .55rem;
+  padding: 4px 8px;
+  border: 1px solid #e8fcffb0;
+  border-radius: 8px;
+  background: #ecfbff9c;
+  color: #0c2544;
+  font-size: .72rem;
+  font-weight: 750;
+}
+
+.operator-metrics {
+  isolation: isolate;
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #c4f3ffe0;
+  border-radius: 18px;
+  background: #b8e4fa var(--ice-texture, url('/sharkai/ice-surface.webp')) center / 100% 100% no-repeat;
+  box-shadow: 0 5px 20px #041329a8, 0 0 17px #47a9ff23;
+}
+
+.operator-metric {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 70px;
+  flex-direction: column;
+  justify-content: center;
+  padding: 10px 8px 10px clamp(41px, 7.8vw, 65px);
+  color: #071e38;
+  background: linear-gradient(106deg, #e1f9ff3b, #d7f1ff29 52%, #cde2ff22);
+  box-shadow: inset 0 1px #ffffffeb, inset 0 -1px #dff8ffa0, inset 0 0 13px #b4f3ffaf;
+}
+
+.operator-metric dt {
+  font-size: clamp(.68rem, 1.8vw, .83rem);
+  font-weight: 740;
+  line-height: 1.27;
+  overflow-wrap: anywhere;
+}
+
+.operator-metric dd {
+  margin: 2px 0 0;
+  font-size: clamp(1.12rem, 2.7vw, 1.55rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+
+.operator-metric-icon {
+  width: clamp(27px, 6vw, 39px);
+  height: clamp(27px, 6vw, 39px);
+  position: absolute;
+  inset-inline-start: clamp(7px, 1.8vw, 15px);
+  inset-block-start: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  border: 1px solid #f2faffb0;
+  border-radius: 9px;
+  color: #ffffff;
+  background: linear-gradient(140deg, #178adc, #4753b2);
+  box-shadow: inset 0 0 10px #c7f4ff77, 0 4px 9px #104e7e5e;
+}
+
+.operator-metric:nth-child(even) .operator-metric-icon {
+  background: linear-gradient(140deg, #6945c9, #84359c);
+}
+
+.operator-panel {
+  --ice-radius: 18px;
+  --ice-art-extent: 53%;
+  --ice-art-mask: linear-gradient(90deg, transparent, #0003 28%, #000b 65%, #000);
+  --ice-art-position: 72% center;
+  --ice-art-opacity: .48;
+  padding: clamp(13px, 3vw, 21px);
+}
+
+.operator-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 14px;
+  font-weight: 750;
+}
+
+.operator-panel-title svg {
+  flex: none;
+  color: #175084;
+}
+
+.operator-input {
+  min-width: 0;
+  width: 100%;
+  min-height: 43px;
+  border: 1px solid #244e7d6b;
+  border-radius: 11px;
+  padding: 8px 11px;
+  background: #eff9ffe6;
+  color: #081f38;
+  box-shadow: inset 0 1px 4px #18386024;
+  color-scheme: light;
+}
+
+.operator-table {
+  border: 1px solid #2c5b832b;
+  border-radius: 11px;
+  background: #ecfaff9c;
+}
+
+.operator-table thead {
+  background: #d7eeffc7;
+}
+
+.operator-muted {
+  color: #13344e;
+}
+
+.operator-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  --ice-radius: 14px;
+  --ice-art-extent: 51%;
+  --ice-art-mask: linear-gradient(90deg, transparent, #0003 22%, #000a 55%, #000 90%);
+  --ice-art-position: 68% center;
+  --ice-art-opacity: .55;
+  gap: 10px;
+  padding: 9px 12px;
+}
+
+.operator-result-content {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  overflow-wrap: anywhere;
+}
+
+.operator-status {
+  border-radius: 12px;
+  padding: 9px 12px;
+}
+
+@media (max-width: 435px) {
+  .operator-topbar .shark-wordmark {
+    gap: 6px;
+    font-size: 1rem;
+  }
+
+  .operator-topbar .shark-action {
+    padding-inline: 11px;
+    font-size: .8rem;
+  }
+
+  .operator-hero {
+    --ice-art-extent: 48%;
+    --ice-art-position: 70% center;
+  }
+
+  .operator-hero-copy {
+    width: 70%;
+  }
+}

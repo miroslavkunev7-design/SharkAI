@@ -9,11 +9,18 @@
   <script defer src="offline.js"></script>
 </head>
 <body>
-  <main>
-    <img src="assets/logo-icon.png" alt="" width="54" height="54">
-    <h1>Няма връзка с SharkAI</h1>
-    <p>Провери интернет връзката и опитай отново. Чатът и проектите са достъпни след свързване.</p>
-    <a id="retry">Опитай отново</a>
-  </main>
+  <div class="offline-shell">
+    <div class="brand">
+      <img src="assets/logo-icon.png" alt="" width="41" height="41">
+      <span>Shark<span>AI</span></span>
+    </div>
+    <main class="ice-section" data-ice-art="shark" aria-labelledby="offline-title">
+      <div class="offline-copy">
+        <h1 id="offline-title">Няма връзка с SharkAI</h1>
+        <p>Провери интернет връзката и опитай отново. Чатът и проектите са достъпни след свързване.</p>
+        <a id="retry">Опитай отново</a>
+      </div>
+    </main>
+  </div>
 </body>
 </html>

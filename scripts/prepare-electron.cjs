@@ -18,7 +18,9 @@ for (const name of ['main.cjs', 'offline.html', 'offline.css', 'offline.js']) {
   fs.copyFileSync(path.join(root, 'electron', name), path.join(electron, name));
 }
 fs.copyFileSync(path.join(root, 'public', 'logo-icon.png'), path.join(assets, 'logo-icon.png'));
-fs.copyFileSync(path.join(root, 'public', 'sharkai', 'shark-hero.webp'), path.join(assets, 'shark-hero.webp'));
+for (const name of ['shark-hero.webp', 'ice-surface.webp']) {
+  fs.copyFileSync(path.join(root, 'public', 'sharkai', name), path.join(assets, name));
+}
 fs.writeFileSync(path.join(electron, 'service.json'), JSON.stringify({ origin: service.origin }));
 fs.writeFileSync(path.join(staging, 'package.json'), JSON.stringify({
   name: 'sharkai', version, description: 'SharkAI for Windows', author: 'SharkAI', main: 'electron/main.cjs',

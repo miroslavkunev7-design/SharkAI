@@ -1,9 +1,9 @@
-import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, MessageSquare, PanelsTopLeft, UsersRound } from 'lucide-react';
 import { Navbar } from '@/components/Navbar';
 import { Hero } from '@/components/Hero';
 import { Footer } from '@/components/Footer';
+import './entry.css';
 
 const modules = [
   { href: '/chat', title: 'AI чат', description: 'Питай, прикачи изображение или продължи разговор.', anchor: undefined, image: 'agent', icon: MessageSquare },
@@ -13,7 +13,7 @@ const modules = [
 
 export default function HomePage() {
   return (
-    <>
+    <div className="shark-entry-home">
       <Navbar />
       <main id="main-content">
         <Hero />
@@ -24,25 +24,24 @@ export default function HomePage() {
               <Link
                 key={href}
                 href={href}
-                className="shark-home-module shark-glass"
+                className="ice-section shark-entry-module"
+                data-ice-art={image}
                 id={anchor}
               >
-                <Image
-                  src={`/sharkai/${image}.webp`}
-                  alt=""
-                  fill
-                  sizes="(max-width: 760px) 90vw, 30vw"
-                  className="shark-module-image"
-                />
-                <Icon className="shark-module-icon" size={22} aria-hidden="true" />
-                <h3>{title}<ArrowRight size={17} aria-hidden="true" /></h3>
-                <p>{description}</p>
+                <div className="shark-entry-module-copy">
+                  <div className="shark-entry-module-heading">
+                    <Icon size={18} aria-hidden="true" />
+                    <h3>{title}</h3>
+                  </div>
+                  <p>{description}</p>
+                </div>
+                <span className="shark-entry-module-arrow" aria-hidden="true"><ArrowRight size={16} /></span>
               </Link>
             ))}
           </div>
         </section>
       </main>
       <Footer />
-    </>
+    </div>
   );
 }

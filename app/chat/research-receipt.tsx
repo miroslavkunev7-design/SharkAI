@@ -94,7 +94,7 @@ export function ResearchReceipt({ id, label, open }: { id: string; label: string
 
   return (
     <section className="shark-chat-receipt shark-chat-research" aria-label={label}>
-      <div><Globe2 size={17} /><strong>{label}</strong><span aria-live="polite">{job ? STATUS[job.status] : 'Зареждане…'}</span></div>
+      <div className="shark-chat-receipt-head ice-section" data-ice-art="agent"><Globe2 size={17} /><strong>{label}</strong><span aria-live="polite">{job ? STATUS[job.status] : 'Зареждане…'}</span></div>
       {job && <>
         <p className="shark-chat-research-topic">{job.topic}</p>
         <section className="shark-chat-research-progress" aria-label="Напредък на проучването">

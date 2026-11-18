@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, BarChart3, KeyRound, RefreshCw, Shield, TestTube, Users } from 'lucide-react';
+import { ArrowLeft, BarChart3, Boxes, KeyRound, RefreshCw, Shield, TestTube, Users } from 'lucide-react';
 import { Logo } from '@/components/Logo';
+import '../operator-workspace.css';
 
 interface AISettings {
   paidAIEnabled: boolean;
@@ -101,53 +102,58 @@ export default function AdminPage() {
 
   const cards = data ? [
     { label: 'Потребители', value: data.stats.totalUsers, icon: Users },
-    { label: 'План PRO в профила', value: data.stats.proUsers, icon: Users },
-    { label: 'План ULTRA в профила', value: data.stats.ultraUsers, icon: Users },
-    { label: 'Проекти', value: data.stats.totalProjects, icon: BarChart3 },
+    { label: 'План PRO в профила', value: data.stats.proUsers, icon: BarChart3 },
+    { label: 'План ULTRA в профила', value: data.stats.ultraUsers, icon: Shield },
+    { label: 'Проекти', value: data.stats.totalProjects, icon: Boxes },
   ] : [];
 
   return (
-    <main className="min-h-screen max-w-6xl mx-auto px-4 py-5">
-      <header className="shark-glass rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href="/dashboard?view=settings" className="shark-action-secondary" aria-label="Към настройките на акаунта"><ArrowLeft size={18} /></Link>
-          <Logo size="md" />
-          <h1 className="text-xl font-bold">Администрация</h1>
-          {data && <span className="inline-flex items-center gap-2 text-sm text-white/75"><Shield size={16} /> {data.account.plan}</span>}
+    <main className="operator-workspace mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6">
+      <nav className="operator-topbar" aria-label="Администрация">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Link href="/dashboard?view=settings" className="shark-action-secondary operator-icon-button" aria-label="Към настройките на акаунта"><ArrowLeft size={18} aria-hidden="true" /></Link>
+          <div className="shark-wordmark"><Logo size="sm" /><span aria-hidden="true">Shark<span>AI</span></span></div>
         </div>
-        <button className="shark-action-secondary" type="button" onClick={() => void load()} disabled={loading || saving} aria-label="Обнови">
-          <RefreshCw size={17} className={loading ? 'animate-spin' : undefined} />
+        <button className="shark-action-secondary operator-icon-button" type="button" onClick={() => void load()} disabled={loading || saving} aria-label="Обнови">
+          <RefreshCw size={17} aria-hidden="true" className={loading ? 'animate-spin' : undefined} />
         </button>
+      </nav>
+      <header className="ice-section operator-hero" data-ice-art="team">
+        <div className="operator-hero-copy">
+          <h1>Администрация</h1>
+          <p>Настройки на AI услуги и преглед на потребителите.</p>
+          {data && <span className="operator-plan"><Shield size={13} aria-hidden="true" /> Текущ план {data.account.plan}</span>}
+        </div>
       </header>
-      {loading && <p role="status" className="my-4 text-white/70">Зареждане на административните данни…</p>}
-      {error && <p role="alert" className="my-4 text-rose-200">{error}</p>}
-      {status && <p role="status" className="my-4 text-cyan-200">{status}</p>}
+      {loading && <p role="status" className="operator-status shark-glass text-sm text-white/75">Зареждане на административните данни…</p>}
+      {error && <p role="alert" className="operator-status shark-glass text-sm text-rose-200">{error}</p>}
+      {status && <p role="status" className="operator-status shark-glass text-sm text-cyan-200">{status}</p>}
       {data && (
         <>
-          <dl className="grid grid-cols-2 md:grid-cols-4 gap-3 my-5">
+          <dl className="operator-metrics grid-cols-2 md:grid-cols-4" aria-label="Обобщение">
             {cards.map(({ icon: Icon, label, value }) => (
-              <div key={label} className="shark-glass rounded-xl p-4">
-                <Icon className="mb-2 text-cyan-200" size={19} aria-hidden="true" />
-                <dt className="text-sm text-white/75">{label}</dt><dd className="text-2xl font-bold">{value}</dd>
+              <div key={label} className="operator-metric">
+                <dt><span className="operator-metric-icon"><Icon size={17} aria-hidden="true" /></span>{label}</dt>
+                <dd>{value}</dd>
               </div>
             ))}
           </dl>
-          <div className="grid lg:grid-cols-2 gap-4">
-            <section id="settings" className="shark-glass rounded-2xl p-5">
-              <h2 className="mb-4 flex items-center gap-2 font-bold"><KeyRound size={19} /> AI доставчици</h2>
+          <div className="grid gap-3 lg:grid-cols-2">
+            <section id="settings" className="ice-section operator-panel min-w-0" data-ice-art="agent">
+              <h2 className="operator-panel-title"><KeyRound size={19} aria-hidden="true" /> AI доставчици</h2>
               <form className="grid gap-4" onSubmit={saveSettings}>
                 <label className="flex gap-3 items-center min-h-11">
-                  <input type="checkbox" className="w-5 h-5 accent-cyan-400" checked={paidAI} onChange={(event) => setPaidAI(event.target.checked)} />
+                  <input type="checkbox" className="h-5 w-5 shrink-0 accent-blue-700" checked={paidAI} onChange={(event) => setPaidAI(event.target.checked)} />
                   Разреши конфигурираните AI услуги
                 </label>
-                <p className="text-sm text-white/75">{data.ai.aiConfigured ? 'Има конфигуриран доставчик.' : 'Няма разрешен и конфигуриран доставчик.'}</p>
+                <p className="operator-muted text-sm">{data.ai.aiConfigured ? 'Има конфигуриран доставчик.' : 'Няма разрешен и конфигуриран доставчик.'}</p>
                 <label className="grid gap-2 text-sm">OpenAI API ключ
-                  {data.ai.openai.hasKey && <small className="text-cyan-200">Запазен ключ</small>}
-                  <input type="password" value={openaiKey} onChange={(event) => setOpenaiKey(event.target.value)} className="rounded-xl border border-white/20 bg-black/35 p-3" autoComplete="off" />
+                  {data.ai.openai.hasKey && <small className="operator-muted">Запазен ключ</small>}
+                  <input type="password" value={openaiKey} onChange={(event) => setOpenaiKey(event.target.value)} className="operator-input" autoComplete="off" />
                 </label>
                 <label className="grid gap-2 text-sm">Anthropic API ключ
-                  {data.ai.anthropic.hasKey && <small className="text-cyan-200">Запазен ключ</small>}
-                  <input type="password" value={anthropicKey} onChange={(event) => setAnthropicKey(event.target.value)} className="rounded-xl border border-white/20 bg-black/35 p-3" autoComplete="off" />
+                  {data.ai.anthropic.hasKey && <small className="operator-muted">Запазен ключ</small>}
+                  <input type="password" value={anthropicKey} onChange={(event) => setAnthropicKey(event.target.value)} className="operator-input" autoComplete="off" />
                 </label>
                 <div className="flex flex-wrap gap-2">
                   <button className="shark-action" type="submit" disabled={saving}>{saving ? 'Запазване…' : 'Запази настройките'}</button>
@@ -157,18 +163,18 @@ export default function AdminPage() {
                 </div>
               </form>
             </section>
-            <section className="shark-glass rounded-2xl p-5 min-w-0">
-              <h2 className="mb-4 flex items-center gap-2 font-bold"><Users size={19} /> Потребители</h2>
-              {!data.users.length ? <p className="text-sm text-white/75">Няма потребителски записи.</p> : (
-                <div className="overflow-x-auto max-h-96">
-                  <table className="w-full text-left text-sm"><thead><tr><th className="p-2">Имейл</th><th className="p-2">План в профила</th></tr></thead>
-                    <tbody>{data.users.map((user) => <tr key={user.id} className="border-t border-white/10"><td className="p-2 break-all">{user.email}</td><td className="p-2 text-cyan-200">{user.plan}</td></tr>)}</tbody>
+            <section className="ice-section operator-panel min-w-0" data-ice-art="team">
+              <h2 className="operator-panel-title"><Users size={19} aria-hidden="true" /> Потребители</h2>
+              {!data.users.length ? <p className="operator-muted text-sm">Няма потребителски записи.</p> : (
+                <div className="operator-table max-h-96 overflow-auto">
+                  <table className="w-full table-fixed text-left text-sm"><thead><tr><th className="p-2">Имейл</th><th className="w-[34%] p-2">План в профила</th></tr></thead>
+                    <tbody>{data.users.map((user) => <tr key={user.id} className="border-t border-sky-950/20"><td className="p-2 break-all">{user.email}</td><td className="operator-muted p-2 font-semibold">{user.plan}</td></tr>)}</tbody>
                   </table>
                 </div>
               )}
             </section>
           </div>
-          <div className="flex flex-wrap gap-2 mt-4">
+          <div className="flex flex-wrap gap-2">
             <Link href="/chat" className="shark-action-secondary">AI чат</Link>
             <Link href="/dashboard?view=studio" className="shark-action-secondary">Студио</Link>
             <Link href="/pricing" className="shark-action-secondary">Планове</Link>

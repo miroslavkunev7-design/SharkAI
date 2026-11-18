@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
-import { Check, Zap, ArrowLeft, CreditCard } from 'lucide-react';
+import { Check, Zap, ArrowLeft, ArrowRight, CreditCard } from 'lucide-react';
 import { PLANS } from '@/lib/agents';
+import '../entry.css';
 
 type BillingPeriod = {
   plan: 'FREE' | 'PRO' | 'ULTRA';
@@ -14,6 +15,10 @@ type BillingPeriod = {
 };
 
 const periodDate = new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeStyle: 'short' });
+const planDetails = [
+  { key: 'PRO', art: 'agent', icon: Check, features: ['Месечен лимит за AI чат', 'Разширен модел при наличен доставчик', 'Файлове, история и проекти', 'Преглед и експортиране от Студио'] },
+  { key: 'ULTRA', art: 'team', icon: Zap, features: ['Без токенов лимит от SharkAI', 'Права за целия платен период', 'Разширен модел при наличен доставчик', 'Инструменти в чата и Студио'] },
+] as const;
 
 export default function PricingPage() {
   const [loading, setLoading] = useState<string | null>(null);
@@ -21,6 +26,7 @@ export default function PricingPage() {
   const [error, setError] = useState('');
   const [active, setActive] = useState<string | null>(null);
   const [canPurchase, setCanPurchase] = useState(true);
+  const [checking, setChecking] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -54,6 +60,8 @@ export default function PricingPage() {
         }
       } catch {
         if (expectedPlan && !cancel.signal.aborted) setError('Състоянието на плащането временно е недостъпно.');
+      } finally {
+        if (!cancel.signal.aborted) setChecking(false);
       }
     }
 
@@ -71,7 +79,7 @@ export default function PricingPage() {
         body: JSON.stringify({ plan, provider: 'stripe' }),
       });
       const data = await res.json();
-      if (res.status === 401) router.push('/login');
+      if (res.status === 401) router.push('/login?next=/pricing');
       else if (res.ok && data.url) window.location.href = data.url;
       else setError(data.error || 'Плащането временно е недостъпно.');
     } catch {
@@ -81,62 +89,51 @@ export default function PricingPage() {
     }
   }
 
+  function checkoutLabel(plan: 'PRO' | 'ULTRA') {
+    if (checking) return 'Проверяваме достъпа…';
+    if (!canPurchase) return 'Администраторски достъп';
+    if (active === plan) return 'Активен план';
+    if (active === 'ULTRA') return 'Включен в Ultra';
+    if (loading === plan) return 'Отваряне на Stripe…';
+    return `Абонамент за ${PLANS[plan].name}`;
+  }
+
   return (
-    <div className="min-h-screen bg-shark-black">
-      <header className="glass border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Link href="/" aria-label="Начало" className="text-white/50 hover:text-white"><ArrowLeft className="w-5 h-5" /></Link>
-          <Logo size="sm" />
-          <span className="font-display font-bold gradient-text">Планове</span>
-        </div>
+    <main className="shark-entry-page shark-entry-pricing">
+      <header className="shark-entry-return">
+        <Link href="/" className="shark-wordmark" aria-label="SharkAI, начало">
+          <ArrowLeft size={17} aria-hidden="true" /><Logo size="sm" />
+          <span aria-hidden="true">SharkAI</span>
+        </Link>
       </header>
-
-      <div className="max-w-4xl mx-auto px-4 py-16">
-        <div className="text-center mb-12">
-          <h1 className="font-display text-4xl font-bold mb-4">
-            Изберете <span className="gradient-text">план</span>
-          </h1>
-          <p className="text-white/60 flex items-center justify-center gap-2 flex-wrap">
-            <CreditCard className="w-4 h-4" />
-            Плащане през Stripe
-          </p>
-          {notice && <p className="mt-4 text-shark-cyan" role="status">{notice}</p>}
-          {error && <p className="mt-4 text-red-300" role="alert">{error}</p>}
+      <section className="ice-section shark-entry-price-intro" data-ice-art="agent" aria-labelledby="plans-title">
+        <div className="shark-entry-price-lede">
+          <h1 id="plans-title">Планове</h1>
+          <p><CreditCard size={17} aria-hidden="true" /> Месечни абонаменти през Stripe</p>
+          <Link className="shark-entry-inline-link" href="/chat">Започни без абонамент <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
-
-        <div className="grid md:grid-cols-2 gap-8">
-          {Object.entries(PLANS).map(([key, plan]) => (
-            <div
-              key={key}
-              className={`rounded-3xl p-8 ${
-                'popular' in plan && plan.popular ? 'glass-strong border-shark-cyan/30 shadow-glow' : 'glass'
-              }`}
-            >
-              <div className="flex items-center gap-3 mb-4">
-                {key === 'ULTRA' ? <Zap className="w-7 h-7 text-shark-purple" /> : <Check className="w-7 h-7 text-shark-cyan" />}
-                <h2 className="font-display text-2xl font-bold">{plan.name}</h2>
-              </div>
-              <p className="text-4xl font-bold gradient-text mb-6">
-                €{plan.price}<span className="text-lg text-white/50">/месец</span>
-              </p>
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2 text-sm text-white/70">
-                    <Check className="w-4 h-4 text-shark-cyan shrink-0 mt-0.5" />{f}
-                  </li>
-                ))}
-              </ul>
+      </section>
+      {(notice || error) && <div className="shark-entry-price-message ice-section">
+        {notice && <p role="status">{notice}</p>}
+        {error && <p role="alert" className="shark-entry-error">{error}</p>}
+      </div>}
+      <div className="shark-entry-price-grid">
+        {planDetails.map(({ key, art, icon: Icon, features }) => (
+          <article key={key} className="ice-section shark-entry-plan" data-ice-art={art}>
+            <div className="shark-entry-plan-copy">
+              <h2><Icon size={19} aria-hidden="true" /> {PLANS[key].name}</h2>
+              <p className="shark-entry-plan-price">€{PLANS[key].price}<span> / месец</span></p>
+              <ul>{features.map((feature) => <li key={feature}><Check size={15} aria-hidden="true" />{feature}</li>)}</ul>
               <button
-                onClick={() => handleCheckout(key)}
-                disabled={loading !== null || !canPurchase || active === key || active === 'ULTRA'}
-                className={key === 'ULTRA' ? 'btn-primary w-full' : 'btn-secondary w-full'}
-              >
-                {!canPurchase ? 'Администраторски достъп' : active === key ? 'Активен план' : active === 'ULTRA' ? 'Включен в Ultra' : loading === key ? 'Отваряне на Stripe…' : `Абонамент за ${plan.name}`}
-              </button>
+                type="button"
+                onClick={() => void handleCheckout(key)}
+                disabled={checking || loading !== null || !canPurchase || active === key || active === 'ULTRA'}
+                className="shark-action"
+              >{checkoutLabel(key)}</button>
             </div>
-          ))}
-        </div>
+          </article>
+        ))}
       </div>
-    </div>
+    </main>
   );
 }

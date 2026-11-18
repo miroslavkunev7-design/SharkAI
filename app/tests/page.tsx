@@ -2,12 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CircleAlert, CircleCheck, LoaderCircle, Play } from 'lucide-react';
+import { ArrowLeft, CircleAlert, CircleCheck, CircleMinus, LoaderCircle, Play } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import cases from '@/scripts/test-cases.json';
+import '../operator-workspace.css';
 
 type Result = { id: string; status: 'passed' | 'failed' | 'skipped'; duration: number; error?: string };
 type Summary = { ranAt: string; passed: number; failed: number; skipped: number; results: Result[] };
+
+const testArt: Readonly<Record<string, string>> = {
+  'Ресурси': 'shark',
+  'Изолация': 'team',
+  'Файлове': 'studio',
+  'Студио': 'studio',
+  'Уеб': 'studio',
+  Windows: 'shark',
+};
 
 export default function TestsPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -60,50 +70,67 @@ export default function TestsPage() {
   }
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-7 min-h-screen">
-      <header className="flex flex-wrap items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" aria-label="Към обзора" className="shark-action-secondary"><ArrowLeft size={17} /></Link>
-          <Logo size="sm" />
-          <h1 className="font-semibold text-xl">Проверки на SharkAI</h1>
+    <main className="operator-workspace mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
+      <nav className="operator-topbar" aria-label="Проверки">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Link href="/dashboard" aria-label="Към обзора" className="shark-action-secondary operator-icon-button"><ArrowLeft size={17} aria-hidden="true" /></Link>
+          <div className="shark-wordmark"><Logo size="sm" /><span aria-hidden="true">Shark<span>AI</span></span></div>
         </div>
         {authorized && runnerAvailable && (
-          <button type="button" disabled={!!running} onClick={() => run()} className="shark-action">
-            {running === 'all' ? <LoaderCircle size={17} className="animate-spin" /> : <Play size={17} />}
+          <button type="button" disabled={!!running} onClick={() => run()} className="shark-action shrink-0">
+            {running === 'all' ? <LoaderCircle size={17} className="animate-spin" aria-hidden="true" /> : <Play size={17} aria-hidden="true" />}
             Изпълни всички
           </button>
         )}
+      </nav>
+      <header className="ice-section operator-hero" data-ice-art="agent">
+        <div className="operator-hero-copy">
+          <h1>Проверки на SharkAI</h1>
+          <p>Тестове на приложението и отчети за резултатите.</p>
+        </div>
       </header>
-      {loading && <p role="status">Зареждам резултатите…</p>}
-      {error && <p role="alert" className="text-red-300 mb-4">{error}</p>}
+      {loading && <p role="status" className="operator-status shark-glass text-sm text-white/75">Зареждам резултатите…</p>}
+      {error && <p role="alert" className="operator-status shark-glass text-sm text-rose-200">{error}</p>}
       {authorized && (
-        <section aria-label="Резултати" aria-busy={!!running}>
+        <section aria-label="Резултати" aria-busy={!!running} className="grid gap-3">
           {summary && (
-            <p role="status" className="text-sm text-white/70 mb-4">
-              {summary.passed} успешни · {summary.failed} неуспешни · {summary.skipped ?? 0} с липсваща зависимост
-              {' • '}{new Date(summary.ranAt).toLocaleString('bg-BG')}
-            </p>
+            <div role="status" className="grid gap-2">
+              <dl className="operator-metrics grid-cols-3" aria-label="Обобщение">
+                {[
+                  { label: 'Успешни', value: summary.passed, icon: CircleCheck },
+                  { label: 'Неуспешни', value: summary.failed, icon: CircleAlert },
+                  { label: 'С липсваща зависимост', value: summary.skipped ?? 0, icon: CircleMinus },
+                ].map(({ label, value, icon: Icon }) => (
+                  <div key={label} className="operator-metric">
+                    <dt><span className="operator-metric-icon"><Icon size={16} aria-hidden="true" /></span>{label}</dt>
+                    <dd>{value}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="text-xs text-white/65">Последно изпълнение {new Date(summary.ranAt).toLocaleString('bg-BG')}</p>
+            </div>
           )}
-          {!runnerAvailable && <p className="text-sm text-amber-200 mb-4">Тестовият runner не е наличен в тази среда.</p>}
+          {!runnerAvailable && <p className="operator-status shark-glass text-sm text-amber-200">Тестовият runner не е наличен в тази среда.</p>}
           <ul className="space-y-2">
             {cases.map(test => {
               const result = summary?.results.find(row => row.id === test.id);
               return (
-                <li key={test.id} className="shark-glass rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    {result?.status === 'passed' && <CircleCheck className="text-emerald-300 shrink-0" size={20} />}
-                    {result?.status === 'failed' && <CircleAlert className="text-red-300 shrink-0" size={20} />}
+                <li key={test.id} className="ice-section operator-result" data-ice-art={testArt[test.category] ?? 'agent'}>
+                  <div className="operator-result-content">
+                    {result?.status === 'passed' && <CircleCheck className="shrink-0 text-emerald-800" size={19} aria-hidden="true" />}
+                    {result?.status === 'failed' && <CircleAlert className="shrink-0 text-rose-800" size={19} aria-hidden="true" />}
+                    {result?.status === 'skipped' && <CircleMinus className="shrink-0 text-amber-900" size={19} aria-hidden="true" />}
                     <div>
                       <h2 className="font-semibold">{test.name}</h2>
-                      <p className="text-sm text-white/65">
+                      <p className="operator-muted text-sm">
                         {test.category} · {result?.status === 'passed' ? 'Успешно' : result?.status === 'failed' ? 'Неуспешно' : result?.status === 'skipped' ? 'Липсва зависимост' : 'Очаква проверка'}
                         {result ? ` · ${result.duration} ms` : ''}
                       </p>
-                      {result?.error && <p className="text-sm text-amber-200 mt-1">{result.error}</p>}
+                      {result?.error && <p className="mt-1 text-sm text-amber-950">{result.error}</p>}
                     </div>
                   </div>
-                  {runnerAvailable && <button type="button" disabled={!!running} onClick={() => run(test.id)} className="shark-action-secondary" aria-label={`Изпълни: ${test.name}`}>
-                    {running === test.id ? <LoaderCircle size={16} className="animate-spin" /> : <Play size={16} />}
+                  {runnerAvailable && <button type="button" disabled={!!running} onClick={() => run(test.id)} className="shark-action-secondary operator-icon-button" aria-label={`Изпълни: ${test.name}`}>
+                    {running === test.id ? <LoaderCircle size={16} className="animate-spin" aria-hidden="true" /> : <Play size={16} aria-hidden="true" />}
                   </button>}
                 </li>
               );

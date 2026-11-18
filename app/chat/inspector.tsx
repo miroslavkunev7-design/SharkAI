@@ -175,7 +175,7 @@ export function Inspector({ item, close, talk, save, disabled, reminders, create
 }) {
   return (
     <aside className="shark-chat-inspector" aria-label={item.title}>
-      <header>
+      <header className="ice-section" data-ice-art={item.type === 'project' ? 'studio' : item.type === 'reminders' ? 'team' : 'agent'}>
         <h2>{item.title}</h2>
         <button className="shark-chat-icon" type="button" aria-label="Затвори прегледа" onClick={close}><X size={19} /></button>
       </header>

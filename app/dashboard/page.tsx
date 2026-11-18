@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight, ArrowUpRight, CarFront, CircleHelp, Code2, Download, FolderOpen, Gauge,
   ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare, Mic, Plus,
-  Settings, Sparkles, TrendingUp, Upload, Users, X,
+  Search, Settings, Sparkles, TrendingUp, Upload, Users, X,
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import {
@@ -29,6 +29,15 @@ const VIEWS = {
 };
 
 type View = keyof typeof VIEWS;
+const WORKSPACE_ART: Partial<Record<View, string>> = {
+  chat: 'agent', studio: 'studio', agents: 'team', investments: 'markets', automotive: 'car', settings: 'shark',
+};
+const MODULES = [
+  { view: 'chat', description: 'Разговаряй с SharkAI.' },
+  { view: 'studio', description: 'Проекти от описание и скрийншоти.' },
+  { view: 'agents', description: 'Специализирани роли и резултати.' },
+  { view: 'investments', description: 'Няма свързан източник.' },
+] as const;
 const PROJECT_STATUS: Record<string, string> = {
   ANALYZING: 'Анализира се', BUILDING: 'Създават се файлове', RUNNING: 'Изпълнява се',
   TESTING: 'Проверява се', FIXING: 'Коригира се', DEPLOYING: 'Подготвя се',
@@ -99,10 +108,19 @@ function WorkspaceNav({ view, onNavigate }: { view: View; onNavigate?: () => voi
   );
 }
 
+function WorkspaceBrand({ mobile = false }: { mobile?: boolean }) {
+  return (
+    <Link href="/" className={`module-brand${mobile ? ' module-mobile-brand' : ''}`} aria-label="SharkAI начало">
+      <Logo size={mobile ? 'sm' : 'md'} />
+      <span className="module-wordmark" aria-hidden="true">Shark<span>AI</span></span>
+    </Link>
+  );
+}
+
 function Banner({ view, children }: { view: View; children?: ReactNode }) {
   const { icon: Icon, label } = VIEWS[view];
   return (
-    <section className={`shark-glass module-banner module-banner-${view}`}>
+    <section className="ice-section module-banner" data-ice-art={WORKSPACE_ART[view]}>
       <div>
         <Icon size={24} aria-hidden="true" />
         <h1>{label}</h1>
@@ -112,11 +130,61 @@ function Banner({ view, children }: { view: View; children?: ReactNode }) {
   );
 }
 
+function WorkspaceSearch({ projects }: { projects: Project[] }) {
+  const dialog = useRef<HTMLDialogElement>(null);
+  const field = useRef<HTMLInputElement>(null);
+  const [term, setTerm] = useState('');
+  const query = term.trim().normalize('NFKC').toLocaleLowerCase('bg');
+  const entries = [
+    ...Object.values(VIEWS).map(({ label, href, icon }) => ({ label, href, icon })),
+    ...projects.map(({ name, id }) => ({ label: name, href: `/dashboard?project=${encodeURIComponent(id)}`, icon: FolderOpen })),
+  ].filter(({ label }) => label.normalize('NFKC').toLocaleLowerCase('bg').includes(query));
+
+  function open() {
+    dialog.current?.showModal();
+    field.current?.focus();
+  }
+
+  return (
+    <>
+      <button className="module-utility-button" type="button" aria-label="Търси в работното пространство" aria-haspopup="dialog" onClick={open}>
+        <Search size={17} />
+      </button>
+      <dialog ref={dialog} className="ice-section module-search-dialog" data-ice-art="agent" aria-labelledby="module-search-title"
+        onClose={() => setTerm('')}
+        onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            dialog.current?.close();
+          }
+        }}>
+        <div className="module-search-content">
+          <div className="module-heading">
+            <h2 id="module-search-title">Търсене</h2>
+            <button className="shark-action-secondary" type="button" onClick={() => dialog.current?.close()} aria-label="Затвори търсенето"><X size={17} /></button>
+          </div>
+          <label className="module-search-field">
+            <span className="sr-only">Търси модул или скорошен проект</span>
+            <Search size={16} aria-hidden="true" />
+            <input type="search" ref={field} placeholder="Модул или скорошен проект" value={term} onChange={(event) => setTerm(event.target.value)} />
+          </label>
+          {entries.length ? <ul className="module-search-results">
+            {entries.map(({ label, href, icon: Icon }) => (
+              <li key={href}><Link href={href} onClick={() => dialog.current?.close()}><Icon size={17} aria-hidden="true" /><span>{label}</span><ArrowRight size={15} aria-hidden="true" /></Link></li>
+            ))}
+          </ul> : <p role="status">Няма съвпадения.</p>}
+        </div>
+      </dialog>
+    </>
+  );
+}
+
 function ProjectList({ projects, error, isLoading, onRetry }: {
   projects: Project[]; error?: string; isLoading?: boolean; onRetry: () => void;
 }) {
   return (
-    <section className="shark-glass module-panel" aria-labelledby="module-projects-title">
+    <section className="ice-section module-panel" data-ice-art="studio" aria-labelledby="module-projects-title">
       <div className="module-heading">
         <h2 id="module-projects-title">Последни проекти</h2>
         <Link className="module-link" href={VIEWS.studio.href}>Студио <ArrowRight size={16} /></Link>
@@ -141,36 +209,41 @@ function ProjectList({ projects, error, isLoading, onRetry }: {
 
 function Overview({ data, loading, error, onRetry }: { data: Projects | null; loading: boolean; error: string; onRetry: () => void }) {
   const projects = data?.projects ?? [];
-  const summary = data?.summary;
+  const summary = data?.user && !error ? data.summary : null;
+  const metrics = [
+    { label: 'Проекти', icon: FolderOpen, value: summary?.total },
+    { label: 'AI роли', icon: Users, value: AGENTS.length },
+    { label: 'В работа', icon: Gauge, value: summary?.active },
+    { label: 'Завършени', icon: Sparkles, value: summary?.completed },
+  ];
   return (
     <>
-      <section className="shark-glass module-banner module-overview-hero">
-        <div>
+      <section className="module-overview-hero">
+        <div className="module-hero-copy">
           <h1>Команден <span>център</span></h1>
-          <p>Разговори, проекти и задачи в работното ти пространство.</p>
+          <p>Твоето работно пространство за AI чат, проекти и задачи.</p>
           <div className="module-actions">
             <Link href="/chat" className="shark-action">Отвори AI чата <ArrowRight size={17} /></Link>
             <Link href={VIEWS.studio.href} className="shark-action-secondary">Към Студиото <Code2 size={17} /></Link>
           </div>
         </div>
       </section>
-      {data?.user && summary && (
-        <dl className="module-metrics" aria-label="Състояние на проектите">
-          <div className="shark-glass"><dt><FolderOpen aria-hidden="true" /> Проекти</dt><dd>{summary.total}</dd></div>
-          <div className="shark-glass"><dt><Gauge aria-hidden="true" /> В работа</dt><dd>{summary.active}</dd></div>
-          <div className="shark-glass"><dt><Sparkles aria-hidden="true" /> Завършени</dt><dd>{summary.completed}</dd></div>
-        </dl>
-      )}
+      <dl className="ice-section module-metrics" aria-label="Проекти и AI роли" aria-busy={loading}>
+        {metrics.map(({ label, icon: Icon, value }) => (
+          <div className="module-metric" key={label}>
+            <dt><span className="module-metric-icon" aria-hidden="true"><Icon size={19} /></span>{label}</dt>
+            <dd>{value ?? <span aria-label={loading ? 'Зареждане' : 'Недостъпни данни'}>{loading ? '…' : '—'}</span>}</dd>
+          </div>
+        ))}
+      </dl>
       <section aria-labelledby="module-cards-title">
         <h2 className="module-section-title" id="module-cards-title">Модули</h2>
         <div className="module-tiles">
-          {(['chat', 'studio', 'agents'] as const).map((key) => {
-            const { href, label, icon: Icon } = VIEWS[key];
-            const captions = { chat: 'Разговори, файлове и работни задачи.', studio: 'Проекти от описание и скрийншоти.', agents: 'Роли и резултати от изпълнения.' };
+          {MODULES.map(({ view, description }) => {
+            const { href, label } = VIEWS[view];
             return (
-              <Link key={key} href={href} className={`shark-glass module-tile module-banner-${key}`}>
-                <div><Icon size={20} /><ArrowUpRight size={20} /></div>
-                <span><strong>{label}</strong><p>{captions[key]}</p></span>
+              <Link key={view} href={href} className="ice-section module-tile" data-ice-art={WORKSPACE_ART[view]}>
+                <div><strong>{label}</strong><p>{description}</p></div>
               </Link>
             );
           })}
@@ -293,7 +366,7 @@ function StudioForm({ featureParam, user, loading, onCreated }: {
 
   return (
     <div className="module-columns">
-      <section className="shark-glass module-panel">
+      <section className="ice-section module-panel" data-ice-art="studio">
         <div className="module-heading"><h2>Нов проект</h2></div>
         {loading ? <p role="status">Зареждане на акаунта…</p> : !user ? (
           <>
@@ -345,7 +418,7 @@ function StudioForm({ featureParam, user, loading, onCreated }: {
           </form>
         )}
       </section>
-      <section className="shark-glass module-panel">
+      <section className="ice-section module-panel" data-ice-art="agent">
         <div className="module-heading"><h2>Визуална референция</h2></div>
         <div className="module-upload-preview">
           {upload?.previewUrl
@@ -364,7 +437,7 @@ function Result({ detail, error, onRetry }: { detail: ProjectDetail | null; erro
   const active = agents.find(({ activity }) => activity === 'running');
   const awaiting = detail?.project.statusUnknown || !!error;
   return (
-    <section className="shark-glass module-panel" aria-labelledby="studio-result">
+    <section className="ice-section module-panel" data-ice-art="studio" aria-labelledby="studio-result">
       <div className="module-heading">
         <h2 id="studio-result">{detail?.project.name || 'Резултат от Студиото'}</h2>
         {detail && <span role="status"><ProjectStatus project={awaiting ? { ...detail.project, statusUnknown: !isTerminalStudioStatus(detail.project.status) } : detail.project} /></span>}
@@ -450,7 +523,7 @@ function Agents({ user }: { user: User | null }) {
   return (
     <>
       <Banner view="agents">Задачи в Студиото и последни резултати от твоите проекти.</Banner>
-      <section className="shark-glass module-panel">
+      <section className="ice-section module-panel" data-ice-art="agent">
         <div className="module-heading">
           <div className="module-brain"><Logo size="md" /><div><h2>{SUPREME_BRAIN.name}</h2><p>{SUPREME_BRAIN.description}</p></div></div>
           <Link className="module-link" href={VIEWS.studio.href}>Студио <ArrowRight size={16} /></Link>
@@ -468,14 +541,17 @@ function Agents({ user }: { user: User | null }) {
           {AGENTS.map((agent) => {
             const action = STUDIO_AGENT_ACTIONS[agent.id];
             return (
-              <li key={agent.id} className="shark-glass module-panel">
-                <span className="module-agent-icon"><Users size={18} /></span>
-                <div>
-                  <strong>{agent.name}</strong><p>{action?.description ?? STUDIO_AGENT_DEPENDENCIES[agent.id]}</p>
-                  {action && <Link className="module-link" href={`/dashboard?feature=${action.featureId}`}>Отвори задача <ArrowRight size={14} /></Link>}
-                  {agent.id === 'agent-14' && <Link className="module-link" href="/chat">Към чата <ArrowRight size={14} /></Link>}
-                  {receipt(agent.id)}
+              <li key={agent.id} className="ice-section module-panel module-role-card"
+                data-ice-art={agent.id === 'agent-1' || agent.id === 'agent-14' ? 'agent' : action ? 'studio' : 'team'}>
+                <div className="module-role-heading">
+                  <span className="module-agent-icon" aria-hidden="true"><Users size={18} /></span>
+                  <div>
+                    <strong>{agent.name}</strong><p>{action?.description ?? STUDIO_AGENT_DEPENDENCIES[agent.id]}</p>
+                    {action && <Link className="module-link" href={`/dashboard?feature=${action.featureId}`}>Отвори задача <ArrowRight size={14} /></Link>}
+                    {agent.id === 'agent-14' && <Link className="module-link" href="/chat">Към чата <ArrowRight size={14} /></Link>}
+                  </div>
                 </div>
+                {receipt(agent.id)}
               </li>
             );
           })}
@@ -516,7 +592,7 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
   return (
     <>
       <Banner view="settings">Акаунт, права и абонамент.</Banner>
-      <section className="shark-glass module-panel">
+      <section className="ice-section module-panel" data-ice-art="shark">
         <div className="module-heading"><h2>Профил</h2></div>
         {loading ? <p role="status">Зареждане на профила…</p> : error ? <p role="alert">{error}</p> : !user
           ? <Link className="shark-action" href={signIn(VIEWS.settings.href)}>Вход <ArrowRight size={17} /></Link>
@@ -548,18 +624,18 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
 function Automotive() {
   return (
     <>
-      <section className="shark-glass module-banner module-banner-automotive">
+      <section className="ice-section module-banner module-banner-automotive" data-ice-art="car">
         <div><CarFront size={26} /><h1>Автомобили</h1><p>Автомобилни изображения от проектните материали на SharkAI.</p></div>
         <Image src="/assets/image-1.png" className="module-car" alt="Сребрист автомобил от проектните материали на SharkAI" width={420} height={420} />
       </section>
       <div className="module-columns">
-        <section className="shark-glass module-panel">
+        <section className="ice-section module-panel module-diagnostics" data-ice-art="car">
           <div className="module-heading"><h2>Диагностика</h2></div>
           <p>Няма свързан източник за VIN, OBD диагностичен адаптер или интерактивен 3D модел.</p>
         </section>
-        <figure className="shark-glass module-panel module-engine">
+        <figure className="ice-section module-panel module-engine">
+          <figcaption><strong>Двигател</strong><span>Изображение от проектните материали</span></figcaption>
           <Image src="/assets/image-2.png" alt="Изображение на червен и сребрист двигател" width={320} height={320} />
-          <figcaption>Двигател от проектните материали</figcaption>
         </figure>
       </div>
     </>
@@ -645,7 +721,7 @@ function DashboardContent() {
     <div className="module-workspace">
       <a className="module-skip" href="#workspace-content">Към съдържанието</a>
       <aside className="module-sidebar shark-glass">
-        <Link href="/" className="module-brand"><Logo size="md" /><span>SharkAI</span></Link>
+        <WorkspaceBrand />
         <WorkspaceNav view={view} />
         <Link className="module-sidebar-account" href={data?.user ? VIEWS.settings.href : signIn('/dashboard')}>
           <Settings size={18} /><span>{data?.user?.name || data?.user?.email || 'Вход'}</span>
@@ -653,10 +729,15 @@ function DashboardContent() {
       </aside>
       <div className="module-main">
         <header className="module-topbar">
-          <button type="button" className="module-menu shark-action-secondary" onClick={() => dialog.current?.showModal()} aria-label="Отвори менюто"><Menu size={22} /></button>
-          <Link href="/" className="module-mobile-brand"><Logo size="sm" /></Link>
+          <button type="button" className="module-menu module-utility-button" onClick={() => dialog.current?.showModal()} aria-label="Отвори менюто" aria-haspopup="dialog"><Menu size={18} /></button>
+          <WorkspaceBrand mobile />
           <span className="module-breadcrumb"><Link href="/dashboard">Работно пространство</Link><span aria-hidden="true">/</span><strong>{VIEWS[view].label}</strong></span>
-          <Link className="module-top-chat shark-action-secondary" href="/chat"><MessageSquare size={17} /> <span>AI чат</span></Link>
+          <div className="module-header-actions">
+            <WorkspaceSearch projects={data?.projects ?? []} />
+            <Link className="module-account-puck" href={data?.user ? VIEWS.settings.href : signIn('/dashboard')}>
+              <span aria-hidden="true" />{data?.user ? `План ${data.user.plan}` : 'Вход'}
+            </Link>
+          </div>
         </header>
         <main id="workspace-content" className="module-content" tabIndex={-1}>
           {view === 'overview' && <Overview data={data} loading={loading} error={error} onRetry={() => void fetchProjects()} />}
@@ -664,7 +745,11 @@ function DashboardContent() {
             <Banner view="studio">Създай проект от описание или визуална референция.</Banner>
             {error && <p className="module-error" role="alert">{error} <button type="button" className="module-link" onClick={() => void fetchProjects()}>Опитай отново</button></p>}
             {projectId && data?.user && <Result detail={details} error={projectError} onRetry={() => setReload((value) => value + 1)} />}
-            {projectId && !loading && !data?.user && <section className="shark-glass module-panel"><p>Влез в акаунта си, за да отвориш проекта.</p><Link className="shark-action" href={signIn(`/dashboard?project=${encodeURIComponent(projectId)}`)}>Вход <ArrowRight size={17} /></Link></section>}
+            {projectId && !loading && !data?.user && <section className="ice-section module-panel" data-ice-art="studio">
+              <div className="module-heading"><h2>Проект</h2></div>
+              <p>Влез в акаунта си, за да отвориш проекта.</p>
+              <Link className="shark-action" href={signIn(`/dashboard?project=${encodeURIComponent(projectId)}`)}>Вход <ArrowRight size={17} /></Link>
+            </section>}
             <StudioForm key={featureParam ?? 'screenshot-website'} featureParam={featureParam ?? 'screenshot-website'} user={data?.user ?? null} loading={loading} onCreated={created} />
             {data?.user && <ProjectList projects={data.projects} onRetry={() => void fetchProjects()} />}
           </>}
@@ -672,7 +757,7 @@ function DashboardContent() {
           {view === 'automotive' && <Automotive />}
           {view === 'investments' && <>
             <Banner view="investments">Състояние на свързания портфейл.</Banner>
-            <section className="shark-glass module-panel">
+            <section className="ice-section module-panel" data-ice-art="markets">
               <div className="module-heading"><h2><CircleHelp size={19} /> Няма свързан източник</h2></div>
               <p>За портфейл, наличности и движения е нужен конфигуриран доставчик с достъп за четене.</p>
             </section>
@@ -683,7 +768,7 @@ function DashboardContent() {
       <dialog ref={dialog} className="module-drawer shark-glass" aria-label="Навигация" onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
         <div className="module-drawer-content">
           <div className="module-drawer-head">
-            <Link href="/" className="module-brand"><Logo size="md" /><span>SharkAI</span></Link>
+            <WorkspaceBrand />
             <button type="button" className="shark-action-secondary" aria-label="Затвори менюто" onClick={() => dialog.current?.close()}><X size={22} /></button>
           </div>
           <WorkspaceNav view={view} onNavigate={() => dialog.current?.close()} />

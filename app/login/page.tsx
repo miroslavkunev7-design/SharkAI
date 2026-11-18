@@ -1,12 +1,11 @@
 'use client';
 
-import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
-import sharkHero from '@/public/sharkai/shark-hero.webp';
+import '../entry.css';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -46,38 +45,39 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="shark-hero shark-auth">
-      <Image src={sharkHero} alt="" fill sizes="100vw" priority className="shark-hero-image shark-auth-image" />
-      <section className="shark-auth-card shark-glass" aria-labelledby="login-title">
-        <Link href="/" className="shark-wordmark w-fit" aria-label="SharkAI, начало">
-          <Logo size="sm" />
-          <span aria-hidden="true">SharkAI</span>
-        </Link>
-        <h1 id="login-title" className="!text-2xl mt-5 mb-5">{isRegister ? 'Създай акаунт' : 'Вход в SharkAI'}</h1>
-        <form onSubmit={handleSubmit} className="space-y-3" aria-busy={loading}>
-          {isRegister && (
-            <label className="block text-sm text-white/85">
-              Име
-              <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" className="shark-auth-input" />
+    <main className="shark-entry-page shark-entry-auth">
+      <section className="ice-section shark-entry-feature shark-entry-auth-panel" data-ice-art="shark" aria-labelledby="login-title">
+        <div className="shark-entry-feature-copy shark-entry-auth-copy">
+          <Link href="/" className="shark-wordmark w-fit" aria-label="SharkAI, начало">
+            <Logo size="sm" />
+            <span aria-hidden="true">SharkAI</span>
+          </Link>
+          <h1 id="login-title">{isRegister ? 'Създай акаунт' : 'Вход в SharkAI'}</h1>
+          <form onSubmit={handleSubmit} className="shark-entry-form" aria-busy={loading}>
+            {isRegister && (
+              <label>
+                Име
+                <input value={name} onChange={(event) => setName(event.target.value)} autoComplete="name" />
+              </label>
+            )}
+            <label>
+              Имейл
+              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required />
             </label>
-          )}
-          <label className="block text-sm text-white/85">
-            Имейл
-            <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" required className="shark-auth-input" />
-          </label>
-          <label className="block text-sm text-white/85">
-            Парола
-            <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={isRegister ? 'new-password' : 'current-password'} required className="shark-auth-input" />
-          </label>
-          {error && <p role="alert" className="text-red-300 text-sm">{error}</p>}
-          <button type="submit" disabled={loading} className="shark-action w-full">
-            {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
-            {isRegister ? 'Регистрация' : 'Влез'}
+            <label>
+              Парола
+              <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete={isRegister ? 'new-password' : 'current-password'} required />
+            </label>
+            {error && <p role="alert" className="shark-entry-error">{error}</p>}
+            <button type="submit" disabled={loading} className="shark-action w-full">
+              {loading && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+              {isRegister ? 'Регистрация' : 'Влез'}
+            </button>
+          </form>
+          <button type="button" onClick={toggleRegistration} disabled={loading} className="shark-entry-text-button">
+            {isRegister ? 'Вече имаш акаунт? Влез' : 'Създай акаунт'}
           </button>
-        </form>
-        <button type="button" onClick={toggleRegistration} disabled={loading} className="mt-4 text-sm text-sky-200 hover:underline min-h-8">
-          {isRegister ? 'Вече имаш акаунт? Влез' : 'Създай акаунт'}
-        </button>
+        </div>
       </section>
     </main>
   );
