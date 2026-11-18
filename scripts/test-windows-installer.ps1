@@ -24,6 +24,8 @@ if ($Windows11Acceptance) {
 $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
 $installer = (Resolve-Path "release/SharkAI-Setup-$version.exe").Path
 $target = Join-Path $env:LOCALAPPDATA 'Programs\SharkAI Windows Smoke'
+# Electron Builder rereads /D with StdUtils after choosing the per-user install mode.
+$targetArgument = '"/D={0}"' -f $target
 $executable = Join-Path $target 'SharkAI.exe'
 $uninstaller = Join-Path $target 'Uninstall SharkAI.exe'
 $runnerTemp = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
@@ -86,7 +88,8 @@ function Get-Registration {
 }
 
 function Assert-Installed($ExpectedVersion) {
-  if (!(Test-Path $executable) -or !(Test-Path $uninstaller)) { throw 'Setup did not preserve the installation path containing spaces.' }
+  if (!(Test-Path -LiteralPath $executable -PathType Leaf)) { throw 'SharkAI.exe is missing from the requested installation directory containing spaces.' }
+  if (!(Test-Path -LiteralPath $uninstaller -PathType Leaf)) { throw 'The uninstaller is missing from the requested installation directory containing spaces.' }
   $registered = Get-Registration
   if ($registered.DisplayVersion -ne $ExpectedVersion) { throw 'The expected per-user Windows uninstall registration is missing.' }
   $comShell = New-Object -ComObject WScript.Shell
@@ -135,12 +138,12 @@ if (!$Windows11Acceptance) {
 
 try {
   if ($Windows11Acceptance) {
-    Invoke-Setup $previous "/S /currentuser /D=$target"
+    Invoke-Setup $previous "/S /currentuser $targetArgument"
     Assert-Installed $legacyVersion
     Invoke-Desktop 'online-seed'
     Invoke-Desktop 'online-resume'
   } else {
-    Invoke-Setup $installer "/S /currentuser /D=$target"
+    Invoke-Setup $installer "/S /currentuser $targetArgument"
     Assert-Installed $version
     Invoke-Desktop 'offline'
   }
@@ -150,7 +153,7 @@ try {
   if (!$Windows11Acceptance) {
     Invoke-Setup $uninstaller '/S /currentuser'
     Assert-Uninstalled
-    Invoke-Setup $previous "/S /D=$target"
+    Invoke-Setup $previous "/S $targetArgument"
     if (!(Test-Path $executable)) { throw 'Previous version did not install.' }
   }
 
