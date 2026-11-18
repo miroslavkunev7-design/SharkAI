@@ -3,7 +3,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { getOpenAIKey, getAnthropicKey, getGoogleKey, getGroqKey, isPaidAIMode } from '../settings';
 
 export const googleChatModels = { standard: 'gemini-3.5-flash-lite', advanced: 'gemini-3.8-flash' } as const;
-export const groqChatModels = { standard: 'llama-3.1-8b-instant', advanced: 'llama-3.3-70b-versatile' } as const;
+export const groqChatModels = { standard: 'openai/gpt-oss-20b', advanced: 'openai/gpt-oss-120b' } as const;
 
 let cachedKey: string | null | undefined;
 let cachedAnthropicKey: string | null | undefined;

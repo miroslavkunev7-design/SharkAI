@@ -49,7 +49,7 @@ function googleWorkspaceModel(provider: NonNullable<Awaited<ReturnType<typeof ge
 
 function groqWorkspaceModel(provider: NonNullable<Awaited<ReturnType<typeof getGroq>>>, id: WorkspaceModel['id']): WorkspaceModel {
   return {
-    id, label: id === 'standard' ? 'Llama 3.1 8B · Groq' : 'Llama 3.3 70B · Groq', provider: 'groq',
+    id, label: id === 'standard' ? 'GPT-OSS 20B · Groq' : 'GPT-OSS 120B · Groq', provider: 'groq',
     imageInput: false, reasoningLevels: ['standard'], model: provider.chat(groqChatModels[id]), nativeToolCalls: 'compatible',
   };
 }
