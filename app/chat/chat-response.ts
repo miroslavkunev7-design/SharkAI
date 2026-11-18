@@ -10,10 +10,16 @@ export interface ChatResult {
   toolResult?: ChatToolResult | null;
 }
 
+function isChatResult(value: unknown): value is ChatResult {
+  if (!value || typeof value !== 'object') return false;
+  const { content, conversationId } = value as Partial<ChatResult>;
+  return typeof content === 'string' && (typeof conversationId === 'string' || conversationId === null);
+}
+
 export async function readChatResponse(response: Response, onDelta: (delta: string) => void): Promise<ChatResult> {
   if (!response.ok || !response.headers.get('content-type')?.includes('application/x-ndjson')) {
     const body = await response.json().catch(() => null);
-    if (!response.ok || !body) throw new Error(body?.error || 'SharkAI не успя да обработи съобщението.');
+    if (!response.ok || !isChatResult(body)) throw new Error(body?.error || 'SharkAI не успя да обработи съобщението.');
     return body;
   }
   const reader = response.body?.getReader();
@@ -27,7 +33,10 @@ export async function readChatResponse(response: Response, onDelta: (delta: stri
     const chunk = JSON.parse(line);
     if (chunk.type === 'error') throw new Error(chunk.error || 'Връзката с отговора прекъсна.');
     if (chunk.type === 'delta') onDelta(chunk.text);
-    if (chunk.type === 'done') result = chunk;
+    if (chunk.type === 'done') {
+      if (!isChatResult(chunk)) throw new Error('SharkAI не потвърди отговора. Опитай отново.');
+      result = chunk;
+    }
   }
 
   try {
@@ -36,7 +45,13 @@ export async function readChatResponse(response: Response, onDelta: (delta: stri
       buffer += decoder.decode(value, { stream: !done });
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-      lines.forEach(readLine);
+      for (const line of lines) {
+        readLine(line);
+        if (result) {
+          if (!done) void reader.cancel().catch(() => {});
+          return result;
+        }
+      }
       if (done) {
         readLine(buffer);
         break;

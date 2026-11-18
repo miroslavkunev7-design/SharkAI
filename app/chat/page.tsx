@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { captureFrame, useChatMedia } from './chat-media';
 import { readChatResponse } from './chat-response';
+import { chatTurnScope, readPendingChatTurn, writePendingChatTurn, type BranchFrom, type ChatRequest } from './chat-turn-draft';
 import { Inspector } from './inspector';
 import { useReminders, type ReminderInput } from './reminders';
 import { ToolReceipt } from './tool-receipt';
@@ -24,7 +25,6 @@ import './workspace.css';
 import './chat-voice.css';
 
 type Popup = 'tools' | 'model' | 'mode' | 'profile';
-type BranchFrom = { conversationId: string; messageId: string };
 
 interface ChatData {
   messages?: Message[];
@@ -35,20 +35,6 @@ interface ChatData {
   user?: Account | null;
   capabilities?: { models?: Model[]; reason?: string };
   error?: string;
-}
-
-interface ChatRequest {
-  message: string;
-  conversationId: string;
-  requestId: string;
-  mode: Mode;
-  model?: string;
-  reasoning?: string;
-  uploadId?: string;
-  toolId?: string;
-  projectId?: string;
-  branchFrom?: BranchFrom;
-  reminder?: ReminderInput;
 }
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
@@ -85,6 +71,10 @@ const modeLabel = (mode: Mode) => mode === 'chat' ? 'Чат' : 'Работа';
 function takesTranscriptionLanguage(draft: string) {
   const command = draft.trim().replace(/\s+/gu, ' ');
   return !command || /^(?:транскрибирай(?: аудио(?:то)?)?|transcribe(?: (?:the )?audio)?)[.!?]*$/iu.test(command);
+}
+
+function userTurn(request: ChatRequest, attachmentMime?: string): Message {
+  return { id: request.requestId, role: 'user', content: request.message || 'Прикачен файл', imagePath: request.uploadId, attachmentMime };
 }
 
 const suggestions = [
@@ -197,15 +187,29 @@ export default function ChatPage() {
         throw new Error(data.error || 'Разговорът не може да се зареди.');
       }
       if (controller.signal.aborted) return;
+      const recovered = readPendingChatTurn(data.user?.email, chatTurnScope(id, draftProjectId));
+      const unsavedConversation = !id && recovered && data.conversationId !== recovered.request.conversationId;
       const selected = data.conversations?.find((item) => item.id === data.conversationId);
-      setMessages(draftProjectId ? [] : data.messages ?? []);
+      setMessages(draftProjectId || unsavedConversation ? [] : data.messages ?? []);
       setConversations(data.conversations ?? []);
-      setConversationId(draftProjectId ? null : data.conversationId ?? null);
-      setMode(draftProjectId ? 'work' : data.conversationMode ?? selected?.mode ?? 'chat');
-      setProjectContext(draftProjectId || data.projectId || selected?.projectId || null);
+      setConversationId(draftProjectId || unsavedConversation ? null : data.conversationId ?? null);
+      setMode(recovered?.request.mode ?? (draftProjectId ? 'work' : data.conversationMode ?? selected?.mode ?? 'chat'));
+      setProjectContext(recovered?.request.projectId ?? (unsavedConversation ? null : draftProjectId || data.projectId || selected?.projectId || null));
       setModels(data.capabilities?.models ?? []);
       setCapabilityReason(data.capabilities?.reason || '');
       setAccount(data.user ?? null);
+      if (recovered) {
+        failedRequest.current = recovered.request;
+        setOptimistic(userTurn(recovered.request, recovered.attachment?.mimeType));
+        setInput(recovered.input);
+        setAttachment(recovered.attachment);
+        setSelectedTool(recovered.tool);
+        setBranchFrom(recovered.request.branchFrom ?? null);
+        setModelId(recovered.request.model ?? '');
+        setReasoning(recovered.request.reasoning ?? 'standard');
+        if (recovered.stopped) setNotice(recovered.problem);
+        else setProblem(recovered.problem);
+      }
     } catch (error) {
       if (!controller.signal.aborted) setLoadProblem(error instanceof Error ? error.message : 'Разговорът не може да се зареди.');
     } finally {
@@ -362,6 +366,12 @@ export default function ChatPage() {
     window.history.replaceState(null, '', url);
   }
 
+  function clearFailedChatTurn() {
+    failedRequest.current = null;
+    writePendingChatTurn(null);
+    setOptimistic(null);
+  }
+
   function resetDraft() {
     setInput('');
     setAttachment(null);
@@ -371,7 +381,7 @@ export default function ChatPage() {
     setInspector(null);
     setProblem('');
     setNotice('');
-    failedRequest.current = null;
+    clearFailedChatTurn();
     failedCanvasRequest.current = null;
     failedReminderRequest.current = null;
     media.stopListening();
@@ -440,7 +450,7 @@ export default function ChatPage() {
     }
     setUploading(true);
     setProblem('');
-    failedRequest.current = null;
+    clearFailedChatTurn();
     try {
       const form = new FormData();
       form.append('file', mime === file.type ? file : new File([file], file.name, { type: mime }));
@@ -531,7 +541,7 @@ export default function ChatPage() {
     setSelectedTool(tool);
     setMode('work');
     closePopup();
-    failedRequest.current = null;
+    clearFailedChatTurn();
     requestAnimationFrame(() => {
       const select = tool.id === 'audio-transcribe' ? transcriptionLanguageRef.current : null;
       if (select && !select.disabled) select.focus();
@@ -551,8 +561,19 @@ export default function ChatPage() {
       setNotice('');
     }
     setPartial('');
-    setOptimistic({ id: request.requestId, role: 'user', content: request.message || 'Прикачен файл', imagePath: request.uploadId,
-      attachmentMime: canvasMime || (request.uploadId === attachment?.id ? attachment?.mimeType : undefined) });
+    const priorAttachment = request.uploadId ? messages.find(({ imagePath }) => imagePath === request.uploadId) : undefined;
+    const uploaded = request.uploadId === attachment?.id ? attachment : priorAttachment ? messageAttachment(priorAttachment) : null;
+    const attempt = userTurn(request, canvasMime || uploaded?.mimeType);
+    const query = new URLSearchParams(window.location.search);
+    const previous = !panelAction && account?.email ? {
+      owner: account.email, scope: chatTurnScope(query.get('conversationId') || undefined, query.get('project') || undefined),
+      request, input: input.trim() === request.message ? input : request.message,
+      attachment: uploaded, tool: selectedTool?.id === request.toolId ? selectedTool : tools.find(({ id }) => id === request.toolId) ?? null,
+      problem: 'Получаването на отговора е прекъснато. Можеш да опиташ отново.',
+    } : null;
+    if (previous) writePendingChatTurn(previous);
+    let keepAttempt = false;
+    setOptimistic(attempt);
     closePopup();
     try {
       const response = await fetch('/api/chat', {
@@ -562,6 +583,7 @@ export default function ChatPage() {
       const result = await readChatResponse(response, (delta) => setPartial((text) => text + delta));
       controller.signal.throwIfAborted();
       retry.current = null;
+      if (!panelAction) writePendingChatTurn(null);
       const id = result.conversationId ?? request.conversationId;
       if (request.branchFrom) {
         await loadConversation(id);
@@ -595,8 +617,10 @@ export default function ChatPage() {
     } catch (cause) {
       retry.current = request;
       const error = controller.signal.aborted ? 'Получаването на отговора е прекъснато.'
-        : cause instanceof Error ? cause.message : 'Връзката прекъсна.';
-      if (!panelAction) {
+        : cause instanceof Error && cause.name !== 'TypeError' ? cause.message : 'Връзката прекъсна. Можеш да опиташ отново.';
+      if (!panelAction && mounted.current) {
+        keepAttempt = true;
+        if (previous) writePendingChatTurn({ ...previous, problem: error, stopped: controller.signal.aborted });
         if (controller.signal.aborted) setNotice(error);
         else setProblem(error);
       }
@@ -604,7 +628,7 @@ export default function ChatPage() {
     } finally {
       if (sendController.current === controller) sendController.current = null;
       setSending(false);
-      setOptimistic(null);
+      if (!keepAttempt) setOptimistic(panelAction ? optimistic : null);
       setPartial('');
     }
   }
@@ -699,6 +723,7 @@ export default function ChatPage() {
 
   function editMessage(message: Message, toolId?: string) {
     if (!conversationId || pending) return;
+    clearFailedChatTurn();
     setBranchFrom({ conversationId, messageId: message.id });
     setAttachment(messageAttachment(message));
     const previousTool = tools.find((tool) => tool.id === toolId && tool.available);
@@ -735,7 +760,7 @@ export default function ChatPage() {
     setProblem('');
     setNotice(editor ? 'Опиши желаните промени.' : incompatibleTool
       ? 'Файлът е прикачен. Избери инструмент за този тип файл.' : 'Файлът е прикачен към следващата заявка.');
-    failedRequest.current = null;
+    clearFailedChatTurn();
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
@@ -809,6 +834,7 @@ export default function ChatPage() {
   function logout() {
     void fetch('/api/auth/logout', { method: 'POST' }).then((response) => {
       if (!response.ok) throw new Error();
+      writePendingChatTurn(null);
       window.location.assign('/login');
     }).catch(() => setProblem('Изходът от акаунта не успя.'));
   }
@@ -919,7 +945,7 @@ export default function ChatPage() {
                   <button type="button" aria-label="Премахни избрания инструмент" disabled={sending} onClick={() => setSelectedTool(null)}><X size={15} /></button>
                 </div>}
                 {projectContext && <div className="shark-chat-chip"><span><Folder size={15} /> {projects.find((project) => project.id === projectContext)?.name ?? 'Проект'}</span></div>}
-                {branchFrom && <div className="shark-chat-chip"><span><Pencil size={15} /> Нов клон</span><button type="button" aria-label="Отмени редакцията" disabled={sending} onClick={() => { setBranchFrom(null); setInput(''); setAttachment(null); setNotice(''); }}><X size={15} /></button></div>}
+                {branchFrom && <div className="shark-chat-chip"><span><Pencil size={15} /> Нов клон</span><button type="button" aria-label="Отмени редакцията" disabled={sending} onClick={() => { clearFailedChatTurn(); setBranchFrom(null); setInput(''); setAttachment(null); setNotice(''); setProblem(''); }}><X size={15} /></button></div>}
                 {uploading && <div className="shark-chat-chip" role="status"><LoaderCircle size={15} className="shark-chat-spinner" /> Качване…</div>}
               </div>}
               <label className="shark-chat-sr" htmlFor="chat-input">Съобщение</label>
@@ -927,7 +953,7 @@ export default function ChatPage() {
               <textarea id="chat-input" ref={inputRef} value={input} rows={2} maxLength={12000} disabled={pending || !canSend || !!loadProblem}
                 aria-describedby={datasetExample ? 'chat-dataset-example' : undefined}
                 placeholder={datasetExample ?? (mode === 'work' ? 'Опиши задачата си…' : 'Напиши съобщение…')}
-                onChange={(event) => { setInput(event.target.value); setProblem(''); }}
+                onChange={(event) => { if (failedRequest.current) { clearFailedChatTurn(); setNotice(''); } setInput(event.target.value); setProblem(''); }}
                 onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }} />
               <div className="shark-chat-composer-actions">
                 <div className="shark-chat-plus-anchor">
@@ -978,6 +1004,7 @@ export default function ChatPage() {
             <div className="shark-chat-composer-status" aria-live="polite">
               {problem && <span className="shark-chat-notice" role="alert">{problem}</span>}
               {notice && <span>{notice}</span>}
+              {!pending && (problem || notice) && failedRequest.current && <button type="button" className="shark-chat-new" onClick={() => { if (failedRequest.current) void submit(failedRequest.current); }}><RotateCcw size={15} /> Повтори изпращането</button>}
               {!problem && !notice && (media.recordStage || media.speechStage) && <span>{media.speechStage === 'playing' ? 'SharkAI отговаря на глас.' : media.speechStage === 'preparing' ? 'Подготвям звук…' : media.recordStage === 'transcribing' ? 'Разпознавам записа…' : media.recordStage === 'recording' ? 'Записвам. Натисни отново, за да приключиш.' : 'Включвам микрофона…'}</span>}
               {!loading && account && !model && capabilityReason && <span>{capabilityReason}</span>}
             </div>
