@@ -7,5 +7,5 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Влезте в акаунта си.' }, { status: 401 });
 
   const period = user.role === 'ADMIN' ? null : await getActiveBillingPeriod(user.id);
-  return NextResponse.json({ plan: user.plan, period, canPurchase: user.role !== 'ADMIN' });
+  return NextResponse.json({ plan: user.plan, period, canPurchase: user.role !== 'ADMIN', ...(user.lifetime && { lifetime: true }) });
 }

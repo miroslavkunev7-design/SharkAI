@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, BarChart3, Boxes, KeyRound, RefreshCw, Shield, TestTube, Users } from 'lucide-react';
 import { Logo } from '@/components/Logo';
+import { accountPlanLabel, type AccountPlan } from '../account-plan';
 import '../operator-workspace.css';
 
 interface AISettings {
@@ -17,7 +18,7 @@ interface AISettings {
 interface AdminData {
   stats: { totalUsers: number; proUsers: number; ultraUsers: number; totalProjects: number };
   users: Array<{ id: string; email: string; plan: string }>;
-  account: { plan: string };
+  account: AccountPlan;
   ai: AISettings;
 }
 
@@ -122,7 +123,7 @@ export default function AdminPage() {
         <div className="operator-hero-copy">
           <h1>Администрация</h1>
           <p>Настройки на AI услуги и преглед на потребителите.</p>
-          {data && <span className="operator-plan"><Shield size={13} aria-hidden="true" /> Текущ план {data.account.plan}</span>}
+          {data && <span className="operator-plan"><Shield size={13} aria-hidden="true" /> {accountPlanLabel(data.account, 'Текущ план ')}</span>}
         </div>
       </header>
       {loading && <div role="status" className="ice-section operator-admin-notice" data-ice-art="team"><p>Зареждане на административните данни…</p></div>}

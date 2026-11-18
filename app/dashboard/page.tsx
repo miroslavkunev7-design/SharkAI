@@ -15,6 +15,7 @@ import {
   SUPREME_BRAIN, getFeature, getStudioFeatureAvailability,
 } from '@/lib/agents';
 import { isTerminalStudioStatus, TRACKED_STUDIO_RUNS, type AgentRunActivity } from '@/lib/studio-activity';
+import { accountPlanLabel, hasLifetimeUltra, type AccountPlan } from '../account-plan';
 import { MemorySettings } from './memory-settings';
 import './workspace.css';
 
@@ -59,7 +60,7 @@ const AGENT_STATUS: Record<AgentRunActivity, string> = {
   running: 'Изпълнява се', completed: 'Завършено', failed: 'Неуспешно', unknown: 'Непотвърден статус',
 };
 
-type User = { name: string | null; email?: string; plan: string; role: string };
+type User = AccountPlan & { name: string | null; email?: string; role: string };
 type Project = { id: string; name: string; type: string; status: string; statusUnknown?: boolean; createdAt: string };
 type AgentExecution = { id: string; agentName: string; activity: AgentRunActivity; output: string | null };
 type ProjectDetail = {
@@ -567,13 +568,14 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
   const [billingError, setBillingError] = useState('');
   const [logoutError, setLogoutError] = useState('');
   const [signingOut, setSigningOut] = useState(false);
+  const lifetime = !!user && hasLifetimeUltra(user);
   useEffect(() => {
-    if (!user) return;
+    if (!user || lifetime) return;
     const request = new AbortController();
     void json<BillingStatus>('/api/payments/status', { signal: request.signal })
       .then(setBilling).catch(() => { if (!request.signal.aborted) setBillingError('Периодът на абонамента не можа да се зареди.'); });
     return () => request.abort();
-  }, [user]);
+  }, [user, lifetime]);
 
   async function logout() {
     setSigningOut(true);
@@ -601,12 +603,12 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
               <dl className="module-account">
                 {user.name && <div><dt>Име</dt><dd>{user.name}</dd></div>}
                 {user.email && <div><dt>Имейл</dt><dd>{user.email}</dd></div>}
-                <div><dt>План</dt><dd>{user.plan}</dd></div>
+                <div><dt>План</dt><dd>{accountPlanLabel(user)}</dd></div>
                 <div><dt>Роля</dt><dd>{user.role === 'ADMIN' ? 'Администратор' : 'Потребител'}</dd></div>
-                {billing?.period?.currentPeriodStart && <div><dt>Начало на периода</dt><dd><time dateTime={billing.period.currentPeriodStart}>{formatter.format(new Date(billing.period.currentPeriodStart))}</time></dd></div>}
-                {billing?.period?.currentPeriodEnd && <div><dt>Край на периода</dt><dd><time dateTime={billing.period.currentPeriodEnd}>{formatter.format(new Date(billing.period.currentPeriodEnd))}</time></dd></div>}
+                {!lifetime && billing?.period?.currentPeriodStart && <div><dt>Начало на периода</dt><dd><time dateTime={billing.period.currentPeriodStart}>{formatter.format(new Date(billing.period.currentPeriodStart))}</time></dd></div>}
+                {!lifetime && billing?.period?.currentPeriodEnd && <div><dt>Край на периода</dt><dd><time dateTime={billing.period.currentPeriodEnd}>{formatter.format(new Date(billing.period.currentPeriodEnd))}</time></dd></div>}
               </dl>
-              {billingError && <p role="alert" className="module-error">{billingError}</p>}
+              {!lifetime && billingError && <p role="alert" className="module-error">{billingError}</p>}
               <div className="module-actions">
                 {user.role === 'ADMIN' ? <Link className="shark-action-secondary" href="/admin#settings">Административни настройки</Link>
                   : <Link className="shark-action-secondary" href="/pricing">Планове</Link>}
@@ -735,7 +737,7 @@ function DashboardContent() {
           <div className="module-header-actions">
             <WorkspaceSearch projects={data?.projects ?? []} />
             <Link className="module-account-puck" href={data?.user ? VIEWS.settings.href : signIn('/dashboard')}>
-              <span aria-hidden="true" />{data?.user ? `План ${data.user.plan}` : 'Вход'}
+              <span aria-hidden="true" />{data?.user ? accountPlanLabel(data.user, 'План ') : 'Вход'}
             </Link>
           </div>
         </header>

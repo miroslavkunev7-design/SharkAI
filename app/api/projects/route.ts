@@ -23,11 +23,11 @@ export async function GET() {
     summary.total += group._count;
     if (group.status === 'COMPLETED') summary.completed += group._count;
   }
-  const { name, email, plan, role } = session;
+  const { name, email, plan, role, lifetime } = session;
   return NextResponse.json({
     projects: projects.map((project) => ({ ...project, statusUnknown: studioStatusUnknown(project.status, project.updatedAt, now) })),
     summary,
-    user: { name, email, plan, role },
+    user: { name, email, plan, role, ...(lifetime && { lifetime: true }) },
   });
 }
 

@@ -75,7 +75,8 @@ export async function GET(req: NextRequest) {
       },
     ]);
     const models = access.models.map(({ id, label, reasoningLevels, imageInput }) => ({ id, label, reasoningLevels, imageInput }));
-    const user = account ? { name: account.name, email: account.email, role: account.role, plan: account.plan } : null;
+    const user = account ? { name: account.name, email: account.email, role: account.role, plan: account.plan,
+      ...(account.lifetime && { lifetime: true }) } : null;
     return NextResponse.json({ ...history, user, capabilities: { models, reason: access.reason } }, {
       headers: { 'Cache-Control': 'private, no-store' },
     });

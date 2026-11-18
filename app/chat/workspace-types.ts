@@ -1,4 +1,5 @@
 import type { ChatToolResult } from '@/lib/chat-tools';
+import type { AccountPlan } from '../account-plan';
 
 export type Mode = 'chat' | 'work';
 
@@ -19,10 +20,9 @@ export interface Conversation {
   projectId?: string | null;
 }
 
-export interface Account {
+export interface Account extends AccountPlan {
   name: string | null;
   email?: string;
-  plan: string;
   role: string;
 }
 

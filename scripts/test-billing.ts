@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import Stripe from 'stripe';
 import { POST as handleWebhook } from '@/app/api/payments/webhook/route';
+import { remainingChatTokens } from '@/lib/ai/workspace-chat';
+import { getAccountSession } from '@/lib/auth';
 import { getEffectivePlan } from '@/lib/billing';
 import { prisma } from '@/lib/db';
 import { applyStripeEvent } from '@/lib/stripe-billing';
@@ -24,17 +26,23 @@ async function main() {
 
   const ids: string[] = [];
   const suffix = randomUUID();
-  const userSelect = { id: true, plan: true, role: true } as const;
+  const userSelect = { id: true, email: true, plan: true, role: true } as const;
+  const previousAdminEmail = process.env.ADMIN_EMAIL;
   try {
     const free = await prisma.user.create({
       data: { email: `free-billing-${suffix}@example.invalid`, passwordHash: 'test-user' }, select: userSelect,
     });
     ids.push(free.id);
     const admin = await prisma.user.create({
-      data: { email: `admin-billing-${suffix}@example.invalid`, passwordHash: 'test-user', role: 'ADMIN', plan: 'FREE' },
-      select: userSelect,
+      data: { email: `admin-billing-${suffix}@example.invalid`, passwordHash: 'test-user', role: 'ADMIN', plan: 'FREE', tokensLimit: 10, tokensUsed: 10 },
     });
     ids.push(admin.id);
+    const secondAdmin = await prisma.user.create({
+      data: { email: admin.email.toUpperCase(), passwordHash: 'test-user', role: 'ADMIN', plan: 'FREE' },
+      select: userSelect,
+    });
+    ids.push(secondAdmin.id);
+    process.env.ADMIN_EMAIL = ` ${admin.email} `;
     const manual = await prisma.user.create({
       data: { email: `manual-billing-${suffix}@example.invalid`, passwordHash: 'test-user', plan: 'ULTRA' },
       select: userSelect,
@@ -80,7 +88,25 @@ async function main() {
     const paid = signedEvent('invoice.paid', { id: invoiceId }).event;
     await applyStripeEvent(stripeSubscription(admin.id), paid);
     assert.equal(await prisma.subscription.count({ where: { userId: admin.id } }), 0);
-    assert.equal(await getEffectivePlan(admin, new Date(start)), 'FREE');
+    assert.equal(await getEffectivePlan(admin, new Date(start - 1)), 'ULTRA');
+    assert.equal(await getEffectivePlan(admin, new Date(end + 1)), 'ULTRA');
+    const adminSession = await getAccountSession(admin.id);
+    assert(adminSession);
+    assert.equal(adminSession.plan, 'ULTRA');
+    assert.equal(adminSession.lifetime, true);
+    assert.equal(remainingChatTokens(adminSession), Infinity);
+    assert.equal(await getEffectivePlan({ ...admin, role: 'USER' }, new Date(start)), 'FREE');
+    assert.equal(await getEffectivePlan(secondAdmin, new Date(start)), 'FREE');
+    const secondAdminSession = await getAccountSession(secondAdmin.id);
+    assert.equal(secondAdminSession?.plan, 'FREE');
+    assert.equal(secondAdminSession?.lifetime, undefined);
+    process.env.ADMIN_EMAIL = free.email;
+    const freeSession = await getAccountSession(free.id);
+    assert.equal(freeSession?.plan, 'FREE');
+    assert.equal(freeSession?.lifetime, undefined);
+    assert.equal((await getAccountSession(admin.id))?.plan, 'FREE');
+    process.env.ADMIN_EMAIL = admin.email;
+    assert.deepEqual(await prisma.user.findUniqueOrThrow({ where: { id: admin.id } }), admin);
     assert.equal(await getEffectivePlan(manual, new Date(end + 1)), 'ULTRA');
 
     const stripe = stripeSubscription(free.id);
@@ -123,8 +149,10 @@ async function main() {
     assert.equal(await getEffectivePlan(free, new Date(start)), 'FREE');
     assert.equal(await getEffectivePlan(free, new Date(end)), 'ULTRA');
     assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: free.id } })).plan, 'FREE');
-    console.log('Billing checks passed: signature, unpaid and out-of-band handling, retry, coverage, renewal, refund, lifetime access and admin exclusion.');
+    console.log('Billing checks passed: signature, unpaid and out-of-band handling, retry, coverage, renewal, refund, exact lifetime owner matching and unchanged admin account.');
   } finally {
+    if (previousAdminEmail === undefined) delete process.env.ADMIN_EMAIL;
+    else process.env.ADMIN_EMAIL = previousAdminEmail;
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
   }
 }

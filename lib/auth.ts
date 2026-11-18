@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from './db';
 import type { Role, Plan } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
-import { getEffectivePlan } from './billing';
+import { getEffectivePlan, hasOwnerLifetimeUltra } from './billing';
 
 export const LEGACY_GUEST_EMAIL = 'guest@sharkai.local';
 const developmentSecret = randomBytes(32);
@@ -27,6 +27,7 @@ export interface SessionUser {
 export interface AccountSession extends SessionUser {
   tokensUsed: number;
   tokensLimit: number;
+  lifetime?: true;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -86,7 +87,8 @@ export async function getAccountSession(userId: string): Promise<AccountSession 
   });
   if (!user || user.email === LEGACY_GUEST_EMAIL) return null;
   const plan = await getEffectivePlan(user);
-  return { ...user, plan, tokensLimit: plan === 'PRO' && user.plan === 'FREE' ? 100_000 : user.tokensLimit };
+  return { ...user, plan, tokensLimit: plan === 'PRO' && user.plan === 'FREE' ? 100_000 : user.tokensLimit,
+    ...(hasOwnerLifetimeUltra(user) && { lifetime: true }) };
 }
 
 export async function requireSession(): Promise<SessionUser> {

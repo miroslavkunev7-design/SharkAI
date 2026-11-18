@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import type { ChatTool } from '@/lib/chat-tools';
+import { accountPlanLabel } from '../account-plan';
 import {
   AppWindow, ArrowUp, AudioLines, Bell, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, Download, ExternalLink,
   FileText, Folder, Globe2, Image as ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare,
@@ -846,7 +847,7 @@ export default function ChatPage() {
         <div className="shark-chat-profile">
           {account ? popupButton('profile', 'Меню на профила', <>
             <span className="shark-chat-profile-avatar">{account.name?.trim().charAt(0).toLocaleUpperCase('bg') || 'S'}</span>
-            <span className="shark-chat-profile-name"><strong>{account.name || 'Профил'}</strong><small>{account.plan}</small></span><ChevronDown size={15} />
+            <span className="shark-chat-profile-name"><strong>{account.name || 'Профил'}</strong><small>{accountPlanLabel(account)}</small></span><ChevronDown size={15} />
           </>, 'shark-chat-profile-button') : <Link className="shark-chat-rail-row" href="/login"><Shield size={18} /><span>Вход в SharkAI</span></Link>}
           {popup === 'profile' && <div id="chat-popup-profile" className="shark-chat-popup shark-chat-profile-popup" ref={popupRef}>
             <Link href="/dashboard?view=settings"><Settings size={17} /> Настройки на акаунта</Link>

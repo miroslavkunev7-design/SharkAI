@@ -27,6 +27,6 @@ export async function GET() {
     users,
     ai,
     isAdmin: true,
-    account: { plan: session.plan },
+    account: { plan: session.plan, ...(session.lifetime && { lifetime: true }) },
   });
 }
