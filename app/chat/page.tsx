@@ -58,6 +58,13 @@ const CSV_TYPE = 'text/csv';
 const UPLOAD_TYPES = [...IMAGE_TYPES, PDF_TYPE, DOCX_TYPE, XLSX_TYPE, CSV_TYPE, ...CANVAS_MIME_TYPES, ...AUDIO_MIME_TYPES];
 const AUDIO_ACCEPT = '.wav,.ogg,.m4a,.webm,audio/mp4';
 const MAX_AUDIO_MB = 2;
+const AUDIO_TRANSCRIPTION = 'Транскрибирай аудиото';
+const TRANSCRIPTION_LANGUAGES = {
+  auto: { label: 'Автоматично', suffix: '' },
+  bg: { label: 'Български', suffix: ' на български' },
+  en: { label: 'Английски', suffix: ' на английски' },
+};
+type TranscriptionLanguage = keyof typeof TRANSCRIPTION_LANGUAGES;
 const FILE_ACCEPT = `.jpg,.jpeg,.png,.webp,.pdf,.docx,.csv,.xlsx,.txt,.md,.json,${AUDIO_ACCEPT}`;
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
@@ -74,6 +81,11 @@ const INPUT_FILES: Record<string, { types: string[]; accept: string; required: s
   audio: { types: AUDIO_MIME_TYPES, accept: AUDIO_ACCEPT, required: 'Прикачи аудио файл във формат WAV, Ogg, M4A или WebM.' },
 };
 const modeLabel = (mode: Mode) => mode === 'chat' ? 'Чат' : 'Работа';
+function takesTranscriptionLanguage(draft: string) {
+  const command = draft.trim().replace(/\s+/gu, ' ');
+  return !command || /^(?:транскрибирай(?: аудио(?:то)?)?|transcribe(?: (?:the )?audio)?)[.!?]*$/iu.test(command);
+}
+
 const suggestions = [
   { label: 'Разгледай една идея', text: 'Помогни ми да развия идея. Какви въпроси ще ми зададеш първо?', icon: Sparkles },
   { label: 'Организирай работата ми', text: 'Помогни ми да подредя задачите си за седмицата. Предложи проста структура.', icon: BriefcaseBusiness },
@@ -100,6 +112,7 @@ export default function ChatPage() {
   const [toolsPending, setToolsPending] = useState(true);
   const [toolsError, setToolsError] = useState(false);
   const [selectedTool, setSelectedTool] = useState<ChatTool | null>(null);
+  const [transcriptionLanguage, setTranscriptionLanguage] = useState<TranscriptionLanguage>('auto');
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>('chat');
   const [modeSaving, setModeSaving] = useState(false);
@@ -139,6 +152,7 @@ export default function ChatPage() {
   const popupRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const railTrigger = useRef<HTMLButtonElement>(null);
+  const transcriptionLanguageRef = useRef<HTMLSelectElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const cameraDialog = useRef<HTMLDialogElement>(null);
@@ -150,6 +164,8 @@ export default function ChatPage() {
 
   const reminders = useReminders(account?.email ?? null);
   const reminderTool = tools.find(({ id, available }) => id === 'scheduled-task' && available);
+  const isTranscription = selectedTool?.id === 'audio-transcribe';
+  const canChooseTranscriptionLanguage = isTranscription && takesTranscriptionLanguage(input);
   const datasetExample = selectedTool?.id === 'dataset-analysis' ? 'Сумирай „Приход“ по „Град“' : null;
   const attachmentPreview = attachment ? attachmentInspection(attachment) : null;
   const model = models.find((option) => option.id === modelId) ?? models[0];
@@ -349,6 +365,7 @@ export default function ChatPage() {
     setAttachment(null);
     setBranchFrom(null);
     setSelectedTool(null);
+    setTranscriptionLanguage('auto');
     setInspector(null);
     setProblem('');
     setNotice('');
@@ -508,11 +525,16 @@ export default function ChatPage() {
       return;
     }
     media.stopListening();
+    if (tool.id !== selectedTool?.id) setTranscriptionLanguage('auto');
     setSelectedTool(tool);
     setMode('work');
     closePopup();
     failedRequest.current = null;
-    requestAnimationFrame(() => inputRef.current?.focus());
+    requestAnimationFrame(() => {
+      const select = tool.id === 'audio-transcribe' ? transcriptionLanguageRef.current : null;
+      if (select && !select.disabled) select.focus();
+      else inputRef.current?.focus();
+    });
   }
 
   async function submit(request: ChatRequest, { speak = false, canvasMime }: { speak?: boolean; canvasMime?: string } = {}) {
@@ -561,6 +583,7 @@ export default function ChatPage() {
         setInput('');
         setAttachment(null);
         setSelectedTool(null);
+        setTranscriptionLanguage('auto');
         setBranchFrom(null);
       }
       if (result.toolResult?.projectId || result.messages?.some((message) => message.toolResult?.projectId)) void loadProjects();
@@ -591,7 +614,11 @@ export default function ChatPage() {
     const uploadId = repeat ? options.prior?.imagePath || undefined : attachment?.id;
     const mime = repeat ? options.prior?.attachmentMime || (uploadId ? 'image/jpeg' : '') : attachment?.mimeType;
     const tool = repeat ? options.tool : selectedTool;
-    const message = text.trim() || (tool?.id === 'audio-transcribe' ? 'Транскрибирай аудиото' : tool?.input === 'none' ? tool.label : '');
+    const draft = text.trim();
+    const transcription = tool?.id === 'audio-transcribe';
+    const message = transcription && !repeat && transcriptionLanguage !== 'auto' && takesTranscriptionLanguage(draft)
+      ? AUDIO_TRANSCRIPTION + TRANSCRIPTION_LANGUAGES[transcriptionLanguage].suffix
+      : draft || (transcription ? AUDIO_TRANSCRIPTION : tool?.input === 'none' ? tool.label : '');
     if (!message && !uploadId) return;
     const requiredFile = tool && INPUT_FILES[tool.input];
     if (requiredFile && (!uploadId || !requiredFile.types.includes(mime || ''))) {
@@ -674,6 +701,7 @@ export default function ChatPage() {
     setAttachment(messageAttachment(message));
     const previousTool = tools.find((tool) => tool.id === toolId && tool.available);
     setSelectedTool(previousTool ?? null);
+    setTranscriptionLanguage('auto');
     if (previousTool) setMode('work');
     setInput(message.content);
     setNotice('Редакцията ще отвори нов клон от този момент в разговора.');
@@ -874,12 +902,20 @@ export default function ChatPage() {
               {mode === 'work' ? tools.filter(({ available }) => available).slice(0, 3).map((tool) => <button type="button" disabled={pending} key={tool.id} onClick={() => chooseTool(tool)}><ToolIcon tool={tool} /> {tool.label}</button>) : suggestions.map(({ label, text, icon: Icon }) => <button type="button" key={label} disabled={pending} onClick={() => { setInput(text); send(text); }}><Icon size={16} /> {label}</button>)}
             </div>}
             <form className="shark-chat-composer ice-section" data-ice-art={mode === 'work' ? 'studio' : 'agent'} onSubmit={formSubmit}>
-              {(attachment || selectedTool || branchFrom || uploading || projectContext) && <div className="shark-chat-chips">
+              {(attachment || selectedTool || branchFrom || uploading || projectContext) && <div className="shark-chat-chips" data-transcription={isTranscription || undefined}>
                 {attachment && <div className="shark-chat-chip">
-                  {attachmentPreview ? <button type="button" className="shark-chat-chip-preview" aria-label={`Преглед на ${attachment.name}`} onClick={() => openInspector(attachmentPreview)}>{attachmentPreview.type === 'image' ? <img src={attachmentPreview.url} alt="" /> : attachmentPreview.type === 'audio' ? <AudioLines size={16} /> : <FileText size={16} />}{attachment.name}</button> : <span><FileText size={16} />{attachment.name}</span>}
+                  {attachmentPreview ? <button type="button" className="shark-chat-chip-preview" aria-label={`Преглед на ${attachment.name}`} onClick={() => openInspector(attachmentPreview)}>{attachmentPreview.type === 'image' ? <img src={attachmentPreview.url} alt="" /> : attachmentPreview.type === 'audio' ? <AudioLines size={16} /> : <FileText size={16} />}<span className="shark-chat-chip-name">{attachment.name}</span></button> : <span><FileText size={16} />{attachment.name}</span>}
                   <button type="button" aria-label="Премахни прикачения файл" disabled={sending} onClick={() => setAttachment(null)}><X size={15} /></button>
                 </div>}
-                {selectedTool && <div className="shark-chat-chip"><span><ToolIcon tool={selectedTool} />{selectedTool.label}</span><button type="button" aria-label="Премахни избрания инструмент" disabled={sending} onClick={() => setSelectedTool(null)}><X size={15} /></button></div>}
+                {selectedTool && <div className="shark-chat-chip" data-audio-tool={isTranscription || undefined}>
+                  {isTranscription ? <><span><ToolIcon tool={selectedTool} />Транскрипция</span><select ref={transcriptionLanguageRef} aria-label="Език на транскрипцията"
+                    value={canChooseTranscriptionLanguage ? transcriptionLanguage : 'draft'} disabled={pending || !canChooseTranscriptionLanguage}
+                    onChange={(event) => setTranscriptionLanguage(event.target.value as TranscriptionLanguage)}>
+                    {Object.entries(TRANSCRIPTION_LANGUAGES).map(([value, option]) => <option key={value} value={value}>{option.label}</option>)}
+                    {!canChooseTranscriptionLanguage && <option value="draft">От заявката</option>}
+                  </select></> : <span><ToolIcon tool={selectedTool} />{selectedTool.label}</span>}
+                  <button type="button" aria-label="Премахни избрания инструмент" disabled={sending} onClick={() => setSelectedTool(null)}><X size={15} /></button>
+                </div>}
                 {projectContext && <div className="shark-chat-chip"><span><Folder size={15} /> {projects.find((project) => project.id === projectContext)?.name ?? 'Проект'}</span></div>}
                 {branchFrom && <div className="shark-chat-chip"><span><Pencil size={15} /> Нов клон</span><button type="button" aria-label="Отмени редакцията" disabled={sending} onClick={() => { setBranchFrom(null); setInput(''); setAttachment(null); setNotice(''); }}><X size={15} /></button></div>}
                 {uploading && <div className="shark-chat-chip" role="status"><LoaderCircle size={15} className="shark-chat-spinner" /> Качване…</div>}

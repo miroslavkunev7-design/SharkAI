@@ -16,6 +16,8 @@ type EditAction = { kind: 'append'; body: string }
   | { kind: 'replace'; before: string; after: string }
   | { kind: 'remove-page'; page: number }
   | { kind: 'rotate-page'; page: number; angle: number }
+  | { kind: 'list-fields' }
+  | { kind: 'fill-field'; name: string; value: string }
   | { kind: 'overlay-text'; page: number; options: string; body: string };
 
 type OverlayCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
@@ -23,7 +25,8 @@ type PdfOverlay = {
   kind: 'overlay-text'; page: number; body: string; size: number;
   placement: { x: number; y: number } | { corner: OverlayCorner };
 };
-type PdfAction = Exclude<EditAction, { kind: 'replace' | 'overlay-text' }> | PdfOverlay;
+type PdfFormList = Extract<EditAction, { kind: 'list-fields' }>;
+type PdfMutation = Exclude<EditAction, { kind: 'replace' | 'overlay-text' | 'list-fields' }> | PdfOverlay;
 
 interface DocumentRequest {
   session: AccountSession;
@@ -53,6 +56,18 @@ const maxBody = 40_000;
 const maxXmlBytes = 2 * 1024 * 1024;
 const maxPdfBytes = 12 * 1024 * 1024;
 const maxResultBytes = 25 * 1024 * 1024;
+const maxPdfFieldName = 160;
+const pdfFieldValueLimit = 1500;
+const pdfFields = z.array(z.object({
+  name: z.string().min(1).max(maxPdfFieldName),
+  type: z.enum(['text', 'choice', 'checkbox', 'button', 'signature', 'unsupported']),
+  editable: z.boolean(),
+  reason: z.string().max(160).optional(),
+})).max(50);
+type PdfField = z.infer<typeof pdfFields>[number];
+const pdfFieldTypes: Record<PdfField['type'], string> = {
+  text: 'текст', choice: 'избор', checkbox: 'отметка', button: 'бутон', signature: 'подпис', unsupported: 'неподдържан тип',
+};
 const modelEditLimits = { body: 8_000, paragraphs: 80, request: 2_000, edits: 12 };
 const docxEditPlan = z.object({
   edits: z.array(z.object({
@@ -65,6 +80,9 @@ const docxEditPlan = z.object({
 const declaration = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
 const documentEditPrefix = /^(?:(?:редактирай|поправи)(?: ми)?(?: прикачения)?|(?:edit|revise)(?: the)?(?: attached)?)\s+(?:pdf|docx)\s*[:—–-]?\s*/iu;
 const overlayCommand = /^(?:(?:добави|постави|напиши)\s+(?:текст|надпис|бележка|дата)\s+на\s+страница|(?:add|place|write|overlay)\s+(?:(?:a|the)\s+)?(?:text|label|note|date)\s+(?:to|on|onto)\s+page)\s+(\d{1,6})\b([^:\r\n]*):\s*([\s\S]*)$/iu;
+const pdfListFieldsCommand = /^(?:(?:покажи|изброй|изведи)(?: ми)?\s+(?:pdf\s+)?полетата(?: на (?:прикачения )?pdf)?|(?:list|show)(?: me)?\s+(?:the )?(?:pdf (?:form )?fields|(?:form )?fields(?: (?:in|of) (?:the )?(?:attached )?pdf)?))\s*[.!?]?$/iu;
+const quotedPdfField = String.raw`(?:"([^"]*)"|„([^“]*)“|“([^”]*)”|«([^»]*)»)`;
+const pdfFillFieldCommand = new RegExp(String.raw`^(?:(?:попълни|задай)(?:\s+ми)?\s+поле(?:то)?|(?:fill|set)\s+(?:the\s+)?(?:pdf\s+)?field)\s+${quotedPdfField}\s+(?:със|с|with|to)\s+${quotedPdfField}\s*[.!?]?$`, 'iu');
 const overlayCorners: Record<string, OverlayCorner> = {
   'горе вляво': 'top-left', 'горе вдясно': 'top-right', 'долу вляво': 'bottom-left', 'долу вдясно': 'bottom-right',
   'top left': 'top-left', 'top right': 'top-right', 'bottom left': 'bottom-left', 'bottom right': 'bottom-right',
@@ -97,6 +115,13 @@ export function hasExplicitDocumentBody(prompt: string) {
 
 function parseEdit(prompt: string): EditAction | undefined {
   const command = prompt.trim().replace(/^(?:моля|please)[,\s]+/iu, '').replace(documentEditPrefix, '');
+  if (pdfListFieldsCommand.test(command)) return { kind: 'list-fields' };
+  const field = pdfFillFieldCommand.exec(command);
+  if (field) {
+    const name = field.slice(1, 5).find((value) => value !== undefined) ?? '';
+    const value = field.slice(5, 9).find((part) => part !== undefined) ?? '';
+    return { kind: 'fill-field', name, value };
+  }
   const overlay = command.match(overlayCommand);
   if (overlay) return { kind: 'overlay-text', page: Number(overlay[1]), options: overlay[2], body: overlay[3] };
   const append = command.match(/^(?:добави в края|добави последна страница|append(?: at the end)?|add a final page)\s*:\s*([\s\S]*)$/iu);
@@ -442,7 +467,9 @@ export async function editDocxWithModel(original: Buffer, prompt: string, model:
   };
 }
 
-function runPdf(original: Buffer | undefined, action: PdfAction, signal?: AbortSignal): Promise<Buffer> {
+function runPdf(original: Buffer, action: PdfFormList, signal?: AbortSignal): Promise<PdfField[]>;
+function runPdf(original: Buffer | undefined, action: PdfMutation, signal?: AbortSignal): Promise<Buffer>;
+function runPdf(original: Buffer | undefined, action: PdfMutation | PdfFormList, signal?: AbortSignal): Promise<Buffer | PdfField[]> {
   signal?.throwIfAborted();
   if (original && original.length > maxPdfBytes) throw new LocalDocumentError('Локалният PDF редактор обработва файлове до 12 MB.', 413);
   return new Promise((resolve, reject) => {
@@ -462,8 +489,15 @@ function runPdf(original: Buffer | undefined, action: PdfAction, signal?: AbortS
     }
     function fail(error: unknown) { if (finish()) reject(error); }
     function abort() { fail(signal?.reason); }
-    worker.once('message', ({ error, bytes }: { error?: string; bytes?: Uint8Array }) => {
-      if (!bytes || error) { fail(new LocalDocumentError(error || 'PDF файлът не можа да бъде обработен.')); return; }
+    worker.once('message', ({ error, bytes, fields }: { error?: string; bytes?: Uint8Array; fields?: unknown }) => {
+      if (error) { fail(new LocalDocumentError(error)); return; }
+      if (action.kind === 'list-fields') {
+        const parsed = pdfFields.safeParse(fields);
+        if (!parsed.success) { fail(new LocalDocumentError('PDF обработчикът не върна валидни полета.')); return; }
+        if (finish()) resolve(parsed.data);
+        return;
+      }
+      if (!bytes) { fail(new LocalDocumentError('PDF файлът не можа да бъде обработен.')); return; }
       if (finish()) resolve(Buffer.from(bytes));
     });
     worker.once('error', () => fail(new LocalDocumentError('Локалната обработка на PDF не можа да завърши.')));
@@ -497,9 +531,22 @@ export async function applyLocalDocumentEdit(format: DocumentFormat, original: B
   if (format === 'docx') {
     return action.kind === 'append' || action.kind === 'replace' ? editDocx(original, action, signal) : null;
   }
-  if (action.kind === 'replace') return null;
+  if (action.kind === 'replace' || action.kind === 'list-fields') return null;
   if (action.kind === 'overlay-text') return runPdf(original, pdfOverlay(action), signal);
+  if (action.kind === 'fill-field') {
+    const { name, value } = action;
+    if (!name.trim() || name.length > maxPdfFieldName || /[\p{Cc}\p{Cs}]/u.test(name)) {
+      throw new LocalDocumentError(`Посочи точното име на поле до ${maxPdfFieldName} знака.`, 400);
+    }
+    if (value.length > pdfFieldValueLimit) throw new LocalDocumentError(`Текстът за поле може да съдържа до ${pdfFieldValueLimit} знака.`, 413);
+    validateText(value);
+    return runPdf(original, { ...action, value: value.replace(/\r\n?/gu, '\n') }, signal);
+  }
   return runPdf(original, action.kind === 'append' ? { ...action, body: makeBody(action.body) } : action, signal);
+}
+
+export function listLocalPdfFields(original: Buffer, signal?: AbortSignal) {
+  return runPdf(original, { kind: 'list-fields' }, signal);
 }
 
 export async function extractLocalDocxText(original: Buffer, signal?: AbortSignal) {
@@ -527,9 +574,20 @@ export async function runLocalDocumentTool(operation: DocumentOperation, input: 
   if (operation === 'edit-document') {
     if (!file || !originalFormat) return null;
     outputFormat = originalFormat;
+    const action = parseEdit(prompt);
+    if (outputFormat !== 'pdf' && (action?.kind === 'list-fields' || action?.kind === 'fill-field')) {
+      throw new LocalDocumentError('Прикачи PDF формуляр с AcroForm полета.', 415);
+    }
+    if (outputFormat === 'pdf' && action?.kind === 'list-fields') {
+      const fields = await listLocalPdfFields(file.data, signal);
+      return { text: fields.length
+        ? ['Полета във формуляра', ...fields.map(({ name, type, editable, reason }) =>
+          `„${name}“ · ${pdfFieldTypes[type]} · ${editable ? 'може да се попълни' : reason ?? 'недостъпно'}`)].join('\n')
+        : 'PDF документът няма полета за попълване.' };
+    }
     bytes = await applyLocalDocumentEdit(outputFormat, file.data, prompt, signal);
     if (!bytes) {
-      if (outputFormat !== 'docx' || parseEdit(prompt)) return null;
+      if (outputFormat !== 'docx' || action) return null;
       const { models } = await workspaceModels(session);
       const model = models[0];
       if (!model) return null;

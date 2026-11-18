@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '../lib/db';
 import { executeResearchJob, getResearchStatus } from '../lib/research';
-import { parseNewsFeed, searchNews, wantsNewsCoverage, type NewsHit } from '../lib/research-news';
+import { describeNewsPeriod, parseNewsFeed, requestedNewsPeriod, searchNews, wantsNewsCoverage, type NewsHit } from '../lib/research-news';
+import { formatPublicationDate } from '../lib/research-sources';
 
 const indexUrl = 'https://news.google.com/rss/articles/fixture?oc=5';
 const pubDate = 'Tue, 17 Nov 2026 10:29:00 GMT';
@@ -20,7 +21,32 @@ assert.deepEqual(parseNewsFeed(rss(sample(indexUrl), sample(indexUrl), sample('h
 ]);
 assert.throws(() => parseNewsFeed('<!DOCTYPE rss SYSTEM "https://example.test/data"><rss />'), /declaration/);
 assert.throws(() => parseNewsFeed('<html />'), /Invalid news RSS/);
-console.log('Public-news fixtures passed for dated metadata, archive links, duplicate removal and XML restrictions.');
+
+const now = new Date('2026-11-18T05:40:00.000Z');
+const today = requestedNewsPeriod('Latest news about NASA from today', now)!;
+assert.deepEqual(today, { clause: 'from today', start: Date.parse('2026-11-18T00:00:00Z'), end: now.getTime() });
+assert.equal(describeNewsPeriod(today), '2026-11-18 00:00 до 2026-11-18 05:40 UTC');
+assert.equal(requestedNewsPeriod('News about USA Today', now), null);
+assert.equal(requestedNewsPeriod('днешните новини за НАСА', now)?.start, today.start);
+const yesterday = requestedNewsPeriod('Новини за НАСА от вчера', now)!;
+assert.deepEqual([yesterday.start, yesterday.end], [Date.parse('2026-11-17T00:00:00Z'), today.start - 1]);
+assert.equal(requestedNewsPeriod('Актуални новини за НАСА през последните 7 дни', now)?.start, Date.parse('2026-11-11T05:40:00Z'));
+assert.equal(requestedNewsPeriod('News from the last 24 hours', now)?.start, Date.parse('2026-11-17T05:40:00Z'));
+assert.equal(requestedNewsPeriod('Новини тази седмица', now)?.start, Date.parse('2026-11-16T00:00:00Z'));
+assert.equal(requestedNewsPeriod('News from last week', now)?.end, Date.parse('2026-11-16T00:00:00Z') - 1);
+const todayUrl = 'https://news.google.com/rss/articles/today';
+const old = Array.from({ length: 7 }, (_, index) => sample(`https://news.google.com/rss/articles/previous-${index}`));
+const newFeed = rss(...old, sample(todayUrl, 'Wed, 18 Nov 2026 00:00:00 GMT'),
+  sample('https://news.google.com/rss/articles/future', 'Wed, 18 Nov 2026 06:00:00 GMT'));
+assert.deepEqual(parseNewsFeed(newFeed, today).map(({ url }) => url), [todayUrl]);
+assert.deepEqual(parseNewsFeed(rss(...old), today), []);
+assert.equal(parseNewsFeed(newFeed, yesterday).length, 6);
+assert.equal(formatPublicationDate([2025, 9, 5]), '2025-09-05');
+assert.equal(formatPublicationDate([2025, 9]), '2025-09');
+assert.equal(formatPublicationDate([2025]), '2025');
+assert.equal(formatPublicationDate([2025, 2, 29]), '2025-02');
+assert.equal(formatPublicationDate([2024, 2, 29]), '2024-02-29');
+console.log('Public-news fixtures passed for UTC date boundaries, result limits, dated metadata, links, duplicate removal and XML restrictions.');
 
 async function live() {
   const local = ['localhost', '127.0.0.1', '[::1]'];

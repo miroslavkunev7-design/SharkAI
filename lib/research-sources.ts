@@ -17,6 +17,7 @@ export interface WikiHit extends ResearchSource {
 export interface ScholarlyHit extends ResearchSource {
   publisher: string;
   year?: number;
+  publicationDate?: string;
   doi: string;
 }
 
@@ -88,6 +89,17 @@ export async function readWikiArticles(hits: WikiHit[], signal?: AbortSignal): P
   return hits.map((hit) => ({ ...hit, excerpt: extracts.get(hit.pageId) || hit.excerpt }));
 }
 
+export function formatPublicationDate(parts?: number[]) {
+  if (!parts?.length) return;
+  const [year, month, day] = parts;
+  if (!Number.isInteger(year) || year < 1 || year > 9999) return;
+  const yyyy = String(year).padStart(4, '0');
+  if (!Number.isInteger(month) || month < 1 || month > 12) return yyyy;
+  const yearMonth = `${yyyy}-${String(month).padStart(2, '0')}`;
+  if (!Number.isInteger(day) || day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate()) return yearMonth;
+  return `${yearMonth}-${String(day).padStart(2, '0')}`;
+}
+
 export async function searchCrossref(topic: string, signal?: AbortSignal): Promise<ScholarlyHit[]> {
   const url = new URL('https://api.crossref.org/works');
   url.search = new URLSearchParams({
@@ -102,11 +114,13 @@ export async function searchCrossref(topic: string, signal?: AbortSignal): Promi
     const work = doi.toLowerCase().replace(/\/v\d+$/, '');
     if (seen.has(work)) return [];
     seen.add(work);
-    const year = item.published?.['date-parts'][0]?.[0];
+    const published = item.published?.['date-parts'][0];
+    const year = published?.[0];
+    const publicationDate = formatPublicationDate(published);
     return [{
       doi, title: plainText(title, 250), publisher: plainText(item.publisher || '', 120),
       url: `https://doi.org/${encodeURI(doi).replace(/\(/g, '%28').replace(/\)/g, '%29')}`,
-      excerpt: item.abstract ? plainText(item.abstract, 950) : '', ...(year ? { year } : {}),
+      excerpt: item.abstract ? plainText(item.abstract, 950) : '', ...(publicationDate ? { year, publicationDate } : {}),
     }];
   });
 }

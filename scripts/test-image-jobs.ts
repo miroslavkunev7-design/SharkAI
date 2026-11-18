@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { once } from 'node:events';
 import { createServer } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
 import sharp from 'sharp';
@@ -9,6 +10,37 @@ import { executeImageJob, getImageJobStatus, stageImageJob, updateImageJob, type
 import { readOwnedUpload, saveUpload } from '../lib/uploads';
 
 assert(['localhost', '127.0.0.1', '[::1]'].includes(new URL(process.env.POSTGRES_PRISMA_URL ?? '').hostname), 'Use a disposable local PostgreSQL database.');
+
+function gate() {
+  let open!: () => void;
+  const waiting = new Promise<void>((resolve) => { open = resolve; });
+  return { waiting, open };
+}
+
+async function within<T>(operation: Promise<T>, message: string) {
+  return Promise.race([operation, delay(5000, undefined, { ref: false }).then(() => { throw new Error(message); })]);
+}
+
+async function pauseTransition(id: string, status: 'CANCELLED' | 'QUEUED', exercise: (entered: Promise<void>, resume: () => void) => Promise<void>) {
+  const entered = gate();
+  const resume = gate();
+  const original = prisma.imageJob.updateMany;
+  let paused = false;
+  Reflect.set(prisma.imageJob, 'updateMany', async (args: Parameters<typeof original>[0]) => {
+    if (!paused && args.where?.id === id && args.data.status === status) {
+      paused = true;
+      entered.open();
+      await resume.waiting;
+    }
+    return original(args);
+  });
+  try {
+    await exercise(within(entered.waiting, `Image transition ${status} did not reach the write`), resume.open);
+  } finally {
+    resume.open();
+    Reflect.set(prisma.imageJob, 'updateMany', original);
+  }
+}
 
 async function run() {
   const png = await sharp({ create: { width: 12, height: 8, channels: 3, background: '#156baf' } }).png().toBuffer();
@@ -21,6 +53,9 @@ async function run() {
   const release = new Promise<void>((resolve) => { letCanceledReturn = resolve; });
   const remoteStarted = new Promise<void>((resolve) => { beganRemote = resolve; });
   const remoteRelease = new Promise<void>((resolve) => { letRemoteReturn = resolve; });
+  const concurrentCancelStarts = [gate(), gate()];
+  const claimedCancelStart = gate();
+  const concurrentCancelRelease = gate();
   const worker = createServer((request, response) => {
     void (async () => {
       assert.equal(request.url, '/images');
@@ -34,6 +69,15 @@ async function run() {
       if (prompt === 'Busy fixture' && count === 1) { response.writeHead(429).end(); return; }
       if (prompt === 'Cancel fixture' && count === 1) { beganCancel(); await release; }
       if (prompt === 'Remote cancel fixture') { beganRemote(); await remoteRelease; }
+      if (prompt === 'Concurrent cancel fixture' && count < 3) {
+        concurrentCancelStarts[count - 1].open();
+        await Promise.race([once(response, 'close'), concurrentCancelRelease.waiting]);
+      }
+      if (prompt === 'Claimed cancel fixture') {
+        claimedCancelStart.open();
+        await Promise.race([once(response, 'close'), concurrentCancelRelease.waiting]);
+      }
+      if (prompt === 'Concurrent retry fixture' && count < 3) { response.writeHead(503).end(); return; }
       if (prompt === 'Edit fixture') {
         assert.equal(body.mimeType, 'image/png');
         assert.equal(body.image, png.toString('base64'));
@@ -74,6 +118,15 @@ async function run() {
       throw new Error('Image job did not complete');
     }
 
+    async function waitForFailure(id: string) {
+      for (let attempt = 0; attempt < 80; attempt++) {
+        const job = await prisma.imageJob.findUniqueOrThrow({ where: { id } });
+        if (job.status === 'FAILED') return job;
+        await delay(25);
+      }
+      throw new Error('Image job did not fail');
+    }
+
     const busy = await stage('Busy fixture');
     const initialCount = await outputs();
     await executeImageJob(busy.id, owner.id);
@@ -103,6 +156,7 @@ async function run() {
     const saved = await prisma.chatMessage.findFirstOrThrow({ where: { userId: owner.id, requestId: busy.requestId, role: 'assistant' } });
     assert.match(saved.content, /готово/);
     assert.deepEqual((saved.toolResult as { artifact?: unknown }).artifact, done.artifact);
+    assert.equal((await updateImageJob(busy.id, owner.id, 'cancel')).artifact?.url, done.artifact.url);
     assert.equal((await updateImageJob(busy.id, owner.id, 'retry')).artifact?.url, done.artifact.url);
     assert.equal(await outputs(), initialCount + 1);
 
@@ -151,13 +205,59 @@ async function run() {
     assert.equal((await updateImageJob(quota.id, owner.id, 'retry')).id, quota.id);
     await waitForResult(quota.id);
     assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: owner.id } })).tokensUsed, 0);
-    console.log('Image job tests passed against a controlled local worker: commit gate, busy backoff, concurrency, isolation, local and cross-process cancellation, same-ID retry, lease recovery, real receipt persistence and quota.');
+
+    const claimedCancel = await stage('Claimed cancel fixture');
+    await receipt(claimedCancel);
+    await pauseTransition(claimedCancel.id, 'CANCELLED', async (entered, resume) => {
+      const cancel = updateImageJob(claimedCancel.id, owner.id, 'cancel');
+      await entered;
+      const running = executeImageJob(claimedCancel.id, owner.id);
+      await within(claimedCancelStart.waiting, 'Queued attempt was not claimed');
+      resume();
+      assert.equal((await cancel).status, 'CANCELLED', 'A cancel must still apply if the same attempt is claimed');
+      await within(running, 'Claimed attempt did not abort');
+    });
+
+    const overlappingCancel = await stage('Concurrent cancel fixture');
+    await receipt(overlappingCancel);
+    const first = executeImageJob(overlappingCancel.id, owner.id);
+    await within(concurrentCancelStarts[0].waiting, 'First cancellation attempt did not start');
+    await pauseTransition(overlappingCancel.id, 'CANCELLED', async (entered, resume) => {
+      const stale = updateImageJob(overlappingCancel.id, owner.id, 'cancel');
+      await entered;
+      assert.equal((await updateImageJob(overlappingCancel.id, owner.id, 'cancel')).status, 'CANCELLED');
+      await first;
+      await updateImageJob(overlappingCancel.id, owner.id, 'retry');
+      await within(concurrentCancelStarts[1].waiting, 'Replacement attempt did not start');
+      resume();
+      assert.equal((await stale).status, 'RUNNING', 'A delayed cancel must preserve the replacement attempt');
+    });
+    concurrentCancelRelease.open();
+    await waitForResult(overlappingCancel.id);
+    assert.equal(counts.get(overlappingCancel.input.prompt), 2);
+
+    const overlappingRetry = await stage('Concurrent retry fixture');
+    await receipt(overlappingRetry);
+    await executeImageJob(overlappingRetry.id, owner.id);
+    await waitForFailure(overlappingRetry.id);
+    await pauseTransition(overlappingRetry.id, 'QUEUED', async (entered, resume) => {
+      const stale = updateImageJob(overlappingRetry.id, owner.id, 'retry');
+      await entered;
+      await updateImageJob(overlappingRetry.id, owner.id, 'retry');
+      await waitForFailure(overlappingRetry.id);
+      assert.equal(counts.get(overlappingRetry.input.prompt), 2);
+      resume();
+      assert.equal((await stale).status, 'FAILED', 'A delayed retry must preserve the later failure');
+    });
+    assert.equal(counts.get(overlappingRetry.input.prompt), 2);
+    console.log('Image job tests passed against a controlled local worker: commit gate, busy backoff, claim concurrency, isolation, local and cross-process cancellation, stale cancel and retry fencing, lease recovery, receipt persistence and quota.');
   } finally {
-    await prisma.user.deleteMany({ where: { email: { in: emails } } });
     letCanceledReturn();
     letRemoteReturn();
+    concurrentCancelRelease.open();
     worker.closeAllConnections();
     await new Promise<void>((resolve) => worker.close(() => resolve()));
+    await prisma.user.deleteMany({ where: { email: { in: emails } } });
   }
 }
 

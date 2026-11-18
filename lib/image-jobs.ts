@@ -91,6 +91,22 @@ function isRunnable(job: ImageJob, now = new Date()) {
     || (job.status === 'RUNNING' && !!job.leaseUntil && job.leaseUntil <= now);
 }
 
+// A lease stores <attempt>:<runner>. Between leases the attempt alone remains,
+// so a delayed mutation cannot affect a retry, even if it reaches the same status.
+function attemptIdFor(job: ImageJob) {
+  return job.runnerId?.split(':', 1)[0] ?? job.id;
+}
+
+function attemptWhere(job: ImageJob, attemptId: string): Prisma.ImageJobWhereInput {
+  return {
+    id: job.id, userId: job.userId,
+    OR: [
+      { runnerId: attemptId }, { runnerId: { startsWith: `${attemptId}:` } },
+      ...(attemptId === job.id ? [{ runnerId: null }] : []),
+    ],
+  };
+}
+
 export async function executeImageJob(id: string, userId: string) {
   const job = await prisma.imageJob.findFirst({ where: { id, userId } });
   if (!job || !isRunnable(job)) return;
@@ -98,15 +114,16 @@ export async function executeImageJob(id: string, userId: string) {
   if (!receipt) return;
 
   const now = new Date();
-  const runnerId = randomUUID();
+  const attemptId = attemptIdFor(job);
+  const runnerId = `${attemptId}:${randomUUID()}`;
   const claimed = await prisma.imageJob.updateMany({
-    where: { id, userId, OR: [{ status: 'QUEUED', runAfter: { lte: now } }, { status: 'RUNNING', leaseUntil: { lte: now } }] },
+    where: { id, userId, runnerId: job.runnerId, OR: [{ status: 'QUEUED', runAfter: { lte: now } }, { status: 'RUNNING', leaseUntil: { lte: now } }] },
     data: { status: 'RUNNING', runnerId, leaseUntil: new Date(now.getTime() + LEASE_MS), error: null, retryable: false },
   });
   if (!claimed.count) return;
 
   const controller = new AbortController();
-  running.set(id, controller);
+  running.set(attemptId, controller);
   const where = { id, userId, runnerId, status: 'RUNNING' as const };
   let checkingLease = false;
   const watchCancellation = setInterval(() => {
@@ -132,7 +149,7 @@ export async function executeImageJob(id: string, userId: string) {
     const toolResult = { ...receipt.toolResult as Prisma.JsonObject, status: 'completed', text: content, url: artifact.url, artifact };
     await prisma.$transaction(async (tx) => {
       const checkpoint = await tx.imageJob.updateMany({
-        where, data: { status: 'COMPLETED', outputId, runnerId: null, leaseUntil: null },
+        where, data: { status: 'COMPLETED', outputId, runnerId: attemptId, leaseUntil: null },
       });
       if (!checkpoint.count) return;
       // The result is stored in PostgreSQL so the private upload and receipt commit together even across app instances.
@@ -144,20 +161,20 @@ export async function executeImageJob(id: string, userId: string) {
     if (controller.signal.aborted) return;
     if (error instanceof LocalImageError && error.status === 429) {
       await prisma.imageJob.updateMany({ where, data: {
-        status: 'QUEUED', runAfter: new Date(Date.now() + BUSY_RETRY_MS), runnerId: null, leaseUntil: null,
+        status: 'QUEUED', runAfter: new Date(Date.now() + BUSY_RETRY_MS), runnerId: attemptId, leaseUntil: null,
         error: 'Доставчикът обработва друго изображение. Задачата изчаква.',
       } });
       return;
     }
     const known = error instanceof LocalImageError || error instanceof ImageJobError;
     await prisma.imageJob.updateMany({ where, data: {
-      status: 'FAILED', runnerId: null, leaseUntil: null,
+      status: 'FAILED', runnerId: attemptId, leaseUntil: null,
       retryable: !known || error.status === 429 || error.status >= 500,
       error: known ? error.message : 'Задачата за изображение бе прекъсната. Опитай отново.',
     } });
   } finally {
     clearInterval(watchCancellation);
-    if (running.get(id) === controller) running.delete(id);
+    if (running.get(attemptId) === controller) running.delete(attemptId);
   }
 }
 
@@ -194,18 +211,19 @@ export async function getImageJobStatus(id: string, userId: string) {
 }
 
 export async function updateImageJob(id: string, userId: string, action: 'cancel' | 'retry') {
-  await ownedJob(id, userId);
-  if (action === 'cancel') {
-    const activeController = running.get(id);
+  const job = await ownedJob(id, userId);
+  const attemptId = attemptIdFor(job);
+  const attempt = attemptWhere(job, attemptId);
+  if (action === 'cancel' && (job.status === 'QUEUED' || job.status === 'RUNNING')) {
     const changed = await prisma.imageJob.updateMany({
-      where: { id, userId, status: { in: ['QUEUED', 'RUNNING'] } },
-      data: { status: 'CANCELLED', retryable: true, error: null, leaseUntil: null, runnerId: null },
+      where: { ...attempt, status: { in: ['QUEUED', 'RUNNING'] } },
+      data: { status: 'CANCELLED', retryable: true, error: null, leaseUntil: null, runnerId: attemptId },
     });
-    if (changed.count) activeController?.abort();
-  } else {
+    if (changed.count) running.get(attemptId)?.abort();
+  } else if (action === 'retry' && job.retryable && (job.status === 'FAILED' || job.status === 'CANCELLED')) {
     await prisma.imageJob.updateMany({
-      where: { id, userId, status: { in: ['FAILED', 'CANCELLED'] }, retryable: true },
-      data: { status: 'QUEUED', runAfter: new Date(), retryable: false, error: null },
+      where: { ...attempt, status: job.status, retryable: true },
+      data: { status: 'QUEUED', runAfter: new Date(), runnerId: randomUUID(), retryable: false, error: null },
     });
   }
   return getImageJobStatus(id, userId);

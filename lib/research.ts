@@ -5,7 +5,7 @@ import { getAccountSession } from './auth';
 import { remainingChatTokens } from './ai/workspace-chat';
 import { prisma } from './db';
 import { getHostedOpenAI, HostedWebSearchError, runHostedWebSearch, type HostedOpenAI, type HostedWebSearchResult } from './hosted-web-search';
-import { searchNews, wantsNewsCoverage, type NewsHit } from './research-news';
+import { describeNewsPeriod, isInNewsPeriod, requestedNewsPeriod, searchNews, wantsNewsCoverage, type NewsHit, type NewsPeriod } from './research-news';
 import {
   readWikiArticles, researchTopic, searchCrossref, searchWiki,
   type ResearchSource, type ScholarlyHit, type WikiHit,
@@ -35,6 +35,18 @@ function getTopic(raw: string) {
 
 export async function quickPublicSearch(raw: string, signal?: AbortSignal): Promise<ResearchSource[]> {
   const topic = getTopic(raw);
+  const asOf = new Date();
+  const period = requestedNewsPeriod(topic, asOf);
+  if (period) {
+    const hits = await searchNews(topic, signal, asOf).catch(() => {
+      signal?.throwIfAborted();
+      throw new ResearchInputError('Индексът на Google Новини временно не отговори.', 502);
+    });
+    if (!hits.length) throw new ResearchInputError(`Няма потвърдени новини за периода ${describeNewsPeriod(period)}.`, 404);
+    return hits.map(({ title, url, publisher, publishedAt }) => ({
+      title, url, excerpt: `${publisher} · ${publishedAt.slice(0, 16).replace('T', ' ')} UTC`,
+    }));
+  }
   const [wiki, papers] = await Promise.allSettled([searchWiki(topic, signal), searchCrossref(topic, signal)]);
   signal?.throwIfAborted();
   if (wiki.status === 'rejected' && papers.status === 'rejected') {
@@ -60,6 +72,11 @@ function sourcesFor(evidence: Evidence) {
   return [...new Map([...evidence.wiki, ...evidence.papers, ...(evidence.news ?? []), ...hosted].map((source) => [source.url, { title: source.title, url: source.url }])).values()];
 }
 
+export function researchCitations(job: ResearchJob) {
+  const evidence = evidenceFor(job);
+  return { sources: sourcesFor(evidence), firstCrossrefDoi: evidence.papers[0]?.url };
+}
+
 function hostedParagraphs(result: HostedWebSearchResult, sourceIds: Map<string, number>, escape: (value: string) => string) {
   const paragraphs: string[] = [];
   let offset = 0;
@@ -82,7 +99,7 @@ function markdownUrl(url: string) {
   return url.replace(/\(/g, '%28').replace(/\)/g, '%29');
 }
 
-function reportMarkdown(topic: string, evidence: Evidence, warnings: string[], findings: ResearchFinding[]) {
+function reportMarkdown(topic: string, evidence: Evidence, warnings: string[], findings: ResearchFinding[], newsPeriod: NewsPeriod | null) {
   const escape = (value: string) => value.replace(/[\\`*_\[\]<>|]/g, '\\$&');
   const lines = [
     '# Проучване на SharkAI', '', `**Тема** · ${escape(topic)}`, '',
@@ -98,10 +115,12 @@ function reportMarkdown(topic: string, evidence: Evidence, warnings: string[], f
       'Този раздел съдържа синтеза на доставчика и връзките от неговите цитати.', '',
       ...hostedParagraphs(result, sourceIds, escape));
   }
-  if (evidence.news?.length) {
+  if (newsPeriod || evidence.news?.length) {
     lines.push('## Медийни заглавия от Google Новини', '',
       'Публичният индекс предоставя заглавия, издания и време на публикация. Връзките се отварят през индекса.', '');
-    for (const article of evidence.news) {
+    if (newsPeriod) lines.push(`Период за медийни заглавия · ${describeNewsPeriod(newsPeriod)}`, '');
+    if (!evidence.news?.length) lines.push('Няма потвърдени медийни заглавия за периода.', '');
+    for (const article of evidence.news ?? []) {
       const sourceId = sourceIds.get(article.url);
       const published = article.publishedAt.slice(0, 16).replace('T', ' ');
       lines.push(`- ${escape(article.title)} · ${escape(article.publisher)} · ${published} UTC [${sourceId}](${markdownUrl(article.url)})`);
@@ -122,7 +141,7 @@ function reportMarkdown(topic: string, evidence: Evidence, warnings: string[], f
   });
   if (evidence.papers.length) lines.push('## Публикации и DOI', '');
   evidence.papers.forEach((hit, offset) => {
-    const details = [hit.publisher, hit.year].filter(Boolean).join(' · ');
+    const details = [hit.publisher, hit.publicationDate || hit.year].filter(Boolean).join(' · ');
     lines.push(`### [${evidence.wiki.length + offset + 1}] ${escape(hit.title)}`, '');
     if (details) lines.push(escape(details), '');
     lines.push(hit.excerpt ? escape(hit.excerpt) : 'Crossref предоставя библиографски запис за тази публикация.', '');
@@ -152,8 +171,10 @@ export async function executeResearchJob(jobId: string, userId: string, resolveH
   try {
     const job = await prisma.researchJob.findFirst({ where });
     if (!job) return;
-    const { stage, topic } = job;
+    const { stage, topic, createdAt } = job;
+    const newsPeriod = requestedNewsPeriod(topic, createdAt);
     const evidence = evidenceFor(job);
+    if (newsPeriod && evidence.news) evidence.news = evidence.news.filter(({ publishedAt }) => isInNewsPeriod(Date.parse(publishedAt), newsPeriod));
     const warnings = [...job.warnings];
     const evidenceJson = () => evidence as unknown as Prisma.InputJsonValue;
     async function fromSource<T>(task: Promise<T>, fallback: T, message: string) {
@@ -206,10 +227,10 @@ export async function executeResearchJob(jobId: string, userId: string, resolveH
       if (!(await save(1))) return;
     }
     if (stage < 2) {
-      const lookupNews = () => fromSource(searchNews(topic, controller.signal), [], 'Индексът на Google Новини временно не отговори.');
+      const lookupNews = () => fromSource(searchNews(topic, controller.signal, createdAt), [], 'Индексът на Google Новини временно не отговори.');
       const [papers, news] = await Promise.all([
         fromSource(searchCrossref(topic, controller.signal), [], 'Търсенето в Crossref временно не отговори.'),
-        wantsNewsCoverage(topic) ? lookupNews() : undefined,
+        newsPeriod || wantsNewsCoverage(topic) ? lookupNews() : undefined,
       ]);
       evidence.papers = papers;
       if (news) evidence.news = news;
@@ -222,16 +243,18 @@ export async function executeResearchJob(jobId: string, userId: string, resolveH
     }
     controller.signal.throwIfAborted();
     if (!sourcesFor(evidence).length) {
-      await update({ status: 'FAILED', error: 'Няма достъпни източници за темата. Опитай отново или използвай по-точна тема.', runnerId: null, leaseUntil: null });
+      const error = newsPeriod ? `Няма източници или потвърдени новини за периода ${describeNewsPeriod(newsPeriod)}.`
+        : 'Няма достъпни източници за темата. Опитай отново или използвай по-точна тема.';
+      await update({ status: 'FAILED', error, evidence: evidenceJson(), runnerId: null, leaseUntil: null });
       return;
     }
     const synthesis = evidence.web ? { findings: [], tokens: 0 }
       : await synthesizeResearch(userId, topic, evidence.wiki, evidence.papers, controller.signal);
     controller.signal.throwIfAborted();
-    const report = reportMarkdown(topic, evidence, warnings, synthesis.findings);
+    const report = reportMarkdown(topic, evidence, warnings, synthesis.findings, newsPeriod);
     await prisma.$transaction(async (tx) => {
       const finished = await tx.researchJob.updateMany({
-        where, data: { status: 'COMPLETED', stage: TOTAL_STAGES, report, runnerId: null, leaseUntil: null },
+        where, data: { status: 'COMPLETED', stage: TOTAL_STAGES, report, evidence: evidenceJson(), runnerId: null, leaseUntil: null },
       });
       if (finished.count && synthesis.tokens > 0) {
         await tx.user.update({ where: { id: userId }, data: { tokensUsed: { increment: synthesis.tokens } } });
@@ -302,14 +325,15 @@ function describeResearch(job: ResearchJob) {
   const sources = sourcesFor(evidence);
   const webCount = web?.status === 'done' ? web.result.sources.length : 0;
   const newsCount = evidence.news?.length ?? 0;
+  const newsPeriod = requestedNewsPeriod(job.topic, job.createdAt);
   const stageLabel = job.stage === 0 && web?.status === 'attempted' ? 'Публично уеб търсене чрез OpenAI'
-    : job.stage === 1 && wantsNewsCoverage(job.topic) ? 'Търсене на публикации и медийни заглавия'
+    : job.stage === 1 && (newsPeriod || wantsNewsCoverage(job.topic)) ? 'Търсене на публикации и медийни заглавия'
       : stageLabels[job.stage];
   return {
     id: job.id, topic: job.topic, status: job.status, stage: job.stage, totalStages: TOTAL_STAGES,
     stageLabel, updatedAt: job.updatedAt,
     error: job.error, warnings: [...job.warnings, ...webWarning(evidence)], sources,
-    summary: job.status === 'COMPLETED' ? `Справочни статии · ${wiki.length}. Библиографски записи · ${papers.length}.${newsCount ? ` Медийни заглавия · ${newsCount}.` : ''}${webCount ? ` Цитати от уеб търсене · ${webCount}.` : ''}` : undefined,
+    summary: job.status === 'COMPLETED' ? `Справочни статии · ${wiki.length}. Библиографски записи · ${papers.length}.${newsCount || (newsPeriod && evidence.news) ? ` Медийни заглавия · ${newsCount}.` : ''}${webCount ? ` Цитати от уеб търсене · ${webCount}.` : ''}` : undefined,
     downloadUrl: job.status === 'COMPLETED' && job.report ? `/api/chat/research/${job.id}/report` : null,
   };
 }

@@ -23,6 +23,7 @@ import { localBulgarianTranslatorReady } from './local-translation.server';
 import { createReminder, createReminderFromPrompt, ReminderInputError } from './reminders';
 import type { ReminderInput } from './reminder-input';
 import { ResearchInputError, quickPublicSearch, startResearch } from './research';
+import { requestedNewsPeriod } from './research-news';
 import type { ChatTool, ChatToolResult } from './chat-tools';
 import { voiceCapabilities, VoiceError, voiceMimes } from './chat-voice.server';
 import { ProjectInputError, startProject } from './projects';
@@ -87,7 +88,7 @@ async function imageProperties({ file, uploadId }: ToolExecution): Promise<ToolO
 
 async function webSearch({ openai, prompt, signal }: ToolExecution): Promise<ToolOutput> {
   let hostedError: unknown;
-  if (openai) {
+  if (openai && !requestedNewsPeriod(prompt)) {
     try {
       const { text, sources, usageTokens } = await runHostedWebSearch(openai, prompt, { signal });
       return { status: 'completed', text, sources, usageTokens };
@@ -279,12 +280,8 @@ async function scheduleReminder({ session, requestId, reminder, prompt }: ToolEx
 }
 
 const coreTools: ToolRegistration[] = [
-  { id: 'audio-transcribe', label: 'Транскрибирай аудио', description: 'Връща TXT от WAV, OGG, M4A или аудио WebM до 20 секунди. Можеш да напишеш „Транскрибирай аудиото на български“.', group: 'Глас и аудио', input: 'audio',
-    execute: (input) => runVoiceFileTool('audio-transcribe', input) },
-  { id: 'audio-synthesize', label: 'Озвучи текст във WAV', description: 'Записва WAV на български или английски. Например „Озвучи на български: Здравей!“', group: 'Глас и аудио', input: 'prompt',
-    execute: (input) => runVoiceFileTool('audio-synthesize', input) },
-  { id: 'web-search', label: 'Търси в интернет', description: 'Търси в Wikipedia и Crossref или в мрежата чрез конфигурирания OpenAI доставчик.', group: 'Проучване', input: 'prompt', optionalOpenAI: true, execute: webSearch },
-  { id: 'deep-research', label: 'Задълбочено проучване', description: 'Връща доклад с източници от Wikipedia и Crossref, както и от публичната мрежа при настроено уеб търсене на OpenAI.', group: 'Проучване', input: 'prompt', execute: async ({ session, prompt, requestId }) => {
+  { id: 'web-search', label: 'Търси в интернет', description: 'Търси в Wikipedia и Crossref, в Google Новини за посочен период или чрез конфигуриран OpenAI доставчик.', group: 'Проучване', input: 'prompt', optionalOpenAI: true, execute: webSearch },
+  { id: 'deep-research', label: 'Задълбочено проучване', description: 'Връща доклад със справочни източници, научни публикации и датирани медийни заглавия по актуални теми.', group: 'Проучване', input: 'prompt', execute: async ({ session, prompt, requestId }) => {
     const job = await startResearch(session.id, prompt, requestId);
     return { id: job.id, researchId: job.id, status: 'started', text: 'Задачата за проучване е записана.' };
   } },
@@ -296,13 +293,17 @@ const coreTools: ToolRegistration[] = [
     return runLocalImageEdit({ edit, file, userId: session.id, signal });
   } },
   { id: 'image-properties', label: 'Свойства на изображение', description: 'Измерва размерите и извлича основните цветове.', group: 'Изображения', input: 'image', execute: imageProperties },
+  { id: 'audio-transcribe', label: 'Транскрибирай аудио', description: 'Връща TXT от WAV, OGG, M4A или аудио WebM до 20 секунди. Можеш да напишеш „Транскрибирай аудиото на български“.', group: 'Глас и аудио', input: 'audio',
+    execute: (input) => runVoiceFileTool('audio-transcribe', input) },
+  { id: 'audio-synthesize', label: 'Озвучи текст във WAV', description: 'Записва WAV на български или английски. Например „Озвучи на български: Здравей!“', group: 'Глас и аудио', input: 'prompt',
+    execute: (input) => runVoiceFileTool('audio-synthesize', input) },
   { id: 'image-ocr', label: 'Разчети текст от снимка', description: 'Извлича видимия текст от прикаченото изображение.', group: 'Документи и данни', input: 'image', extraction: 'ocr', optionalOpenAI: true, execute: readDocument },
   { id: 'pdf-read', label: 'Прочети PDF', description: 'Разчита, извлича и превежда съдържание от прикачен PDF.', group: 'Документи и данни', input: 'pdf', extraction: 'pdf', optionalOpenAI: true, execute: readDocument },
   { id: 'document-read', label: 'Прочети DOCX', description: 'Извлича или превежда съдържание на документ.', group: 'Документи и данни', input: 'document', optionalOpenAI: true, execute: executeDataTool('read-document') },
   { id: 'document-translate', label: 'Преведи документ и запази файл', description: 'Превежда текст от PDF или DOCX и връща нов PDF или DOCX. Например „Преведи документа на английски и запази като DOCX“.', group: 'Документи и данни', input: 'document',
     execute: async (input) => ({ status: 'completed', ...await translateChatDocument(input) }) },
   { id: 'document-export', label: 'Създай PDF или DOCX', description: 'Създава и прикачва документ към разговора.', group: 'Документи и данни', input: 'prompt', optionalOpenAI: true, execute: executeDataTool('create-document') },
-  { id: 'document-edit', label: 'Редактирай PDF или DOCX', description: 'Връща коригирано копие. За PDF може да добавиш надпис, завъртиш или премахнеш страница.', group: 'Документи и данни', input: 'document', optionalOpenAI: true, execute: executeDataTool('edit-document') },
+  { id: 'document-edit', label: 'Редактирай PDF или DOCX', description: 'Виж полетата на PDF, попълни текстово поле или промени страниците в отделно копие на файла.', group: 'Документи и данни', input: 'document', optionalOpenAI: true, execute: executeDataTool('edit-document') },
   { id: 'spreadsheet-export', label: 'Създай CSV или Excel таблица', description: 'Прикачва таблица от описаните колони и редове или от въведени CSV или JSON данни.', group: 'Документи и данни', input: 'prompt', execute: createSpreadsheet },
   { id: 'spreadsheet-edit', label: 'Редактирай CSV или Excel таблица', description: 'Записва отделно копие. Например „Промени клетка B2 на 125“.', group: 'Документи и данни', input: 'dataset', execute: ({ session, prompt, file, signal }) =>
     runLocalSpreadsheetTool({ operation: 'edit', userId: session.id, prompt, file, signal }) },

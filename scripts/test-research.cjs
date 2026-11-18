@@ -83,6 +83,63 @@ async function run() {
   const history = await call(`/api/chat?conversationId=${payload.conversationId}`, a.cookie);
   assert.equal(history.messages.at(-1).toolResult.researchId, researchId);
 
+  const reportExport = async (message, conversationId = payload.conversationId, cookie = a.cookie, expected = 200) => {
+    const result = await call('/api/chat', cookie, 'POST', {
+      message, conversationId, requestId: randomUUID(), mode: 'chat',
+    }, expected);
+    if (expected !== 200) return result.error;
+    assert.equal(result.toolResult.toolId, 'text-file-create');
+    const artifact = result.toolResult.artifact;
+    const download = await request(artifact.url, cookie);
+    assert.equal(download.status, 200);
+    assert.equal((await request(artifact.url, b.cookie)).status, 404);
+    return download.text();
+  };
+  assert.equal(await reportExport('Запази Markdown с предишния отговор'), markdown);
+  const ordinary = await call('/api/chat', a.cookie, 'POST', {
+    message: 'Създай Markdown със съдържание:\nМеждинна тестова бележка.', conversationId: payload.conversationId,
+    requestId: randomUUID(), mode: 'chat',
+  });
+  assert.equal(await reportExport('Запази Markdown с предишния отговор'), ordinary.content);
+  assert.equal(await reportExport('Запази предишния доклад от проучването като Markdown'), markdown);
+  assert.match(await reportExport('Запази предишния доклад като Markdown', randomUUID(), a.cookie, 400), /няма достъпен доклад/u);
+  await reportExport('Запази предишния доклад като Markdown', payload.conversationId, b.cookie, 404);
+
+  const doiIndex = job.sources.findIndex(({ url }) => new URL(url).hostname === 'doi.org');
+  const citation = (message, cookie = a.cookie, expected = 200, conversationId = payload.conversationId) => call('/api/chat', cookie, 'POST', {
+    message, conversationId, requestId: randomUUID(), mode: 'chat',
+  }, expected);
+  for (const message of [
+    `Покажи източник ${doiIndex + 1} от предишния доклад`,
+    'Покажи първия DOI от предишния доклад',
+    `Analyze the previous research report: which publication appears as citation [${doiIndex + 1}] in its numbered source list? Give its exact title and exact DOI link copied from the report. Answer in one line.`,
+  ]) {
+    const result = await citation(message);
+    assert.equal(result.toolResult.toolId, 'research-source');
+    assert.deepEqual(result.toolResult.sources, [job.sources[doiIndex]]);
+  }
+  assert.equal((await prisma.user.findUniqueOrThrow({ where: { id: a.id }, select: { tokensUsed: true } })).tokensUsed, tokensUsed);
+  await citation('Покажи източник 999 от предишния доклад', a.cookie, 404);
+  await citation('Покажи източник 1 от предишния доклад', b.cookie, 404);
+  await citation('Покажи източник 1 от предишния доклад', a.cookie, 400, randomUUID());
+
+  const pendingConversation = randomUUID();
+  const pendingId = randomUUID();
+  await prisma.$transaction([
+    prisma.chatConversation.create({ data: { id: pendingConversation, userId: a.id, title: 'Доклад в подготовка' } }),
+    prisma.researchJob.create({ data: {
+      id: pendingId, userId: a.id, requestId: randomUUID(), topic: 'marine heatwave',
+      status: 'RUNNING', leaseUntil: new Date(Date.now() + 30_000),
+    } }),
+    prisma.chatMessage.create({ data: {
+      userId: a.id, conversationId: pendingConversation, role: 'assistant', content: 'Задачата за проучване е записана.',
+      toolResult: { toolId: 'deep-research', researchId: pendingId },
+    } }),
+  ]);
+  assert.match(await reportExport('Запази Markdown с предишния отговор', pendingConversation, a.cookie, 409), /още се подготвя/u);
+  await prisma.researchJob.update({ where: { id: pendingId }, data: { status: 'FAILED' } });
+  assert.match(await reportExport('Запази предишния доклад като Markdown', pendingConversation, a.cookie, 409), /Повтори проучването/u);
+
   const liveRecord = await prisma.researchJob.findUniqueOrThrow({ where: { id: researchId } });
   const interruptedId = randomUUID();
   await prisma.researchJob.create({ data: {

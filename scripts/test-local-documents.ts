@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { MockLanguageModelV3 } from 'ai/test';
 import { ZipArchive } from 'archiver';
-import { PDFArray, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRawStream, PDFString, StandardFonts, decodePDFRawStream, degrees } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRawStream, PDFString, StandardFonts, decodePDFRawStream, degrees } from 'pdf-lib';
 import {
   applyLocalDocumentEdit, buildLocalDocument, editDocxWithModel, extractLocalDocxText, hasExplicitDocumentBody,
-  isLocalDocumentEdit, LocalDocumentError,
+  isLocalDocumentEdit, listLocalPdfFields, LocalDocumentError, runLocalDocumentTool,
 } from '../lib/chat-documents.server';
 import { readZipEntries } from '../lib/document-archive.server';
 
@@ -167,11 +167,116 @@ test('supports corner placement and refuses invalid sizes, overflowing text, mis
     await assert.rejects(applyLocalDocumentEdit('pdf', original, invalid), expected);
   }
   await assert.rejects(applyLocalDocumentEdit('pdf', original, prompt, AbortSignal.abort()), { name: 'AbortError' });
+  source.getForm().createTextField('Initial').addToPage(source.getPage(0), { x: 36, y: 36, width: 100, height: 24 });
   source.catalog.set(PDFName.of('Perms'), source.context.obj({
     DocMDP: { Type: 'Sig', ByteRange: [0, 20, 41, 22], Contents: PDFHexString.of('FFFFFF') },
   }));
   const signedFixture = Buffer.from(await source.save());
-  await assert.rejects(applyLocalDocumentEdit('pdf', signedFixture, prompt), /цифров подпис/iu);
+  assert.deepEqual(await listLocalPdfFields(signedFixture), [
+    { name: 'Initial', type: 'text', editable: false, reason: 'документът е цифрово подписан' },
+  ]);
+  for (const mutation of [prompt, 'Добави в края: Нов текст', 'Завърти страница 1 с 90°', 'Премахни страница 1', 'Попълни поле „Initial“ с „Иван“']) {
+    await assert.rejects(applyLocalDocumentEdit('pdf', signedFixture, mutation), /цифров подпис/iu);
+  }
+});
+
+function fieldAppearance(pdf: PDFDocument, field: string) {
+  const widget = pdf.getForm().getTextField(field).acroField.getWidgets()[0];
+  const normal = widget.getAppearances()?.normal;
+  assert.ok(normal instanceof PDFRawStream);
+  return { content: Buffer.from(normal.getContents()), widget };
+}
+
+test('lists exact AcroForm names and fills the target Cyrillic text without changing other fields', async () => {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage();
+  const form = pdf.getForm();
+  const target = form.createTextField('Applicant.FullName');
+  target.addToPage(page, { x: 48, y: 500, width: 350, height: 32 });
+  target.setText('Original name');
+  const other = form.createTextField('Reference');
+  other.addToPage(page, { x: 48, y: 450, width: 350, height: 32 });
+  other.setText('Existing reference 24');
+  other.enableReadOnly();
+  const agreement = form.createCheckBox('Agreement');
+  agreement.addToPage(page, { x: 48, y: 410, width: 15, height: 15 });
+  agreement.check();
+  const original = Buffer.from(await pdf.save());
+  const snapshot = Buffer.from(original);
+  const exact = 'Редактирай PDF: Попълни поле „Applicant.FullName“ с „Мария „Мими“ Иванова“';
+  assert.equal(isLocalDocumentEdit(exact, 'application/pdf'), false); // Use one pair of outer quotes around an exact literal.
+  const replacement = 'Мария "Мими" Иванова';
+  const fill = `Попълни поле „Applicant.FullName“ с „${replacement}“`;
+  assert.equal(isLocalDocumentEdit(fill, 'application/pdf'), true);
+  assert.equal(isLocalDocumentEdit(fill, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'), false);
+  assert.equal(isLocalDocumentEdit('Покажи полетата на PDF', 'application/pdf'), true);
+  const fields = await listLocalPdfFields(original);
+  assert.deepEqual(fields.map(({ name, type, editable }) => ({ name, type, editable })), [
+    { name: 'Applicant.FullName', type: 'text', editable: true },
+    { name: 'Reference', type: 'text', editable: false },
+    { name: 'Agreement', type: 'checkbox', editable: false },
+  ]);
+  const revised = await applyLocalDocumentEdit('pdf', original, fill);
+  assert.ok(revised);
+  assert.deepEqual(original, snapshot);
+  const previous = await PDFDocument.load(original);
+  const result = await PDFDocument.load(revised);
+  assert.equal(previous.getForm().getTextField('Applicant.FullName').getText(), 'Original name');
+  assert.equal(result.getForm().getTextField('Applicant.FullName').getText(), replacement);
+  assert.equal(result.getForm().getTextField('Applicant.FullName').isReadOnly(), false);
+  assert.equal(result.getForm().getTextField('Reference').getText(), 'Existing reference 24');
+  assert.equal(result.getForm().getTextField('Reference').isReadOnly(), true);
+  assert.equal(result.getForm().getCheckBox('Agreement').isChecked(), true);
+  assert.deepEqual(fieldAppearance(previous, 'Reference').content, fieldAppearance(result, 'Reference').content);
+  assert.notDeepEqual(fieldAppearance(previous, 'Applicant.FullName').content, fieldAppearance(result, 'Applicant.FullName').content);
+  const revisedField = result.getForm().getTextField('Applicant.FullName');
+  const usedFont = /\/([\w-]+) [\d.]+ Tf/u.exec(revisedField.acroField.getDefaultAppearance() ?? fieldAppearance(result, 'Applicant.FullName').widget.getDefaultAppearance() ?? '');
+  assert.ok(usedFont);
+  const fonts = result.getForm().acroForm.dict.lookup(PDFName.of('DR'), PDFDict).lookup(PDFName.of('Font'), PDFDict);
+  assert.ok(fonts.has(PDFName.of(usedFont[1])));
+  const empty = await applyLocalDocumentEdit('pdf', revised, 'Fill field "Applicant.FullName" with ""');
+  assert.ok(empty);
+  assert.equal((await PDFDocument.load(empty)).getForm().getTextField('Applicant.FullName').getText(), undefined);
+});
+
+test('rejects generated, unknown and restricted PDF fields and safely describes a flat PDF', async () => {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage();
+  const form = pdf.getForm();
+  const selected = form.createTextField('Literal');
+  selected.addToPage(page, { x: 48, y: 500, width: 350, height: 32 });
+  selected.setText('Yes');
+  selected.setMaxLength(4);
+  const readOnly = form.createTextField('Protected');
+  readOnly.addToPage(page, { x: 48, y: 460, width: 350, height: 32 });
+  readOnly.enableReadOnly();
+  const totals = form.createTextField('Calculated');
+  totals.addToPage(page, { x: 48, y: 420, width: 350, height: 32 });
+  form.acroForm.dict.set(PDFName.of('CO'), pdf.context.obj([totals.ref]));
+  const checkbox = form.createCheckBox('Checkbox');
+  checkbox.addToPage(page, { x: 48, y: 380, width: 20, height: 20 });
+  const original = Buffer.from(await pdf.save());
+  for (const [request, expected] of [
+    ['Fill field "literal" with "Нова"', /точното име/iu],
+    ['Fill field "Protected" with "Нова"', /само за четене/iu],
+    ['Fill field "Calculated" with "2"', /автоматично управлявано/iu],
+    ['Fill field "Checkbox" with "Yes"', /само текстови/iu],
+    ['Fill field "Literal" with "Longer"', /до 4 знака/iu],
+    ['Fill field "Literal" with "Yes"', /вече е записана/iu],
+    ['Fill field "Literal" with "А\nБ"', /нов ред/iu],
+  ] as const) {
+    await assert.rejects(applyLocalDocumentEdit('pdf', original, request), expected);
+  }
+  form.acroForm.dict.set(PDFName.of('XFA'), PDFString.of('Unsupported XML form'));
+  const xfa = Buffer.from(await pdf.save({ updateFieldAppearances: false }));
+  await assert.rejects(listLocalPdfFields(xfa), /XFA/u);
+  await assert.rejects(applyLocalDocumentEdit('pdf', xfa, 'Fill field "Literal" with "New"'), /XFA/u);
+  const flat = await buildLocalDocument('pdf', 'Flat file.');
+  assert.deepEqual(await listLocalPdfFields(flat), []);
+  const account = { id: 'isolated', email: 'isolated@example.invalid', name: null, role: 'USER', plan: 'FREE', tokensUsed: 0, tokensLimit: 0 } as const;
+  assert.deepEqual(await runLocalDocumentTool('edit-document', {
+    session: account, prompt: 'Покажи полетата на PDF', file: { data: flat, mimeType: 'application/pdf' },
+  }), { text: 'PDF документът няма полета за попълване.' });
 });
 
 test('rejects corrupt, oversized or unsupported documents and respects cancellation', async () => {
