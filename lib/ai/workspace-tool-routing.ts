@@ -2,6 +2,7 @@ import { stepCountIs, streamText, tool, type LanguageModel, type ModelMessage, t
 import { z } from 'zod';
 import { isLocalDocumentEdit } from '../chat-documents.server';
 import { parseLocalImageEdit } from '../chat-image-edits.server';
+import { isLocalSpreadsheetEdit, spreadsheetInputSchema } from '../chat-spreadsheets.server';
 import { supportsLocalTableAnalysis } from '../chat-tables.server';
 import type { ChatTool } from '../chat-tools';
 
@@ -49,6 +50,21 @@ export function createNativeToolRouter(registry: ChatTool[], mimeType?: string, 
       'Create a new private downloadable TXT, Markdown or JSON file when explicitly requested. An ordinary reply does not need a file.',
       z.object({ format: z.enum(['txt', 'md', 'json']), content: draft }).strict(),
       ({ format, content }) => `Създай ${format} със съдържание:\n${content}`);
+    offer('export_spreadsheet', 'spreadsheet-export', false,
+      'Create a real downloadable CSV or Excel (XLSX) file when explicitly requested. Supply one JSON object encoded as text. An ordinary table in an answer does not need an export.',
+      z.object({
+        format: z.enum(['csv', 'xlsx']),
+        content: draft.describe('JSON with headers, rows, and optional sheetName. Example: {"headers":["Item","Count"],"rows":[["Tea",1]]}. Use null for unavailable values.'),
+      }).strict(),
+      ({ format, content }) => {
+        try {
+          const data = spreadsheetInputSchema.safeParse(JSON.parse(content));
+          if (!data.success || data.data.rows.some((row) => row.length !== data.data.headers.length)) return null;
+          return `Създай ${format.toUpperCase()} с данни:\n${JSON.stringify(data.data)}`;
+        } catch {
+          return null;
+        }
+      });
   }
 
   if (mimeType && images.has(mimeType)) {
@@ -66,13 +82,16 @@ export function createNativeToolRouter(registry: ChatTool[], mimeType?: string, 
   }
   if (mimeType === docx || mimeType === pdf) {
     offer('edit_document', 'document-edit', true,
-      `Create an edited copy of the available ${mimeType === pdf ? 'PDF. Commands: rotate page 2 by 90; remove page 2; append:\n<exact text>' : 'Word document. Commands: replace "old text" with "new text"; append:\n<exact text>'}. Use only values supplied by the user.`,
+      `Create an edited copy of the available ${mimeType === pdf ? 'PDF. Commands: rotate page 2 by 90; remove page 2; append:\n<exact text>; add text to page 2 top right: <exact text>' : 'Word document. Commands: replace "old text" with "new text"; append:\n<exact text>'}. Use only values supplied by the user.`,
       command, ({ command }) => isLocalDocumentEdit(command, mimeType) ? command : null);
   }
   if (mimeType === 'text/csv' || mimeType === xlsx) {
     offer('analyze_table', 'dataset-analysis', true,
       'Run a bounded local analysis of the available table when requested. Commands: summary; summary; column: "Exact header"; chart; column: "Exact header". Optional sheet: "Exact sheet" is XLSX only. Supports count, sum, average, minimum, maximum, missing cells and a chart of column values.',
       command, ({ command }) => supportsLocalTableAnalysis(command) ? command : null);
+    offer('edit_spreadsheet', 'spreadsheet-edit', true,
+      'Edit one specified cell in a CSV or Excel file, saving a separate copy. Command: Set cell B2 to 125. Preserve the user’s addresses and exact values.',
+      command, ({ command }) => isLocalSpreadsheetEdit(command) ? command : null);
   }
 
   return validators.size ? { tools, validate: (name, input) => validators.get(name)?.(input) ?? null } : undefined;

@@ -375,3 +375,11 @@
   .shark-chat-reminder-form input, .shark-chat-reminder-form select { min-height: 44px; font-size: 1rem; }
   .shark-chat-reminders section button { min-height: 44px; }
 }
+
+.shark-chat-message-attachments { display: flex; flex-wrap: wrap; gap: 0 12px; margin-bottom: 4px; }
+.shark-chat-message-attachments .shark-chat-attachment-link { text-align: left; text-underline-offset: 3px; }
+.shark-chat-message-attachments .shark-chat-attachment-link:hover, .shark-chat-chip-preview:hover { text-decoration: underline; }
+.shark-chat-message-attachments .shark-chat-attachment-link:disabled { opacity: .65; }
+@media (max-width: 820px) {
+  .shark-chat-message-attachments .shark-chat-attachment-link { min-height: 44px; }
+}

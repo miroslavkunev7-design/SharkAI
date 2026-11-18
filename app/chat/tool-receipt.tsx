@@ -40,7 +40,7 @@ export function ToolReceipt({ result, open, reuse, editable, disabled, projectSt
       <div className="shark-chat-receipt-head ice-section" data-ice-art={projectId || artifact ? 'studio' : 'agent'}><Sparkles size={16} /><strong>{result.label}</strong><span>{projectStatus || (result.status === 'started' ? 'Стартиран' : 'Завършен')}</span></div>
       {projectId && <button type="button" onClick={() => open({ type: 'project', id: projectId, title: result.label })}>Виж статуса <ExternalLink size={15} /></button>}
       {artifactUrl && isImage && (
-        <button type="button" className="shark-chat-image" onClick={() => open({ type: 'image', url: artifactUrl, title })}>
+        <button type="button" className="shark-chat-image" onClick={() => open({ type: 'image', url: artifactUrl, title, attachment: attached || undefined })}>
           <img src={artifactUrl} alt={title} />
         </button>
       )}

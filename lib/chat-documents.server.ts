@@ -15,7 +15,15 @@ type DocumentOperation = 'read-document' | 'create-document' | 'edit-document';
 type EditAction = { kind: 'append'; body: string }
   | { kind: 'replace'; before: string; after: string }
   | { kind: 'remove-page'; page: number }
-  | { kind: 'rotate-page'; page: number; angle: number };
+  | { kind: 'rotate-page'; page: number; angle: number }
+  | { kind: 'overlay-text'; page: number; options: string; body: string };
+
+type OverlayCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+type PdfOverlay = {
+  kind: 'overlay-text'; page: number; body: string; size: number;
+  placement: { x: number; y: number } | { corner: OverlayCorner };
+};
+type PdfAction = Exclude<EditAction, { kind: 'replace' | 'overlay-text' }> | PdfOverlay;
 
 interface DocumentRequest {
   session: AccountSession;
@@ -56,6 +64,11 @@ const docxEditPlan = z.object({
 }).strict();
 const declaration = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
 const documentEditPrefix = /^(?:(?:редактирай|поправи)(?: ми)?(?: прикачения)?|(?:edit|revise)(?: the)?(?: attached)?)\s+(?:pdf|docx)\s*[:—–-]?\s*/iu;
+const overlayCommand = /^(?:(?:добави|постави|напиши)\s+(?:текст|надпис|бележка|дата)\s+на\s+страница|(?:add|place|write|overlay)\s+(?:(?:a|the)\s+)?(?:text|label|note|date)\s+(?:to|on|onto)\s+page)\s+(\d{1,6})\b([^:\r\n]*):\s*([\s\S]*)$/iu;
+const overlayCorners: Record<string, OverlayCorner> = {
+  'горе вляво': 'top-left', 'горе вдясно': 'top-right', 'долу вляво': 'bottom-left', 'долу вдясно': 'bottom-right',
+  'top left': 'top-left', 'top right': 'top-right', 'bottom left': 'bottom-left', 'bottom right': 'bottom-right',
+};
 const exactBody = /(?:^|\s)(?:със съдържание|със следния текст|с текст|with content|with the following text|with text)\s*:\s*([\s\S]*)$/iu;
 const previousAnswer = /(?:предишния(?:т)? (?:ти )?отговор|последния(?:т)? (?:ти )?отговор|previous (?:answer|response)|last (?:answer|response))/iu;
 const rewriteRequest = /(?:обобщи|преведи|резюмирай|резюме|на английски|на български|summari[sz]e|translate|summary|review)(?=\W|$)/iu;
@@ -83,7 +96,9 @@ export function hasExplicitDocumentBody(prompt: string) {
 }
 
 function parseEdit(prompt: string): EditAction | undefined {
-  const command = prompt.trim().replace(documentEditPrefix, '');
+  const command = prompt.trim().replace(/^(?:моля|please)[,\s]+/iu, '').replace(documentEditPrefix, '');
+  const overlay = command.match(overlayCommand);
+  if (overlay) return { kind: 'overlay-text', page: Number(overlay[1]), options: overlay[2], body: overlay[3] };
   const append = command.match(/^(?:добави в края|добави последна страница|append(?: at the end)?|add a final page)\s*:\s*([\s\S]*)$/iu);
   if (append) return { kind: 'append', body: append[1] };
   const replace = command.match(/^(?:замени(?: всички срещания на)?|replace(?: every occurrence of)?)\s+[„“"«]([^„“”"«»\n]+)[“”"»]\s+(?:със|с|with)\s+[„“"«]([^„“”"«»\n]*)[“”"»]\s*[.!]?$/iu);
@@ -92,6 +107,31 @@ function parseEdit(prompt: string): EditAction | undefined {
   if (remove) return { kind: 'remove-page', page: Number(remove[1]) };
   const rotate = command.match(/^(?:завърти страница|rotate page)\s+(\d{1,3})\s+(?:с|със|на|by)\s+(-?(?:90|180|270))\s*(?:°|градуса|degrees?)?\s*[.!]?$/iu);
   if (rotate) return { kind: 'rotate-page', page: Number(rotate[1]), angle: Number(rotate[2]) };
+}
+
+function pdfOverlay(action: Extract<EditAction, { kind: 'overlay-text' }>): PdfOverlay {
+  const body = makeBody(action.body).replace(/\t/g, '    ');
+  if (body.length > 800 || body.split('\n').length > 8) {
+    throw new LocalDocumentError('Надписът може да съдържа до 800 знака на максимум 8 реда.', 413);
+  }
+  let options = action.options.trim().replace(/^,\s*/u, '');
+  const declaredSize = /(?:^|[\s,]+)(?:(?:с\s+)?размер|(?:font\s+)?size)\s*=?\s*(-?\d{1,3}(?:[.,]\d{1,2})?)\s*(?:pt|пт)?$/iu.exec(options);
+  const size = declaredSize ? Number(declaredSize[1].replace(',', '.')) : 11;
+  if (size < 6 || size > 36) throw new LocalDocumentError('Размерът на надписа трябва да е от 6 до 36 точки.', 400);
+  if (declaredSize) options = options.slice(0, declaredSize.index).trimEnd();
+  const position = options.replace(/^(?:при|at|в|на позиция)\s+/iu, '');
+  const coords = /^x\s*=\s*(-?\d{1,5}(?:[.,]\d{1,2})?)(?:[,;]\s*|\s+(?:и|and)\s+|\s+)y\s*=\s*(-?\d{1,5}(?:[.,]\d{1,2})?)\s*(?:pt|пт)?$/iu.exec(position);
+  if (coords) {
+    const [x, y] = coords.slice(1).map((value) => Number(value.replace(',', '.')));
+    if (x < 0 || y < 0 || x > 14_400 || y > 14_400) {
+      throw new LocalDocumentError('Координатите трябва да са между 0 и 14 400 точки от горния ляв ъгъл.', 400);
+    }
+    return { kind: action.kind, page: action.page, body, size, placement: { x, y } };
+  }
+  const key = position.toLowerCase().replace(/[-\s]+/g, ' ');
+  const corner = !key ? 'top-left' : Object.hasOwn(overlayCorners, key) ? overlayCorners[key] : undefined;
+  if (!corner) throw new LocalDocumentError('Посочи позиция като „горе вдясно“ или „при x=48, y=60, размер 12“.', 400);
+  return { kind: action.kind, page: action.page, body, size, placement: { corner } };
 }
 
 export function isLocalDocumentEdit(prompt: string, mimeType?: string) {
@@ -402,7 +442,7 @@ export async function editDocxWithModel(original: Buffer, prompt: string, model:
   };
 }
 
-function runPdf(original: Buffer | undefined, action: Exclude<EditAction, { kind: 'replace' }>, signal?: AbortSignal): Promise<Buffer> {
+function runPdf(original: Buffer | undefined, action: PdfAction, signal?: AbortSignal): Promise<Buffer> {
   signal?.throwIfAborted();
   if (original && original.length > maxPdfBytes) throw new LocalDocumentError('Локалният PDF редактор обработва файлове до 12 MB.', 413);
   return new Promise((resolve, reject) => {
@@ -458,6 +498,7 @@ export async function applyLocalDocumentEdit(format: DocumentFormat, original: B
     return action.kind === 'append' || action.kind === 'replace' ? editDocx(original, action, signal) : null;
   }
   if (action.kind === 'replace') return null;
+  if (action.kind === 'overlay-text') return runPdf(original, pdfOverlay(action), signal);
   return runPdf(original, action.kind === 'append' ? { ...action, body: makeBody(action.body) } : action, signal);
 }
 

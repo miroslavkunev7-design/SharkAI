@@ -185,7 +185,7 @@ export function Inspector({ item, close, talk, save, disabled, reminders, create
         <>
           {item.type === 'text' ? <TextInspector key={item.url} item={item} save={save} disabled={disabled} /> : <img className="shark-chat-inspector-image" src={item.url} alt={item.title} />}
           <div className="shark-chat-inspector-links">
-            <a href={artifactDownloadUrl(item.url, item.type === 'text' ? item.attachment : undefined)} download={item.title}><Download size={16} /> Изтегли</a>
+            <a href={artifactDownloadUrl(item.url, item.attachment)} download={item.title}><Download size={16} /> Изтегли</a>
           </div>
         </>
       )}

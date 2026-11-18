@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import type { ChatTool } from '@/lib/chat-tools';
 import {
-  AppWindow, ArrowUp, AudioLines, Bell, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, ExternalLink,
+  AppWindow, ArrowUp, AudioLines, Bell, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, Download, ExternalLink,
   FileText, Folder, Globe2, Image as ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare,
   Mic, PanelLeftClose, PanelLeftOpen, Paperclip, Pencil, Plus, RotateCcw, ScanLine, ScreenShare,
   Search, Settings, Shield, Sparkles, Square, Table2, X,
@@ -16,7 +16,7 @@ import { Inspector } from './inspector';
 import { useReminders, type ReminderInput } from './reminders';
 import { ToolReceipt } from './tool-receipt';
 import {
-  artifactAttachment, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, CANVAS_SAVE_PREFIX, imageUrl, projectInProgress, projectStatusLabel, type Account, type Attachment, type Conversation,
+  artifactAttachment, artifactDownloadUrl, attachmentInspection, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, CANVAS_SAVE_PREFIX, messageAttachment, projectInProgress, projectStatusLabel, uploadUrl, type Account, type Attachment, type Conversation,
   type InspectorItem, type Message, type Mode, type Model, type Project,
 } from './workspace-types';
 import './workspace.css';
@@ -79,7 +79,7 @@ const suggestions = [
 function ToolIcon({ tool, size = 17 }: { tool: ChatTool; size?: number }) {
   const id = tool.id;
   const Icon = id.includes('search') ? Globe2 : id.includes('image') ? ImageIcon
-    : id.includes('ocr') ? ScanLine : tool.input === 'dataset' ? Table2 : /pdf|document|textfile/.test(tool.input) ? FileText : AppWindow;
+    : id.includes('ocr') ? ScanLine : (tool.input === 'dataset' || id.startsWith('spreadsheet-')) ? Table2 : /pdf|document|textfile/.test(tool.input) ? FileText : AppWindow;
   return <Icon size={size} />;
 }
 
@@ -145,6 +145,7 @@ export default function ChatPage() {
 
   const reminders = useReminders(account?.email ?? null);
   const reminderTool = tools.find(({ id, available }) => id === 'scheduled-task' && available);
+  const attachmentPreview = attachment ? attachmentInspection(attachment) : null;
   const model = models.find((option) => option.id === modelId) ?? models[0];
   const voiceUnavailable = media.voiceReason || (!model ? 'Няма достъпен модел за гласов отговор.' : '');
   const dictationLabel = media.listening === 'dictation' ? (media.recordStage === 'recording' ? 'Приключи диктовката' : 'Отмени диктовката') : 'Диктовка';
@@ -623,14 +624,14 @@ export default function ChatPage() {
   async function saveCanvas(file: Attachment, value: string) {
     const mime = file.mimeType || '';
     const tool = tools.find(({ id, available }) => id === 'text-file-edit' && available);
-    if (!account || !conversationId || pending || loadProblem || !tool || !CANVAS_MIME_TYPES.includes(mime)) {
+    if (!account || pending || loadProblem || !tool || !CANVAS_MIME_TYPES.includes(mime)) {
       throw new Error('В този разговор записът на текстово копие е недостъпен.');
     }
     if (value.length > CANVAS_CONTENT_LIMIT) throw new Error('Съдържанието надхвърля допустимия размер.');
     const message = CANVAS_SAVE_PREFIX + value;
     const previous = failedCanvasRequest.current;
-    const request = previous?.message === message && previous.uploadId === file.id && previous.conversationId === conversationId
-      ? previous : { message, uploadId: file.id, mode, conversationId, projectId: projectContext ?? undefined,
+    const request = previous?.message === message && previous.uploadId === file.id && (!conversationId || previous.conversationId === conversationId)
+      ? previous : { message, uploadId: file.id, mode, conversationId: conversationId ?? crypto.randomUUID(), projectId: projectContext ?? undefined,
         requestId: crypto.randomUUID(), toolId: tool.id };
     const reply = await submit(request, { canvasMime: mime });
     if (!reply.result) throw new Error(reply.error);
@@ -663,11 +664,7 @@ export default function ChatPage() {
   function editMessage(message: Message, toolId?: string) {
     if (!conversationId || pending) return;
     setBranchFrom({ conversationId, messageId: message.id });
-    const image = !message.attachmentMime || message.attachmentMime.startsWith('image/');
-    setAttachment(message.imagePath ? {
-      id: message.imagePath, name: image ? 'Прикачено изображение' : 'Прикачен файл',
-      previewUrl: image ? imageUrl(message.imagePath) : undefined, mimeType: message.attachmentMime ?? (image ? 'image/jpeg' : undefined),
-    } : null);
+    setAttachment(messageAttachment(message));
     const previousTool = tools.find((tool) => tool.id === toolId && tool.available);
     setSelectedTool(previousTool ?? null);
     if (previousTool) setMode('work');
@@ -679,12 +676,13 @@ export default function ChatPage() {
   function artifactEditor(file: Attachment) {
     const mime = file.mimeType || '';
     const ids = mime.startsWith('image/') ? ['image-edit', 'image-transform']
+      : INPUT_FILES.dataset.types.includes(mime) ? ['spreadsheet-edit']
       : INPUT_FILES.document.types.includes(mime) ? ['document-edit']
       : CANVAS_MIME_TYPES.includes(mime) ? ['text-file-edit'] : [];
     return ids.map((id) => tools.find((tool) => tool.id === id && tool.available)).find(Boolean);
   }
 
-  function useArtifact(file: Attachment, edit: boolean) {
+  function attachArtifact(file: Attachment, edit: boolean) {
     if (pending) return;
     const editor = edit ? artifactEditor(file) : undefined;
     setBranchFrom(null);
@@ -725,14 +723,21 @@ export default function ChatPage() {
     const reminderId = message.toolResult?.reminderId;
     const regenerate = message.toolResult?.artifact ? tools.find((tool) => tool.id === message.toolResult?.toolId && tool.available) : undefined;
     const regenerateLabel = regenerate ? 'Прегенерирай резултата в клон' : 'Поискай нов отговор в клон';
-    const attached = message.imagePath ? imageUrl(message.imagePath) : null;
-    const image = !message.attachmentMime || message.attachmentMime.startsWith('image/');
+    const attached = messageAttachment(message);
+    const preview = attached ? attachmentInspection(attached) : null;
+    const canReuse = !local && attached?.mimeType && !CANVAS_MIME_TYPES.includes(attached.mimeType) && !!artifactEditor(attached);
     return (
       <article className={`shark-chat-message shark-chat-message-${message.role}`} key={message.id} aria-label={message.role === 'assistant' ? 'SharkAI' : 'Ти'}>
         {message.role === 'assistant' && <div className="shark-chat-message-author"><Logo size="sm" /> SharkAI</div>}
-        {attached && (image ? <button type="button" className="shark-chat-image" onClick={() => openInspector({ type: 'image', url: attached, title: 'Прикачено изображение' })}><img src={attached} alt="Прикачено изображение" /></button> : <a className="shark-chat-attachment-link" href={attached} download><FileText size={16} /> Прикачен файл</a>)}
+        {preview?.type === 'image' ? (
+          <button type="button" className="shark-chat-image" onClick={() => openInspector(preview)}><img src={preview.url} alt="Прикачено изображение" /></button>
+        ) : attached && <div className="shark-chat-message-attachments">
+          {preview && <button type="button" className="shark-chat-attachment-link" onClick={() => openInspector(preview)}><FileText size={16} /> Преглед на прикачения файл</button>}
+          <a className="shark-chat-attachment-link" href={artifactDownloadUrl(uploadUrl(attached.id), attached)} download={attached.name}><Download size={16} /> Изтегли прикачения файл</a>
+          {canReuse && <button type="button" disabled={pending} className="shark-chat-attachment-link" onClick={() => attachArtifact(attached, true)}><Pencil size={16} /> Използвай файла за редакция</button>}
+        </div>}
         <div className="shark-chat-message-text">{message.content}</div>
-        {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} reuse={useArtifact} editable={(file) => !!artifactEditor(file)} disabled={pending} projectStatus={project && projectStatusLabel(project)} reminder={reminderId ? reminders.reminders.find(({ id }) => id === reminderId) : undefined} reminderDue={!!reminderId && reminders.notifications.some(({ reminderId: id }) => id === reminderId)} />}
+        {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} reuse={attachArtifact} editable={(file) => !!artifactEditor(file)} disabled={pending} projectStatus={project && projectStatusLabel(project)} reminder={reminderId ? reminders.reminders.find(({ id }) => id === reminderId) : undefined} reminderDue={!!reminderId && reminders.notifications.some(({ reminderId: id }) => id === reminderId)} />}
         {!local && (
           <div className="shark-chat-message-actions">
             <button type="button" title={copied === message.id ? 'Копирано' : 'Копирай'} aria-label={copied === message.id ? 'Копирано' : 'Копирай'} onClick={() => void copyMessage(message)}>{copied === message.id ? <Check size={15} /> : <Copy size={15} />}</button>
@@ -853,7 +858,7 @@ export default function ChatPage() {
             <form className="shark-chat-composer ice-section" data-ice-art={mode === 'work' ? 'studio' : 'agent'} onSubmit={formSubmit}>
               {(attachment || selectedTool || branchFrom || uploading || projectContext) && <div className="shark-chat-chips">
                 {attachment && <div className="shark-chat-chip">
-                  {attachment.previewUrl ? <button type="button" onClick={() => openInspector({ type: 'image', url: attachment.previewUrl!, title: attachment.name })}><img src={attachment.previewUrl} alt="" />{attachment.name}</button> : <span><FileText size={16} />{attachment.name}</span>}
+                  {attachmentPreview ? <button type="button" className="shark-chat-chip-preview" aria-label={`Преглед на ${attachment.name}`} onClick={() => openInspector(attachmentPreview)}>{attachmentPreview.type === 'image' ? <img src={attachmentPreview.url} alt="" /> : <FileText size={16} />}{attachment.name}</button> : <span><FileText size={16} />{attachment.name}</span>}
                   <button type="button" aria-label="Премахни прикачения файл" disabled={sending} onClick={() => setAttachment(null)}><X size={15} /></button>
                 </div>}
                 {selectedTool && <div className="shark-chat-chip"><span><ToolIcon tool={selectedTool} />{selectedTool.label}</span><button type="button" aria-label="Премахни избрания инструмент" disabled={sending} onClick={() => setSelectedTool(null)}><X size={15} /></button></div>}

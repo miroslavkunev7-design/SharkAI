@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { MockLanguageModelV3 } from 'ai/test';
 import { ZipArchive } from 'archiver';
-import { PDFDocument } from 'pdf-lib';
+import { PDFArray, PDFDocument, PDFHexString, PDFName, PDFNumber, PDFRawStream, PDFString, StandardFonts, decodePDFRawStream, degrees } from 'pdf-lib';
 import {
   applyLocalDocumentEdit, buildLocalDocument, editDocxWithModel, extractLocalDocxText, hasExplicitDocumentBody,
   isLocalDocumentEdit, LocalDocumentError,
@@ -74,6 +74,104 @@ test('writes real PDFs and rotates, appends and removes pages in a new copy', as
   assert.equal((await PDFDocument.load(reduced)).getPageCount(), 1);
   assert.equal((await PDFDocument.load(reduced)).getPage(0).getRotation().angle, 0);
   await assert.rejects(applyLocalDocumentEdit('pdf', original, 'Премахни страница 1'), LocalDocumentError);
+});
+
+function pdfStreams(pdf: PDFDocument, pageIndex: number) {
+  const contents = pdf.getPage(pageIndex).node.Contents();
+  const objects = contents instanceof PDFArray ? contents.asArray().map((entry) => pdf.context.lookup(entry)) : [contents];
+  return objects.flatMap((object) => object instanceof PDFRawStream ? [Buffer.from(decodePDFRawStream(object).decode()).toString('ascii')] : []);
+}
+
+function lastTextMatrix(content: string) {
+  const matrix = content.split('\n').findLast((line) => line.endsWith(' Tm'));
+  assert.ok(matrix);
+  return matrix.split(' ').slice(0, 6).map(Number);
+}
+
+test('draws upright PDF labels at displayed points and keeps unrelated pages, crop, forms and annotations', async () => {
+  const source = await PDFDocument.create();
+  source.setTitle('Original QA document');
+  const firstPage = source.addPage([250, 300]);
+  const target = source.addPage([400, 500]);
+  target.setCropBox(20, 30, 300, 400);
+  target.setRotation(degrees(90));
+  target.node.set(PDFName.of('UserUnit'), PDFNumber.of(2));
+  const font = await source.embedFont(StandardFonts.Helvetica);
+  firstPage.drawText('Original page 1', { x: 40, y: 250, font });
+  target.drawText('Original page 2', { x: 48, y: 250, font });
+  const field = source.getForm().createTextField('original-field');
+  field.setText('Retain this value');
+  field.addToPage(firstPage, { x: 36, y: 36, width: 110, height: 24, font });
+  const link = source.context.obj({
+    Type: 'Annot', Subtype: 'Link', Rect: [48, 225, 130, 242],
+    A: { S: 'URI', URI: PDFString.of('https://example.com/') },
+  });
+  target.node.addAnnot(source.context.register(link));
+  const original = Buffer.from(await source.save());
+  const originalBytes = Buffer.from(original);
+  const before = await PDFDocument.load(original, { updateMetadata: false });
+  const prompt = 'Редактирай PDF: Добави текст на страница 2 при x=48, y=60, размер 12: Одобрено\n18.11.2026';
+  assert.equal(isLocalDocumentEdit(prompt, 'application/pdf'), true);
+  assert.equal(isLocalDocumentEdit(prompt, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'), false);
+  const result = await applyLocalDocumentEdit('pdf', original, prompt);
+  assert.ok(result);
+  const after = await PDFDocument.load(result, { updateMetadata: false });
+  assert.deepEqual(original, originalBytes);
+  assert.equal(after.getTitle(), 'Original QA document');
+  assert.equal(after.getPageCount(), 2);
+  assert.deepEqual(after.getPage(1).getCropBox(), before.getPage(1).getCropBox());
+  assert.equal(after.getPage(1).getRotation().angle, 90);
+  assert.equal(after.getPage(1).node.Annots()?.size(), 1);
+  assert.equal(after.getForm().getTextField('original-field').getText(), 'Retain this value');
+  assert.deepEqual(pdfStreams(after, 0), pdfStreams(before, 0));
+  const existing = pdfStreams(before, 1);
+  const streams = pdfStreams(after, 1);
+  assert.ok(existing.length && existing.every((stream) => streams.includes(stream)));
+  const overlay = streams.find((stream) => stream.includes('NotoSans'));
+  assert.ok(overlay);
+  assert.match(overlay, / 6 Tf/u); // 12 physical points with a page UserUnit of 2.
+  const [a, b, c, d, x, y] = lastTextMatrix(overlay);
+  assert.ok(Math.abs(a) < 1e-10 && Math.abs(d) < 1e-10 && b === 1 && c === -1);
+  assert.ok(x > 50 && x < 73);
+  assert.equal(y, 54); // Crop bottom 30 + 48 displayed points / UserUnit 2.
+});
+
+test('supports corner placement and refuses invalid sizes, overflowing text, missing pages and signed PDFs', async () => {
+  const source = await PDFDocument.create();
+  source.addPage([200, 300]);
+  const original = Buffer.from(await source.save());
+  const prompt = 'Please add a note on page 1, top right, size 10: Approved';
+  assert.equal(isLocalDocumentEdit(prompt, 'application/pdf'), true);
+  const result = await applyLocalDocumentEdit('pdf', original, prompt);
+  assert.ok(result);
+  const pdf = await PDFDocument.load(result);
+  const drawn = pdfStreams(pdf, 0).find((stream) => stream.includes('NotoSans'));
+  assert.ok(drawn);
+  const [a, b, c, d, x, y] = lastTextMatrix(drawn);
+  assert.deepEqual([a, b, c, d], [1, 0, 0, 1]);
+  assert.ok(x > 100 && x < 164 && y > 240 && y < 264);
+  const defaultResult = await applyLocalDocumentEdit('pdf', original, 'Добави текст на страница 1: Съгласувано');
+  assert.ok(defaultResult);
+  const defaultDrawing = pdfStreams(await PDFDocument.load(defaultResult), 0).find((stream) => stream.includes('NotoSans'));
+  assert.ok(defaultDrawing);
+  assert.equal(lastTextMatrix(defaultDrawing)[4], 36);
+  for (const [invalid, expected] of [
+    ['Add text to page 4: Missing', /посочи съществуваща страница/iu],
+    ['Добави текст на страница 1 при x=195, y=49: Не се побира', /не се побира/iu],
+    ['Добави текст на страница 1 при x=25, y=283: Непобиращ се текст\nВтори ред', /не се побира/iu],
+    ['Добави текст на страница 1 при x=-2, y=20: Отвън', /между 0 и/iu],
+    ['Add text to page 1 top right, size 2: Too small', /от 6 до 36/iu],
+    ['Add text to page 1 at some location: Unspecified', /посочи позиция/iu],
+    ['Add text to page 1: ' + 'a'.repeat(801), /до 800 знака/iu],
+  ] as const) {
+    await assert.rejects(applyLocalDocumentEdit('pdf', original, invalid), expected);
+  }
+  await assert.rejects(applyLocalDocumentEdit('pdf', original, prompt, AbortSignal.abort()), { name: 'AbortError' });
+  source.catalog.set(PDFName.of('Perms'), source.context.obj({
+    DocMDP: { Type: 'Sig', ByteRange: [0, 20, 41, 22], Contents: PDFHexString.of('FFFFFF') },
+  }));
+  const signedFixture = Buffer.from(await source.save());
+  await assert.rejects(applyLocalDocumentEdit('pdf', signedFixture, prompt), /цифров подпис/iu);
 });
 
 test('rejects corrupt, oversized or unsupported documents and respects cancellation', async () => {

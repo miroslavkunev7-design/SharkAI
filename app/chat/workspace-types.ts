@@ -50,10 +50,10 @@ export interface Project {
 export type InspectorItem =
   | { type: 'project'; id: string; title: string }
   | { type: 'reminders'; title: string }
-  | { type: 'image'; url: string; title: string }
+  | { type: 'image'; url: string; title: string; attachment?: Attachment }
   | { type: 'text'; url: string; title: string; attachment?: Attachment; saved?: boolean };
 
-export const imageUrl = (id: string) => `/api/upload/${encodeURIComponent(id)}`;
+export const uploadUrl = (id: string) => `/api/upload/${encodeURIComponent(id)}`;
 
 export function safeLink(link: string) {
   if (link.startsWith('/') && !link.startsWith('//') && !link.includes('\\')) return link;
@@ -75,7 +75,7 @@ export const projectInProgress = (project: Project) => !project.statusUnknown &&
 
 export const projectStatusLabel = (project: Project) => project.statusUnknown ? 'Непотвърден статус' : PROJECT_STATUS[project.status] || project.status;
 
-const ARTIFACT_EXTENSIONS: Record<string, string> = {
+const FILE_EXTENSIONS: Record<string, string> = {
   'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
   'application/pdf': 'pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
@@ -88,6 +88,25 @@ export const CANVAS_CONTENT_LIMIT = 24000 - CANVAS_SAVE_PREFIX.length;
 
 export function isTextArtifact(mime: string) {
   return CANVAS_MIME_TYPES.includes(mime) || mime === 'text/csv';
+}
+
+export function messageAttachment(message: Message): Attachment | null {
+  if (!message.imagePath) return null;
+  const mimeType = message.attachmentMime ?? 'image/jpeg';
+  const isImage = mimeType.startsWith('image/');
+  const extension = message.attachmentMime ? FILE_EXTENSIONS[message.attachmentMime] : undefined;
+  const label = isImage ? 'Прикачено изображение' : 'Прикачен файл';
+  return {
+    id: message.imagePath, mimeType, name: extension ? `${label}.${extension}` : label,
+    previewUrl: isImage ? uploadUrl(message.imagePath) : undefined,
+  };
+}
+
+export function attachmentInspection(file: Attachment): InspectorItem | null {
+  if (file.previewUrl) return { type: 'image', url: file.previewUrl, title: file.name, attachment: file };
+  return file.mimeType && isTextArtifact(file.mimeType)
+    ? { type: 'text', url: uploadUrl(file.id), title: file.name, attachment: file }
+    : null;
 }
 
 export function artifactDownloadUrl(url: string, attachment: Attachment | undefined) {
@@ -105,7 +124,7 @@ export function artifactAttachment(result: ChatToolResult): Attachment | null {
   const location = new URL(artifact.url, localOrigin);
   if (location.origin !== localOrigin) return null;
   const id = /^\/api\/upload\/([\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12})$/i.exec(location.pathname)?.[1];
-  const extension = ARTIFACT_EXTENSIONS[artifact.mimeType];
+  const extension = FILE_EXTENSIONS[artifact.mimeType];
   if (!id || !extension) return null;
   return {
     id, name: artifact.filename || `${result.label}.${extension}`, mimeType: artifact.mimeType,

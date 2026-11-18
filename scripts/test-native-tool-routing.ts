@@ -4,12 +4,14 @@ import { simulateReadableStream } from 'ai';
 import { MockLanguageModelV3 } from 'ai/test';
 import type { LanguageModelV3StreamPart } from '@ai-sdk/provider';
 import { createNativeToolRouter, NativeToolSelectionError, streamWorkspaceReply } from '../lib/ai/workspace-tool-routing';
+import { inferChatTool } from '../lib/chat-tools.server';
 import type { ChatTool } from '../lib/chat-tools';
 
 const registry = [
   ['document-export', true], ['text-file-create', true], ['image-properties', true], ['image-transform', true],
   ['document-read', true], ['document-edit', true], ['dataset-analysis', true], ['deep-research', true],
   ['image-generate', true], ['prompt-software', true], ['web-search', true], ['image-edit', true],
+  ['spreadsheet-export', true], ['spreadsheet-edit', true],
 ].map(([id, available]): ChatTool => ({ id: String(id), available: Boolean(available), group: 'QA', input: 'prompt', label: String(id), description: '', platforms: ['web-desktop'] }));
 
 const usage = {
@@ -46,6 +48,26 @@ test('only advertises available, strictly local tools compatible with the source
   assert.deepEqual(Object.keys(pdf.tools), ['edit_document']);
   assert.equal(pdf.validate('edit_document', { command: 'replace "A" with "B"' }), null);
   assert.equal(pdf.validate('edit_document', { command: 'rotate page 2 by 90' })?.toolId, 'document-edit');
+  assert.equal(pdf.validate('edit_document', { command: 'add text to page 2 top right: Checked' })?.toolId, 'document-edit');
+});
+
+test('routes explicit spreadsheet output and edits separately from ordinary tabular answers', () => {
+  assert.equal(inferChatTool('Моля, можеш ли да направиш таблица в Excel с имената и цените?', false), 'spreadsheet-export');
+  assert.equal(inferChatTool('Create a file report.csv with data:\nItem,Price\nTea,2', false), 'spreadsheet-export');
+  assert.equal(inferChatTool('Направи таблица с две колони.', false), undefined);
+  assert.equal(inferChatTool('Промени клетка B2 на 125', true, 'text/csv'), 'spreadsheet-edit');
+  assert.equal(inferChatTool('Начертай графика по колона Цена', true, 'text/csv'), 'dataset-analysis');
+
+  const router = createNativeToolRouter(registry, 'text/csv')!;
+  const data = { headers: ['Име', 'Цена'], rows: [['Чай', 2.5]], sheetName: null };
+  const content = JSON.stringify(data);
+  const selected = router.validate('export_spreadsheet', { format: 'xlsx', content });
+  assert.equal(selected?.toolId, 'spreadsheet-export');
+  assert.equal(selected?.prompt, `Създай XLSX с данни:\n${content}`);
+  assert.equal(router.validate('export_spreadsheet', { format: 'pdf', content }), null);
+  assert.equal(router.validate('export_spreadsheet', { format: 'xlsx', content: 'not JSON' }), null);
+  assert.equal(router.validate('edit_spreadsheet', { command: 'Set cell B2 to 4', fileId: 'foreign' }), null);
+  assert.equal(router.validate('edit_spreadsheet', { command: 'Set cell B2 to 4' })?.needsFile, true);
 });
 
 test('suppresses text around a tool call, captures usage and emits one validated action', async () => {
