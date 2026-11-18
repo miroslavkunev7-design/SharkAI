@@ -6,7 +6,9 @@ export type LocalImageEdit =
   | { operation: 'crop'; width: number; height: number; left?: number; top?: number }
   | { operation: 'rotate'; degrees: number }
   | { operation: 'grayscale' }
-  | { operation: 'flip'; axis: 'horizontal' | 'vertical' };
+  | { operation: 'flip'; axis: 'horizontal' | 'vertical' }
+  | { operation: 'temperature'; tone: 'warm' | 'cool' }
+  | { operation: 'saturation'; percentage: number };
 
 export class LocalImageEditError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
@@ -23,6 +25,9 @@ const crop = new RegExp(String.raw`^(?:crop|изрежи|изкропни)${imag
 const rotate = new RegExp(String.raw`^(?:rotate|завърти)${imageObject} (?:by |на |с )?([+-]?\d{1,6})(?:\s*(?:°|degrees?|deg|градуса?))?(?: (clockwise|counterclockwise|anticlockwise|по часовниковата стрелка|обратно на часовниковата стрелка|наляво|надясно))?$`, 'u');
 const tones = String.raw`(?:grayscale|greyscale|black(?: and |-)white|черно(?:-| и )бял[оа]|в сивата гама)`;
 const grayscale = new RegExp(String.raw`^(?:(?:make|convert|turn|направи|превърни)${imageObject} (?:to |in |в )?)?${tones}$`, 'u');
+const warm = /^(?:затопли (?:цветовете|тоновете)|направи (?:цветовете|тоновете) по[- ]топли|warm (?:the )?(?:colou?rs|tones)|make (?:the |this )?(?:image|photo|picture|colou?rs|tones) warmer)$/u;
+const cool = /^(?:охлади (?:цветовете|тоновете)|направи (?:цветовете|тоновете) по[- ]студени|cool (?:the )?(?:colou?rs|tones)|make (?:the |this )?(?:image|photo|picture|colou?rs|tones) cooler)$/u;
+const saturation = /^(?:set (?:the )?saturation to|(?:задай|настрой) (?:наситеността|цветната наситеност) (?:на|до)) ([+-]?\d{1,5}(?:[.,]\d{1,2})?) ?%$/u;
 const flip = new RegExp(String.raw`^(?:flip|mirror|обърни|огледай)${imageObject} (?:по )?(horizontal(?:ly)?|vertical(?:ly)?|хоризонтално|вертикално)$`, 'u');
 
 export function parseLocalImageEdit(prompt: string): LocalImageEdit | null {
@@ -48,6 +53,10 @@ export function parseLocalImageEdit(prompt: string): LocalImageEdit | null {
   if (grayscale.test(command)) return { operation: 'grayscale' };
   const reflection = flip.exec(command);
   if (reflection) return { operation: 'flip', axis: /^(?:horizontal|хоризонтално)/u.test(reflection[1]) ? 'horizontal' : 'vertical' };
+  if (warm.test(command)) return { operation: 'temperature', tone: 'warm' };
+  if (cool.test(command)) return { operation: 'temperature', tone: 'cool' };
+  const percentage = saturation.exec(command);
+  if (percentage) return { operation: 'saturation', percentage: Number(percentage[1].replace(',', '.')) };
   return null;
 }
 
@@ -117,6 +126,23 @@ export async function runLocalImageEdit({ edit, file, userId, signal }: {
       if (edit.axis === 'horizontal') input.flop();
       else input.flip();
       break;
+    case 'temperature':
+    case 'saturation': {
+      checkSize(width, height);
+      // Keep 16-bit PNG precision and leave the alpha channel out of the adjustment.
+      const space = metadata?.depth === 'ushort' ? 'rgb16' : 'srgb';
+      input.pipelineColourspace(space).toColourspace(space);
+      if (edit.operation === 'temperature') {
+        input.linear(edit.tone === 'warm' ? [1.08, 1, 0.92] : [0.92, 1, 1.08], [0, 0, 0]);
+      } else {
+        const { percentage } = edit;
+        if (!Number.isFinite(percentage) || percentage < 0 || percentage > 200) {
+          throw new LocalImageEditError('Задай наситеност от 0% до 200% спрямо оригинала.', 422);
+        }
+        if (percentage !== 100) input.modulate({ saturation: percentage / 100 });
+      }
+      break;
+    }
   }
 
   const result = await input.png().toBuffer({ resolveWithObject: true }).catch(() => null);

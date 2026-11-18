@@ -41,6 +41,10 @@ test('only advertises available, strictly local tools compatible with the source
   assert.deepEqual(router.validate('transform_image', { command: 'rotate by 90' }), { toolId: 'image-transform', prompt: 'rotate by 90', needsFile: true });
   assert.equal(router.validate('transform_image', { command: 'Fetch a remote background and add it' }), null);
   assert.equal(router.validate('inspect_image', { uploadId: 'foreign-upload' }), null);
+  assert.equal(createNativeToolRouter(registry, 'image/png', false, 'Turn this image into a sunset scene.')
+    ?.validate('transform_image', { command: 'Warm the colors' }), null);
+  assert.equal(createNativeToolRouter(registry, 'image/png', false, 'Set saturation to 60%.')
+    ?.validate('transform_image', { command: 'Set saturation to 20%' })?.prompt, 'Set saturation to 60%.');
   assert.equal(router.validate('deep-research', {}), null);
   const disabled = registry.map((tool) => ({ ...tool, available: false }));
   assert.equal(createNativeToolRouter(disabled, 'image/png'), undefined);

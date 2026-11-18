@@ -526,7 +526,7 @@ export default function ChatPage() {
     try {
       const response = await fetch('/api/chat', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
-        body: JSON.stringify(request), signal: controller.signal,
+        body: JSON.stringify({ ...request, asyncImage: true }), signal: controller.signal,
       });
       const result = await readChatResponse(response, (delta) => setPartial((text) => text + delta));
       controller.signal.throwIfAborted();
@@ -736,7 +736,7 @@ export default function ChatPage() {
           <a className="shark-chat-attachment-link" href={artifactDownloadUrl(uploadUrl(attached.id), attached)} download={attached.name}><Download size={16} /> Изтегли прикачения файл</a>
           {canReuse && <button type="button" disabled={pending} className="shark-chat-attachment-link" onClick={() => attachArtifact(attached, true)}><Pencil size={16} /> Използвай файла за редакция</button>}
         </div>}
-        <div className="shark-chat-message-text">{message.content}</div>
+        {(!message.toolResult?.imageJobId || message.toolResult.status === 'completed') && <div className="shark-chat-message-text">{message.content}</div>}
         {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} reuse={attachArtifact} editable={(file) => !!artifactEditor(file)} disabled={pending} projectStatus={project && projectStatusLabel(project)} reminder={reminderId ? reminders.reminders.find(({ id }) => id === reminderId) : undefined} reminderDue={!!reminderId && reminders.notifications.some(({ reminderId: id }) => id === reminderId)} />}
         {!local && (
           <div className="shark-chat-message-actions">

@@ -1,6 +1,18 @@
 # SharkAI image worker
 
-The optional Linux worker runs Stable Diffusion v1.5 and its LCM LoRA on CPU. It generates 512 × 512 PNG files from text and uses image-to-image diffusion for edits. Edits use a centered square crop. Prompts in English tend to follow the instructions more closely. The worker handles one request at a time and stops the native process if the caller disconnects or the 150-second limit expires.
+The optional Linux worker runs Stable Diffusion v1.5 and its LCM LoRA on CPU. Text-to-image produces 512 × 512 PNGs. Image-to-image uses the original orientation and full frame, with the longest side capped at 512 pixels. Prompts in English tend to follow the instructions more closely. The worker handles one request at a time and stops the native process if the caller disconnects or the 150-second limit expires.
+
+## Edits
+
+Send `prompt`, base64-encoded `image` and its `mimeType` to `POST /images`. The optional `edit` object accepts these fields when a source image is supplied.
+
+| Field | Accepted values |
+|---|---|
+| `mode` | `preserve` keeps more of the source structure and uses a strength of 0.35. This is the default. `transform` uses a strength of 0.55 for a broader change. |
+| `strength` | Optional numeric override from 0.20 through 0.65. Lower strengths generally preserve more detail. The sampler groups nearby values into discrete steps. |
+| `style` | Optional descriptive text up to 240 characters, appended to the prompt. |
+
+For an edit, describe the desired appearance, such as `orange sunset over a mountain lake, watercolor illustration`. The output is a new PNG. The model can change objects and details, even in `preserve` mode.
 
 ## Runtime
 

@@ -13,6 +13,7 @@ import {
 import { ChatToolError, dispatchChatTool, getChatToolIntent, listChatTools } from '@/lib/chat-tools.server';
 import type { ChatToolResult } from '@/lib/chat-tools';
 import { prisma } from '@/lib/db';
+import { kickImageJob } from '@/lib/image-jobs';
 import { MemoryError, readChatMemory } from '@/lib/personal-memory.server';
 import { reminderInputSchema } from '@/lib/reminder-input';
 import { readOwnedUpload } from '@/lib/uploads';
@@ -31,6 +32,7 @@ const inputSchema = z.object({
   reasoning: z.enum(['standard', 'deep']).default('standard'),
   mode: z.enum(['chat', 'work']).default('chat'),
   toolId: z.string().min(1).max(100).nullish(),
+  asyncImage: z.boolean().default(false),
   reminder: reminderInputSchema.optional(),
   branchFrom: z.object({ conversationId: conversationKey, messageId: z.string().min(1).max(80) }).optional(),
 });
@@ -140,7 +142,7 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
 
     async function executeTool(id: string, prompt: string) {
       const dispatched = await dispatchChatTool({
-        session: account, toolId: id, prompt, uploadId, requestId, signal, reminder: input.reminder,
+        session: account, toolId: id, prompt, uploadId, requestId, signal, reminder: input.reminder, asyncImage: input.asyncImage,
         file: upload ? { data: Buffer.from(upload.data), mimeType: upload.mimeType } : undefined,
         contextText: lastReply?.role === 'assistant' ? lastReply.content : undefined,
       });
@@ -226,10 +228,13 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
       }
     }
     signal.throwIfAborted();
-    return await recordChatTurn({
+    const saved = await recordChatTurn({
       userId, requestId, lease, conversationId, conversationMode: mode, context, message, content,
       uploadId: uploadId ?? undefined, attachmentMime: upload?.mimeType, toolResult: toolResult ?? undefined, tokens,
     });
+    const savedTool = saved.toolResult as ChatToolResult | null;
+    if (savedTool?.imageJobId) kickImageJob(savedTool.imageJobId, userId);
+    return saved;
   } finally {
     await releaseChatLease(userId, requestId, lease).catch(() => console.error('Chat lease cleanup failed'));
   }

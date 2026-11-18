@@ -2,6 +2,7 @@ import { APICallError, generateImage, generateText, NoObjectGeneratedError, NoOu
 import { randomUUID } from 'node:crypto';
 import { FEATURES, getStudioFeatureAvailability } from './agents';
 import { getHostedOpenAI, HostedWebSearchError, runHostedWebSearch, type HostedOpenAI as OpenAI } from './hosted-web-search';
+import { ImageJobError, stageImageJob } from './image-jobs';
 import { remainingChatTokens, workspaceModels } from './ai/workspace-chat';
 import type { AccountSession } from './auth';
 import { DataToolError, runOpenAIDataTool } from './chat-data-tools.server';
@@ -38,6 +39,7 @@ interface ToolRequest {
   prompt: string;
   uploadId?: string;
   requestId: string;
+  asyncImage?: boolean;
   contextText?: string;
   reminder?: ReminderInput;
   file?: { data: Buffer; mimeType: string };
@@ -136,8 +138,18 @@ async function readDocument({ openai, prompt, file, session, signal }: ToolExecu
   return { status: 'completed', text: answer.text, usageTokens: answer.usage.totalTokens };
 }
 
-async function createImage({ openai, prompt, file, session, signal }: ToolExecution): Promise<ToolOutput> {
+async function createImage({ openai, prompt, file, session, signal, asyncImage, requestId, uploadId }: ToolExecution): Promise<ToolOutput> {
   if (!openai) {
+    if (asyncImage) {
+      try {
+        const job = await stageImageJob(session, requestId, {
+          toolId: file ? 'image-edit' : 'image-generate', prompt, uploadId: file ? uploadId : undefined,
+        });
+        return { id: job.id, imageJobId: job.id, status: 'started', text: 'Задачата за изображение е записана.' };
+      } catch (error) {
+        if (!(error instanceof ImageJobError) || error.code !== 'IMAGE_JOB_MIGRATION_REQUIRED') throw error;
+      }
+    }
     const image = await runLocalImage({ prompt, file, signal });
     signal?.throwIfAborted();
     const saved = await saveUpload(image.data, image.mimeType, session.id);
@@ -264,7 +276,7 @@ const coreTools: ToolRegistration[] = [
   } },
   { id: 'image-generate', label: 'Създай изображение', description: 'Генерира и прикачва изображение към разговора.', group: 'Изображения', input: 'prompt', imageProvider: true, execute: createImage },
   { id: 'image-edit', label: 'Редактирай изображение', description: 'Променя прикаченото изображение с генеративен модел.', group: 'Изображения', input: 'image', imageProvider: true, execute: createImage },
-  { id: 'image-transform', label: 'Размер, изрязване и завъртане', description: 'Преоразмерява, изрязва, завърта, отразява или преобразува снимка в черно-бяло. Например „Завърти снимката на 90°“.', group: 'Изображения', input: 'image', execute: async ({ prompt, file, session, signal }) => {
+  { id: 'image-transform', label: 'Точни промени на изображение', description: 'Преоразмерява, изрязва, завърта и променя цветовете на цялото изображение. Например „Задай наситеността на 60%“.', group: 'Изображения', input: 'image', execute: async ({ prompt, file, session, signal }) => {
     const edit = parseLocalImageEdit(prompt);
     if (!edit || !file) throw new ChatToolError('Посочи една промяна, например „Изрежи 200 × 200“, „Завърти на 90°“ или „Направи снимката черно-бяла“.', 422);
     return runLocalImageEdit({ edit, file, userId: session.id, signal });
@@ -385,6 +397,7 @@ export function inferChatTool(prompt: string, hasUpload: boolean, mimeType?: str
     .replace(/^(?:моля|please)[,\s]+/iu, '')
     .replace(/^(?:можеш ли да|би ли|can you|could you|would you)\s+/iu, '');
   if ((!mimeType || mimeType.startsWith('image/')) && parseLocalImageEdit(request)) return 'image-transform';
+  if (mimeType?.startsWith('image/') && /^(?:(?:смени|промени)\s+(?:фона|осветлението|стила)|(?:прерисувай|преобразувай)\s|превърни\s+(?:я|го|изображението|снимката)\s+в|(?:change|replace)\s+(?:(?:the|its)\s+)?(?:background|lighting|style)\b|(?:restyle|redraw|reimagine)\s|(?:turn|transform|convert)\s+(?:(?:the|this)\s+)?(?:image|photo|picture|it)\s+into\b)/iu.test(request)) return 'image-edit';
   if (/^(?:създай|създадеш|направи|направиш|генерирай|генерираш|запази|запазиш|експортирай|експортираш|create|make|generate|export|save)\s+(?:(?:ми|a|an|as|като)\s+)*(?:(?:файл|таблица|file|spreadsheet|table)\s+)?(?:(?:в|in|като|as)\s+)?(?:[\p{L}\p{N}_.-]+\.)?(?:csv|xlsx|excel)\b/iu.test(request)) return 'spreadsheet-export';
   const table = mimeType === 'text/csv' || mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   if (isLocalSpreadsheetEdit(request) || /^(?:редактирай|редактираш|поправи|edit|revise)\s+(?:(?:прикачения|прикачената|this|the|attached)\s+)*(?:csv|xlsx|excel)\b/iu.test(request)) return 'spreadsheet-edit';
@@ -462,6 +475,7 @@ export async function dispatchChatTool(request: ToolRequest): Promise<ChatToolRe
     if (request.signal?.aborted || error instanceof ChatToolError) throw error;
     if (error instanceof LocalDocumentError || error instanceof LocalImageError || error instanceof LocalImageEditError
       || error instanceof OcrError || error instanceof TextFileError || error instanceof LocalTableError || error instanceof SpreadsheetInputError
+      || error instanceof ImageJobError
       || error instanceof HostedWebSearchError || error instanceof ResearchInputError || error instanceof ReminderInputError || error instanceof DataToolError) {
       throw new ChatToolError(error.message, error.status);
     }

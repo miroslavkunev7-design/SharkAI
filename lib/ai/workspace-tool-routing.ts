@@ -62,8 +62,14 @@ export function createNativeToolRouter(registry: ChatTool[], mimeType?: string, 
       'Measure the available image dimensions or sample its color palette. This tool does not identify objects or read text.',
       noArgs, () => 'Свойства на изображение');
     offer('transform_image', 'image-transform', true,
-      'Apply one requested transformation to the available image. Use one exact command: resize to 300 × 200, resize width 300, crop 200 × 200, rotate by 90, grayscale, or flip horizontally. Use the user’s numbers.',
-      command, ({ command }) => parseLocalImageEdit(command) ? command : null);
+      'Apply one requested exact transformation to the available image. Use an exact command such as resize to 300 × 200, crop 200 × 200, rotate by 90, grayscale, flip horizontally, or set saturation to 60%. Use only the user’s instructions.',
+      command, ({ command }) => {
+        const edit = parseLocalImageEdit(command);
+        if (edit?.operation === 'temperature' || edit?.operation === 'saturation') {
+          return parseLocalImageEdit(latestRequest)?.operation === edit.operation ? latestRequest : null;
+        }
+        return edit ? command : null;
+      });
   }
   if (mimeType === docx) {
     offer('extract_docx', 'document-read', true,

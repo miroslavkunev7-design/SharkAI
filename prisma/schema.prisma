@@ -58,6 +58,7 @@ model User {
   chatRequests  ChatRequest[]
   uploads       FileUpload[]
   researchJobs  ResearchJob[]
+  imageJobs     ImageJob[]
   personalMemory PersonalMemory?
   reminders     Reminder[]
 }
@@ -85,6 +86,35 @@ model ResearchJob {
   error      String?
   runnerId   String?
   leaseUntil DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([userId, requestId])
+}
+
+enum ImageJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model ImageJob {
+  id         String         @id
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  requestId  String
+  toolId     String
+  prompt     String
+  uploadId   String?
+  outputId   String?
+  status     ImageJobStatus @default(QUEUED)
+  runAfter   DateTime       @default(now())
+  runnerId   String?
+  leaseUntil DateTime?
+  error      String?
+  retryable  Boolean        @default(false)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
