@@ -57,7 +57,7 @@ export function HomeHero() {
             </button>
           ))}
         </div>
-        <div className="shark-launch-copy" aria-live="polite">
+        <div className="shark-launch-copy" data-module={slide.id} aria-live="polite">
           <h1 id="home-title">{slide.title}</h1>
           <p>{slide.description}</p>
           <Link href={slide.href} className="shark-action shark-launch-primary">

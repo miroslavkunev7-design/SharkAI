@@ -1,10 +1,11 @@
-const { app, BrowserWindow, desktopCapturer, dialog, shell } = require('electron');
+const { app, BrowserWindow, desktopCapturer, dialog, screen, shell } = require('electron');
 const path = require('node:path');
 
 const origin = app.isPackaged
   ? require('./service.json').origin
   : 'http://localhost:3847';
 const landingURL = new URL('/', origin).href;
+const serviceLoadTimeout = 15_000;
 let mainWindow;
 
 function isServiceURL(url) {
@@ -95,11 +96,16 @@ function configureMedia(window) {
 }
 
 function createWindow() {
+  const { workArea } = screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
+  const width = Math.min(1440, workArea.width);
+  const height = Math.min(900, workArea.height);
   const window = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 480,
-    minHeight: 540,
+    x: workArea.x + Math.floor((workArea.width - width) / 2),
+    y: workArea.y + Math.floor((workArea.height - height) / 2),
+    width,
+    height,
+    minWidth: Math.min(480, width),
+    minHeight: Math.min(540, height),
     title: 'SharkAI',
     icon: path.join(__dirname, app.isPackaged ? 'assets/logo-icon.png' : '../public/logo-icon.png'),
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
@@ -107,7 +113,12 @@ function createWindow() {
     backgroundColor: '#080b15',
   });
   mainWindow = window;
-  window.on('closed', () => { mainWindow = undefined; });
+  let serviceLoadTimer;
+  let showingOffline = false;
+  window.on('closed', () => {
+    clearServiceLoadTimer();
+    mainWindow = undefined;
+  });
 
   const { webContents } = window;
   configureMedia(window);
@@ -115,27 +126,55 @@ function createWindow() {
     if (!isServiceURL(url)) {
       event.preventDefault();
       openInBrowser(url);
+    } else if (showingOffline) {
+      event.preventDefault();
+      if (!serviceLoadTimer) loadService(url);
     }
   });
   webContents.on('will-redirect', (event, url) => {
     if (!isServiceURL(url)) event.preventDefault();
   });
   webContents.setWindowOpenHandler(({ url }) => {
-    if (isServiceURL(url)) void window.loadURL(url).catch(showOffline);
+    if (isServiceURL(url)) loadService(url);
     else openInBrowser(url);
     return { action: 'deny' };
   });
   webContents.on('did-fail-load', (_event, code, _description, url, isMainFrame) => {
-    if (isMainFrame && code !== -3 && isServiceURL(url)) showOffline();
+    if (isMainFrame && code !== -3) showOffline(url);
   });
   webContents.on('did-navigate', (_event, url, httpResponseCode) => {
-    if (isServiceURL(url) && httpResponseCode >= 500) showOffline();
+    if (!isServiceURL(url)) return;
+    if (httpResponseCode >= 500) showOffline(url, 'service');
+    else showingOffline = false;
   });
-  void window.loadURL(landingURL).catch(() => {}); // did-fail-load handles main-frame network errors.
+  webContents.on('dom-ready', () => {
+    if (isServiceURL(webContents.getURL())) clearServiceLoadTimer();
+  });
+  loadService(landingURL);
 
-  function showOffline() {
-    if (window.isDestroyed()) return;
-    void window.loadFile(path.join(__dirname, 'offline.html'), { query: { origin } }).catch(console.error);
+  function clearServiceLoadTimer() {
+    clearTimeout(serviceLoadTimer);
+    serviceLoadTimer = undefined;
+  }
+
+  function loadService(url) {
+    clearServiceLoadTimer();
+    const timer = setTimeout(() => showOffline(url, 'timeout'), serviceLoadTimeout);
+    serviceLoadTimer = timer;
+    void window.loadURL(url).catch((error) => {
+      if (serviceLoadTimer === timer && error.code !== 'ERR_ABORTED') showOffline(url);
+    }).finally(() => {
+      if (serviceLoadTimer === timer) clearServiceLoadTimer();
+    });
+  }
+
+  function showOffline(destination, reason = 'network') {
+    if (!isServiceURL(destination) || window.isDestroyed() || (showingOffline && !serviceLoadTimer)) return;
+    clearServiceLoadTimer();
+    showingOffline = true;
+    void window.loadFile(path.join(__dirname, 'offline.html'), { query: { origin, reason, destination } }).catch((error) => {
+      if (!window.isDestroyed() && error.code !== 'ERR_ABORTED') console.error('SharkAI offline screen failed:', error.code);
+    });
   }
 }
 

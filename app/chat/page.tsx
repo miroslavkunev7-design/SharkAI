@@ -6,7 +6,7 @@ import { Logo } from '@/components/Logo';
 import type { ChatTool } from '@/lib/chat-tools';
 import { accountPlanLabel } from '../account-plan';
 import {
-  AppWindow, ArrowUp, AudioLines, Bell, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, Download, ExternalLink,
+  AppWindow, ArrowDown, ArrowUp, AudioLines, Bell, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, Download, ExternalLink,
   FileText, Folder, Globe2, Image as ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare,
   Mic, PanelLeftClose, PanelLeftOpen, Paperclip, Pencil, Plus, RotateCcw, ScanLine, ScreenShare,
   Search, Settings, Shield, Sparkles, Square, Table2, X,
@@ -17,6 +17,7 @@ import { chatTurnScope, readPendingChatTurn, writePendingChatTurn, type BranchFr
 import { Inspector } from './inspector';
 import { useReminders, type ReminderInput } from './reminders';
 import { ToolReceipt } from './tool-receipt';
+import { useChatScroll } from './use-chat-scroll';
 import {
   artifactAttachment, artifactDownloadUrl, attachmentInspection, AUDIO_MIME_TYPES, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, CANVAS_SAVE_PREFIX, messageAttachment, projectInProgress, projectStatusLabel, uploadUrl, type Account, type Attachment, type Conversation,
   type InspectorItem, type Message, type Mode, type Model, type Project,
@@ -144,8 +145,9 @@ export default function ChatPage() {
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const railTrigger = useRef<HTMLButtonElement>(null);
   const transcriptionLanguageRef = useRef<HTMLSelectElement>(null);
-  const endRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
+  const topbarRef = useRef<HTMLElement>(null);
+  const composeAreaRef = useRef<HTMLDivElement>(null);
   const cameraDialog = useRef<HTMLDialogElement>(null);
   const cameraVideo = useRef<HTMLVideoElement>(null);
   const cameraStream = useRef<MediaStream | null>(null);
@@ -168,11 +170,13 @@ export default function ChatPage() {
   const pending = loading || sending || uploading || mediaPending || modeSaving;
   const awaitingProjects = projects.some(projectInProgress);
   const showStart = !loading && !loadProblem && messages.length === 0 && !optimistic;
+  const { scrollRef, following, followLatest, onScroll } = useChatScroll(!showStart && !loading && !loadProblem);
   const signInHref = `/login?next=${encodeURIComponent(`/chat${typeof window === 'undefined' ? '' : window.location.search}`)}`;
   const appliedReasoning = model?.reasoningLevels.includes(reasoning) ? reasoning : model?.reasoningLevels[0];
 
   const loadConversation = useCallback(async (id?: string, draftProjectId?: string) => {
     loadController.current?.abort();
+    followLatest();
     const controller = new AbortController();
     loadController.current = controller;
     setLoading(true);
@@ -215,7 +219,7 @@ export default function ChatPage() {
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
-  }, []);
+  }, [followLatest]);
 
   const loadProjects = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -282,10 +286,6 @@ export default function ChatPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (messages.length || optimistic) endRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages, optimistic, partial]);
-
   const closePopup = useCallback((restore = false) => {
     setPopup(null);
     if (restore) triggerRef.current?.focus();
@@ -317,7 +317,29 @@ export default function ChatPage() {
   }
 
   useEffect(() => {
-    if (popup) popupRef.current?.querySelector<HTMLElement>('button:not(:disabled),a[href]')?.focus();
+    const panel = popupRef.current;
+    const anchor = triggerRef.current;
+    const shell = shellRef.current;
+    const topbar = topbarRef.current;
+    const composeArea = composeAreaRef.current;
+    if (popup !== 'tools' || small || !panel || !anchor || !shell || !topbar || !composeArea) return;
+    const measure = () => {
+      const space = anchor.getBoundingClientRect().top - topbar.getBoundingClientRect().bottom;
+      panel.style.setProperty('--chat-popup-space', `${Math.max(0, space)}px`);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(shell);
+    observer.observe(topbar);
+    observer.observe(composeArea);
+    return () => {
+      observer.disconnect();
+      panel.style.removeProperty('--chat-popup-space');
+    };
+  }, [popup, small]);
+
+  useEffect(() => {
+    if (popup) popupRef.current?.querySelector<HTMLElement>('button:not(:disabled),a[href]')?.focus({ preventScroll: true });
   }, [popup]);
 
   useEffect(() => {
@@ -391,6 +413,7 @@ export default function ChatPage() {
   function newConversation(project?: string) {
     if (sending || uploading || mediaPending) return;
     loadController.current?.abort();
+    followLatest();
     setLoading(false);
     setLoadProblem('');
     setLoginRequired(false);
@@ -573,6 +596,7 @@ export default function ChatPage() {
     } : null;
     if (previous) writePendingChatTurn(previous);
     let keepAttempt = false;
+    if (!panelAction) followLatest();
     setOptimistic(attempt);
     closePopup();
     try {
@@ -885,7 +909,7 @@ export default function ChatPage() {
       </aside>
 
       <div className="shark-chat-workspace" data-mode={mode} inert={(small && !!inspector) || (small && drawerOpen)}>
-        <header className="shark-chat-topbar">
+        <header className="shark-chat-topbar" ref={topbarRef}>
           <div className="shark-chat-topbar-start">
             <button ref={railTrigger} className="shark-chat-icon shark-chat-rail-trigger" type="button" aria-label={railOpen ? 'Скрий историята' : 'Отвори историята'} title="История и проекти" aria-controls="chat-rail" aria-expanded={railOpen} onClick={railAction}>
               {small ? <Menu size={21} /> : railOpen ? <PanelLeftClose size={19} /> : <PanelLeftOpen size={19} />}
@@ -902,7 +926,7 @@ export default function ChatPage() {
           </div>}
           <div className="shark-chat-topbar-actions">
             {account && <button type="button" className="shark-chat-icon shark-chat-reminder-trigger" aria-label={reminders.notifications.length ? `Напомняния, ${reminders.notifications.length} непрочетени` : 'Напомняния'} title="Напомняния" aria-haspopup={small ? 'dialog' : undefined} aria-expanded={inspector?.type === 'reminders'} aria-controls="chat-reminders-panel" onClick={() => openInspector({ type: 'reminders', title: 'Напомняния' })}><Bell size={18} />{reminders.notifications.length > 0 && <span aria-hidden="true">{reminders.notifications.length}</span>}</button>}
-            <Link className="shark-chat-topbar-studio" href="/dashboard?view=studio"><AppWindow size={17} /><span>Студио</span></Link>
+            <Link className="shark-chat-topbar-studio" href="/dashboard?view=studio" aria-label="Студио" title="Студио"><AppWindow size={17} /><span>Студио</span></Link>
           </div>
         </header>
         <main id="chat-main" tabIndex={-1} className="shark-chat-main" data-start={showStart}>
@@ -914,18 +938,21 @@ export default function ChatPage() {
               <h1 id="chat-welcome-title">{mode === 'work' ? 'С какво ще работим?' : 'Как мога да помогна?'}</h1>
             </div>
           </section> : !loading && !loadProblem ? (
-            <div className="shark-chat-thread-scroll">
-              <div className="shark-chat-thread" role="log" aria-label="Разговор с SharkAI" aria-live="polite">
-                {messages.map((message, index) => renderMessage(message, index))}
-                {optimistic && renderMessage(optimistic, messages.length, true)}
-                {sending && (partial ? renderMessage({ id: 'stream', role: 'assistant', content: partial }, messages.length, true) : (
-                  <div className="shark-chat-status" role="status"><LoaderCircle size={17} className="shark-chat-spinner" /> {selectedTool ? `Изпълнявам ${selectedTool.label}…` : 'Очаквам отговор…'}</div>
-                ))}
-                <div ref={endRef} />
+            <div className="shark-chat-thread-area">
+              <div className="shark-chat-thread-scroll" ref={scrollRef} tabIndex={0} role="region" aria-label="История на разговора" onScroll={onScroll}>
+                <div className="shark-chat-thread" role="log" aria-label="Разговор с SharkAI" aria-live="polite">
+                  {messages.map((message, index) => renderMessage(message, index))}
+                  {optimistic && renderMessage(optimistic, messages.length, true)}
+                  {sending && (partial ? renderMessage({ id: 'stream', role: 'assistant', content: partial }, messages.length, true) : (
+                    <div className="shark-chat-status" role="status"><LoaderCircle size={17} className="shark-chat-spinner" /> {selectedTool ? `Изпълнявам ${selectedTool.label}…` : 'Очаквам отговор…'}</div>
+                  ))}
+                </div>
               </div>
+              {!following && <button className="shark-chat-jump-latest shark-chat-compose-icon" type="button" aria-label="Към последното съобщение" title="Към последното съобщение"
+                onClick={() => { scrollRef.current?.focus({ preventScroll: true }); followLatest(); }}><ArrowDown size={19} /></button>}
             </div>
           ) : null}
-          {canSend && !loadProblem ? <div className="shark-chat-compose-area">
+          {canSend && !loadProblem ? <div className="shark-chat-compose-area" ref={composeAreaRef}>
             {showStart && (model || (mode === 'work' && tools.some(({ available }) => available))) && <div className="shark-chat-suggestions" aria-label="Предложения">
               {mode === 'work' ? tools.filter(({ available }) => available).slice(0, 3).map((tool) => <button type="button" disabled={pending} key={tool.id} onClick={() => chooseTool(tool)}><ToolIcon tool={tool} /> {tool.label}</button>) : suggestions.map(({ label, text, icon: Icon }) => <button type="button" key={label} disabled={pending} onClick={() => { setInput(text); send(text); }}><Icon size={16} /> {label}</button>)}
             </div>}
