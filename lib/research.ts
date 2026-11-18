@@ -1,7 +1,10 @@
 import { Prisma, type ResearchJob } from '@prisma/client';
 import { waitUntil } from '@vercel/functions';
 import { randomUUID } from 'node:crypto';
+import { getAccountSession } from './auth';
+import { remainingChatTokens } from './ai/workspace-chat';
 import { prisma } from './db';
+import { getHostedOpenAI, HostedWebSearchError, runHostedWebSearch, type HostedOpenAI, type HostedWebSearchResult } from './hosted-web-search';
 import {
   readWikiArticles, researchTopic, searchCrossref, searchWiki,
   type ResearchSource, type ScholarlyHit, type WikiHit,
@@ -15,7 +18,9 @@ const stageLabels = [
   'Търсене в Wikipedia', 'Търсене на публикации в Crossref', 'Извличане на текст от източниците', 'Подготовка на отчета', 'Отчетът е готов',
 ];
 
-type Evidence = { wiki: WikiHit[]; papers: ScholarlyHit[] };
+type WebEvidence = { status: 'attempted' | 'interrupted' | 'failed' } | { status: 'done'; result: HostedWebSearchResult };
+type Evidence = { wiki: WikiHit[]; papers: ScholarlyHit[]; web?: WebEvidence };
+type ResolveHostedSearch = () => Promise<HostedOpenAI | null>;
 
 export class ResearchInputError extends Error {
   constructor(message: string, readonly status = 400) { super(message); }
@@ -42,14 +47,56 @@ function evidenceFor(job: ResearchJob): Evidence {
   return job.evidence as Evidence | null ?? { wiki: [], papers: [] };
 }
 
+function webWarning(evidence: Evidence) {
+  if (evidence.web?.status === 'interrupted') return ['Предишното търсене чрез OpenAI бе прекъснато.'];
+  if (evidence.web?.status === 'failed') return ['Търсенето чрез OpenAI не върна проверими резултати.'];
+  if (evidence.web?.status === 'done' && evidence.web.result.partial) return ['OpenAI върна частичен синтез от уеб търсенето.'];
+  return [];
+}
+
+function sourcesFor(evidence: Evidence) {
+  const hosted = evidence.web?.status === 'done' ? evidence.web.result.sources : [];
+  return [...new Map([...evidence.wiki, ...evidence.papers, ...hosted].map((source) => [source.url, { title: source.title, url: source.url }])).values()];
+}
+
+function hostedParagraphs(result: HostedWebSearchResult, sourceIds: Map<string, number>, escape: (value: string) => string) {
+  const paragraphs: string[] = [];
+  let offset = 0;
+  for (const paragraph of result.text.split(/\n\s*\n/)) {
+    if (!paragraph.trim()) continue;
+    const start = result.text.indexOf(paragraph, offset);
+    offset = start + paragraph.length;
+    const urls = [...new Set(result.citations.filter(({ end }) => end > start && end <= offset).map(({ url }) => url))];
+    const links = urls.flatMap((url) => {
+      const id = sourceIds.get(url);
+      return id ? [`[${id}](${markdownUrl(url)})`] : [];
+    });
+    const text = escape(paragraph.replace(/\[([^\]]+)\]\(https?:\/\/[^\s)]+\)/gi, '$1').replace(/https?:\/\/[^\s)\]<>]+/gi, '').trim());
+    if (text) paragraphs.push([text, ...links].join(' '), '');
+  }
+  return paragraphs;
+}
+
+function markdownUrl(url: string) {
+  return url.replace(/\(/g, '%28').replace(/\)/g, '%29');
+}
+
 function reportMarkdown(topic: string, evidence: Evidence, warnings: string[], findings: ResearchFinding[]) {
   const escape = (value: string) => value.replace(/[\\`*_\[\]<>|]/g, '\\$&');
   const lines = [
     '# Проучване на SharkAI', '', `**Тема** · ${escape(topic)}`, '',
     `**Дата на проучването** · ${new Date().toISOString().slice(0, 10)} (UTC)`, '',
-    'Отчетът включва статии от Wikipedia и библиографски записи от Crossref. Текстът под източниците идва от предоставените извлечения и резюмета.', '',
   ];
-  const sources = [...evidence.wiki, ...evidence.papers];
+  const collection = [evidence.wiki.length ? 'Wikipedia' : '', evidence.papers.length ? 'Crossref' : ''].filter(Boolean);
+  if (collection.length) lines.push(`Справочните материали са от ${collection.join(' и ')}. Те включват наличните извлечения и резюмета.`, '');
+  const sources = sourcesFor(evidence);
+  const sourceIds = new Map(sources.map((source, index) => [source.url, index + 1]));
+  if (evidence.web?.status === 'done') {
+    const result = evidence.web.result;
+    lines.push('## Публично уеб търсене чрез OpenAI', '',
+      'Този раздел съдържа синтеза на доставчика и връзките от неговите цитати.', '',
+      ...hostedParagraphs(result, sourceIds, escape));
+  }
   if (findings.length) {
     lines.push('## Синтез по източниците', '');
     for (const finding of findings) {
@@ -69,12 +116,13 @@ function reportMarkdown(topic: string, evidence: Evidence, warnings: string[], f
     if (details) lines.push(escape(details), '');
     lines.push(hit.excerpt ? escape(hit.excerpt) : 'Crossref предоставя библиографски запис за тази публикация.', '');
   });
-  if (warnings.length) lines.push('## Достъп до източниците', '', ...warnings.map((warning) => `- ${warning}`), '');
-  lines.push('## Връзки към източниците', '', ...sources.map((source, index) => `${index + 1}. [${escape(source.title)}](${source.url})`), '');
+  const notices = [...warnings, ...webWarning(evidence)];
+  if (notices.length) lines.push('## Достъп до източниците', '', ...notices.map((warning) => `- ${warning}`), '');
+  lines.push('## Връзки към източниците', '', ...sources.map((source, index) => `${index + 1}. [${escape(source.title)}](${markdownUrl(source.url)})`), '');
   return lines.join('\n');
 }
 
-async function execute(jobId: string, userId: string) {
+export async function executeResearchJob(jobId: string, userId: string, resolveHosted: ResolveHostedSearch = getHostedOpenAI) {
   const now = new Date();
   const runnerId = randomUUID();
   const claim = await prisma.researchJob.updateMany({
@@ -96,6 +144,7 @@ async function execute(jobId: string, userId: string) {
     const { stage, topic } = job;
     const evidence = evidenceFor(job);
     const warnings = [...job.warnings];
+    const evidenceJson = () => evidence as unknown as Prisma.InputJsonValue;
     async function fromSource<T>(task: Promise<T>, fallback: T, message: string) {
       try { return await task; } catch {
         controller.signal.throwIfAborted();
@@ -103,8 +152,45 @@ async function execute(jobId: string, userId: string) {
         return fallback;
       }
     }
-    const save = (stage: number) => update({ stage, evidence: evidence as unknown as Prisma.InputJsonValue, warnings });
+    const save = (stage: number) => update({ stage, evidence: evidenceJson(), warnings });
     if (stage < 1) {
+      if (evidence.web?.status === 'attempted') {
+        // The previous request's outcome is unknown. Keep the job without risking another billable search.
+        evidence.web = { status: 'interrupted' };
+        if (!(await update({ evidence: evidenceJson() }))) return;
+      } else if (!evidence.web) {
+        const account = await getAccountSession(userId);
+        const outputBudget = account ? Math.min(2200, remainingChatTokens(account) - 400 - Buffer.byteLength(topic)) : 0;
+        const openai = outputBudget >= 200 ? await resolveHosted().catch(() => null) : null;
+        if (openai) {
+          evidence.web = { status: 'attempted' };
+          if (!(await update({ evidence: evidenceJson() }))) return;
+          controller.signal.throwIfAborted();
+          let usage = 0;
+          try {
+            const result = await runHostedWebSearch(openai, topic, {
+              depth: 'research', maxOutputTokens: outputBudget,
+              signal: AbortSignal.any([controller.signal, AbortSignal.timeout(24_000)]),
+            });
+            usage = result.usageTokens;
+            evidence.web = { status: 'done', result };
+          } catch (error) {
+            controller.signal.throwIfAborted();
+            if (error instanceof HostedWebSearchError) usage = error.usageTokens;
+            evidence.web = { status: 'failed' };
+          }
+          const accepted = await prisma.$transaction(async (tx) => {
+            const checkpoint = await tx.researchJob.updateMany({
+              where, data: { evidence: evidenceJson(), leaseUntil: new Date(Date.now() + LEASE_TIME) },
+            });
+            if (checkpoint.count && usage > 0) {
+              await tx.user.update({ where: { id: userId }, data: { tokensUsed: { increment: usage } } });
+            }
+            return checkpoint.count > 0;
+          });
+          if (!accepted) return;
+        }
+      }
       evidence.wiki = await fromSource(searchWiki(topic, controller.signal), [], 'Търсенето в Wikipedia временно не отговори.');
       if (!(await save(1))) return;
     }
@@ -117,11 +203,12 @@ async function execute(jobId: string, userId: string) {
       if (!(await save(3))) return;
     }
     controller.signal.throwIfAborted();
-    if (!evidence.wiki.length && !evidence.papers.length) {
+    if (!sourcesFor(evidence).length) {
       await update({ status: 'FAILED', error: 'Няма достъпни източници за темата. Опитай отново или използвай по-точна тема.', runnerId: null, leaseUntil: null });
       return;
     }
-    const synthesis = await synthesizeResearch(userId, topic, evidence.wiki, evidence.papers, controller.signal);
+    const synthesis = evidence.web ? { findings: [], tokens: 0 }
+      : await synthesizeResearch(userId, topic, evidence.wiki, evidence.papers, controller.signal);
     controller.signal.throwIfAborted();
     const report = reportMarkdown(topic, evidence, warnings, synthesis.findings);
     await prisma.$transaction(async (tx) => {
@@ -143,7 +230,7 @@ async function execute(jobId: string, userId: string) {
 
 function resume(job: ResearchJob) {
   if (job.status !== 'QUEUED' && !(job.status === 'RUNNING' && job.leaseUntil && job.leaseUntil.getTime() <= Date.now())) return;
-  waitUntil(execute(job.id, job.userId).catch((error: unknown) => {
+  waitUntil(executeResearchJob(job.id, job.userId).catch((error: unknown) => {
     console.error('Research execution failed:', error instanceof Error ? error.name : 'UnknownError');
   }));
 }
@@ -180,24 +267,27 @@ export async function updateResearch(id: string, userId: string, action: 'cancel
     });
     if (changed.count) running.get(id)?.abort();
   } else {
-    const { wiki, papers } = evidenceFor(job);
-    const reset = job.stage === 3 && !wiki.length && !papers.length;
+    const evidence = evidenceFor(job);
+    const reset = job.stage === 3 && !sourcesFor(evidence).length;
+    const retained = evidence.web ? { wiki: [], papers: [], web: evidence.web } as unknown as Prisma.InputJsonValue : Prisma.DbNull;
     await prisma.researchJob.updateMany({
       where: { id, userId, status: { in: ['FAILED', 'CANCELLED'] } },
-      data: { status: 'QUEUED', error: null, ...(reset ? { stage: 0, warnings: [], evidence: Prisma.DbNull } : {}) },
+      data: { status: 'QUEUED', error: null, ...(reset ? { stage: 0, warnings: [], evidence: retained } : {}) },
     });
   }
   return getResearchStatus(id, userId);
 }
 
 function describeResearch(job: ResearchJob) {
-  const { wiki, papers } = evidenceFor(job);
-  const sources = [...wiki, ...papers].map(({ title, url }) => ({ title, url }));
+  const evidence = evidenceFor(job);
+  const { wiki, papers, web } = evidence;
+  const sources = sourcesFor(evidence);
+  const webCount = web?.status === 'done' ? web.result.sources.length : 0;
   return {
     id: job.id, topic: job.topic, status: job.status, stage: job.stage, totalStages: TOTAL_STAGES,
-    stageLabel: stageLabels[job.stage], updatedAt: job.updatedAt,
-    error: job.error, warnings: job.warnings, sources,
-    summary: job.status === 'COMPLETED' ? `Справочни статии · ${wiki.length}. Библиографски записи · ${papers.length}.` : undefined,
+    stageLabel: job.stage === 0 && web?.status === 'attempted' ? 'Публично уеб търсене чрез OpenAI' : stageLabels[job.stage], updatedAt: job.updatedAt,
+    error: job.error, warnings: [...job.warnings, ...webWarning(evidence)], sources,
+    summary: job.status === 'COMPLETED' ? `Справочни статии · ${wiki.length}. Библиографски записи · ${papers.length}.${webCount ? ` Цитати от уеб търсене · ${webCount}.` : ''}` : undefined,
     downloadUrl: job.status === 'COMPLETED' && job.report ? `/api/chat/research/${job.id}/report` : null,
   };
 }

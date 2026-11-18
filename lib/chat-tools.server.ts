@@ -1,7 +1,7 @@
 import { APICallError, generateImage, generateText, type ModelMessage } from 'ai';
 import { randomUUID } from 'node:crypto';
 import { FEATURES, getStudioFeatureAvailability } from './agents';
-import { getOpenAI } from './ai/config';
+import { getHostedOpenAI, HostedWebSearchError, runHostedWebSearch, type HostedOpenAI as OpenAI } from './hosted-web-search';
 import { remainingChatTokens, workspaceModels } from './ai/workspace-chat';
 import type { AccountSession } from './auth';
 import { DataToolError, runOpenAIDataTool } from './chat-data-tools.server';
@@ -19,7 +19,6 @@ import { ProjectInputError, startProject } from './projects';
 import { readOwnedUpload, saveUpload } from './uploads';
 import { analyzeImageBase64 } from './vision-local';
 
-type OpenAI = NonNullable<Awaited<ReturnType<typeof getOpenAI>>>;
 type ToolOutput = Omit<ChatToolResult, 'id' | 'toolId' | 'label'> & { id?: string };
 type ToolRegistration = Omit<ChatTool, 'available' | 'reason' | 'platforms'> & {
   requiresOpenAI?: boolean;
@@ -57,12 +56,6 @@ const platforms: ChatTool['platforms'] = ['web-desktop', 'web-mobile', 'windows'
 const providerMissing = 'Изисква активиран OpenAI доставчик в настройките на SharkAI.';
 const quotaReached = 'Достигна лимита за използване на AI за този план.';
 
-async function getHostedOpenAI() {
-  const endpoint = process.env.OPENAI_BASE_URL?.trim();
-  if (endpoint && !/^https:\/\/api\.openai\.com\/v1\/?$/i.test(endpoint)) return null;
-  return getOpenAI();
-}
-
 async function imageProperties({ file, uploadId }: ToolExecution): Promise<ToolOutput> {
   if (!file || !uploadId) throw new ChatToolError('Прикачи изображение.');
   let profile;
@@ -87,36 +80,8 @@ async function webSearch({ openai, prompt, signal }: ToolExecution): Promise<Too
     return { status: 'completed', text: hits.map((hit, index) => '[' + (index + 1) + '] ' + hit.title + '\n' + hit.excerpt).join('\n\n'),
       sources: hits.map(({ title, url }) => ({ title, url })) };
   }
-  const answer = await generateText({
-    model: openai.responses('gpt-4.1'),
-    system: 'Search the web for the request, answer in the user’s language, and cite the actual sources supporting factual claims. Explain any uncertainty.',
-    prompt,
-    tools: { web_search: openai.tools.webSearch({ searchContextSize: 'medium' }) },
-    toolChoice: { type: 'tool', toolName: 'web_search' },
-    providerOptions: { openai: { store: false } },
-    maxOutputTokens: 1800,
-    maxRetries: 0,
-    abortSignal: signal,
-  });
-  const sources = answer.sources.flatMap((source) => {
-    if (source.sourceType !== 'url') return [];
-    try {
-      const url = new URL(source.url);
-      if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password) return [];
-      return [{ title: source.title || url.hostname, url: url.href }];
-    } catch {
-      return [];
-    }
-  });
-  if (!answer.text.trim() || !sources.length) {
-    throw new ChatToolError('Търсенето не върна отговор с проверими източници.', 502);
-  }
-  return {
-    status: 'completed',
-    text: answer.text,
-    sources: [...new Map(sources.map((source) => [source.url, source])).values()],
-    usageTokens: answer.usage.totalTokens,
-  };
+  const { text, sources, usageTokens } = await runHostedWebSearch(openai, prompt, { signal });
+  return { status: 'completed', text, sources, usageTokens };
 }
 
 async function readDocument({ openai, prompt, file, session, signal }: ToolExecution): Promise<ToolOutput> {
@@ -198,6 +163,9 @@ function executeDataTool(operation: Parameters<typeof runOpenAIDataTool>[0]) {
     }
     if (!openai) {
       if (remainingChatTokens(session) <= 0) throw new ChatToolError(quotaReached, 429);
+      if (operation === 'edit-document' && file?.mimeType.endsWith('wordprocessingml.document')) {
+        throw new ChatToolError('Точните замени и добавянето на абзаци са достъпни локално. За редакция по описание свържи текстов модел или OpenAI Code Interpreter.', 503);
+      }
       const limitation = operation === 'dataset'
         ? 'Локално са налични обобщения, изчисления по колони и графики.'
         : 'Локално са налични създаване на документ, текстови замени в DOCX и редакция на страници в PDF.';
@@ -226,7 +194,7 @@ async function scheduleReminder({ session, requestId, reminder, prompt }: ToolEx
 
 const coreTools: ToolRegistration[] = [
   { id: 'web-search', label: 'Търси в интернет', description: 'Търси в Wikipedia и Crossref или в мрежата чрез конфигурирания OpenAI доставчик.', group: 'Проучване', input: 'prompt', optionalOpenAI: true, execute: webSearch },
-  { id: 'deep-research', label: 'Задълбочено проучване', description: 'Проучва публикации в Crossref и статии в Wikipedia. Връща доклад с източници.', group: 'Проучване', input: 'prompt', execute: async ({ session, prompt, requestId }) => {
+  { id: 'deep-research', label: 'Задълбочено проучване', description: 'Връща доклад с източници от Wikipedia и Crossref, както и от публичната мрежа при настроено уеб търсене на OpenAI.', group: 'Проучване', input: 'prompt', execute: async ({ session, prompt, requestId }) => {
     const job = await startResearch(session.id, prompt, requestId);
     return { id: job.id, researchId: job.id, status: 'started', text: 'Задачата за проучване е записана.' };
   } },
@@ -421,7 +389,7 @@ export async function dispatchChatTool(request: ToolRequest): Promise<ChatToolRe
     if (request.signal?.aborted || error instanceof ChatToolError) throw error;
     if (error instanceof LocalDocumentError || error instanceof LocalImageError || error instanceof LocalImageEditError
       || error instanceof OcrError || error instanceof TextFileError || error instanceof LocalTableError
-      || error instanceof ResearchInputError || error instanceof ReminderInputError || error instanceof DataToolError) {
+      || error instanceof HostedWebSearchError || error instanceof ResearchInputError || error instanceof ReminderInputError || error instanceof DataToolError) {
       throw new ChatToolError(error.message, error.status);
     }
     if (tool.requiresOpenAI || tool.imageProvider || APICallError.isInstance(error)) {
