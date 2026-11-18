@@ -1,11 +1,11 @@
 'use client';
 
 import type { ChatToolResult } from '@/lib/chat-tools';
-import { Bell, Download, ExternalLink, FileText, Image as ImageIcon, LoaderCircle, Paperclip, Pencil, RotateCcw, Sparkles, Square } from 'lucide-react';
+import { AudioLines, Bell, Download, ExternalLink, FileText, Image as ImageIcon, LoaderCircle, Paperclip, Pencil, RotateCcw, Sparkles, Square } from 'lucide-react';
 import { formatReminderTime, reminderStatus, type Reminder } from './reminders';
 import { ResearchReceipt } from './research-receipt';
 import { CHAT_JOB_STATUS, useChatJob, type ChatJobStatus } from './use-chat-job';
-import { artifactAttachment, artifactDownloadUrl, isTextArtifact, safeLink, type Attachment, type InspectorItem } from './workspace-types';
+import { artifactAttachment, artifactDownloadUrl, attachmentInspection, isTextArtifact, safeLink, type Attachment, type InspectorItem } from './workspace-types';
 
 interface ReceiptProps {
   result: ChatToolResult;
@@ -71,15 +71,17 @@ function ArtifactFields({ result, open, reuse, editable, disabled }: ArtifactPro
   if (!artifact || !url) return null;
   const attached = artifactAttachment(result);
   const title = attached?.name || result.label;
+  const preview = attached ? attachmentInspection(attached) : null;
 
   return (
     <>
       {artifact.mimeType.startsWith('image/') && <button type="button" className="shark-chat-image" onClick={() => open({ type: 'image', url, title, attachment: attached || undefined })}>
         <img src={url} alt={title} />
       </button>}
-      {attached && <p className="shark-chat-artifact-name"><FileText size={15} />{attached.name}</p>}
+      {attached && <p className="shark-chat-artifact-name">{preview?.type === 'audio' ? <AudioLines size={15} /> : <FileText size={15} />}{attached.name}</p>}
       <footer className="shark-chat-result-actions">
         {isTextArtifact(artifact.mimeType) && <button type="button" onClick={() => open({ type: 'text', url, title, attachment: attached || undefined })}><FileText size={15} /> Преглед на файла</button>}
+        {preview?.type === 'audio' && <button type="button" onClick={() => open(preview)}><AudioLines size={15} /> Прослушай записа</button>}
         <a href={artifactDownloadUrl(url, attached || undefined)} download={attached?.name || true}><Download size={15} /> Изтегли резултата</a>
         {attached && <button type="button" disabled={disabled} onClick={() => reuse(attached, false)}><Paperclip size={15} /> Прикачи резултата</button>}
         {attached && editable(attached) && <button type="button" disabled={disabled} onClick={() => reuse(attached, true)}><Pencil size={15} /> Редактирай резултата</button>}

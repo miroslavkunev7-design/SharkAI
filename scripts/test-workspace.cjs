@@ -41,14 +41,43 @@ async function signIn(email) {
   return { cookie, id: data.user.id };
 }
 
-async function uploadImage(cookie) {
-  const bytes = await sharp({ create: { width: 12, height: 8, channels: 3, background: '#156baf' } }).png().toBuffer();
+async function uploadFile(cookie, bytes, type, name) {
   const form = new FormData();
-  form.set('file', new Blob([bytes], { type: 'image/png' }), 'image.png');
+  form.set('file', new Blob([bytes], { type }), name);
   const response = await fetch(new URL('/api/upload', base), { method: 'POST', headers: { Cookie: cookie }, body: form });
   const data = await response.json();
   assert.equal(response.status, 200, data.error);
   return { ...data, bytes };
+}
+
+async function verifyPrivateAudio(owner, other) {
+  const pcm = Buffer.alloc(3200);
+  const wave = Buffer.alloc(44);
+  wave.write('RIFF', 0);
+  wave.writeUInt32LE(36 + pcm.length, 4);
+  wave.write('WAVEfmt ', 8);
+  wave.writeUInt32LE(16, 16);
+  wave.writeUInt16LE(1, 20);
+  wave.writeUInt16LE(1, 22);
+  wave.writeUInt32LE(16000, 24);
+  wave.writeUInt32LE(32000, 28);
+  wave.writeUInt16LE(2, 32);
+  wave.writeUInt16LE(16, 34);
+  wave.write('data', 36);
+  wave.writeUInt32LE(pcm.length, 40);
+  const upload = await uploadFile(owner.cookie, Buffer.concat([wave, pcm]), 'audio/x-wav', 'private.wav');
+  const path = `/api/upload/${upload.uploadId}`;
+  const headers = { Range: 'bytes=0-43' };
+  const partial = await request(path, { cookie: owner.cookie, headers });
+  assert.equal(partial.status, 206);
+  assert.equal(partial.headers.get('content-type'), 'audio/wav');
+  assert.equal(partial.headers.get('content-range'), `bytes 0-43/${upload.bytes.length}`);
+  assert.deepEqual(Buffer.from(await partial.arrayBuffer()), wave);
+  assert.equal((await request(path, { cookie: other.cookie, headers })).status, 404);
+  assert.equal((await request(path, { headers })).status, 401);
+  const download = await request(`${path}?download=private.wav`, { cookie: owner.cookie });
+  assert.match(download.headers.get('content-disposition'), /^attachment;/);
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()), upload.bytes);
 }
 
 async function verifyStreamingAbort(account) {
@@ -162,7 +191,8 @@ async function run() {
   assert(legacyHistory.messages.some(({ id }) => id === legacy.id));
   await json('/api/chat?conversationId=legacy', { cookie: b.cookie }, 404);
 
-  const upload = await uploadImage(a.cookie);
+  const image = await sharp({ create: { width: 12, height: 8, channels: 3, background: '#156baf' } }).png().toBuffer();
+  const upload = await uploadFile(a.cookie, image, 'image/png', 'image.png');
   const preview = await request(upload.previewUrl, { cookie: a.cookie });
   assert.equal(preview.status, 200);
   assert.deepEqual(Buffer.from(await preview.arrayBuffer()), upload.bytes);
@@ -170,6 +200,7 @@ async function run() {
   assert.equal((await request(upload.previewUrl)).status, 401);
   await json('/api/projects', { cookie: b.cookie, body: { featureId: 'screenshot-website', uploadId: upload.uploadId } }, 404);
   await json('/api/chat', { cookie: b.cookie, body: { message: 'Image', uploadId: upload.uploadId } }, 404);
+  await verifyPrivateAudio(a, b);
 
   const conversationId = randomUUID();
   const first = { conversationId, mode: 'work', message: 'Измери изображението', uploadId: upload.uploadId, requestId: randomUUID(), toolId: 'image-properties' };

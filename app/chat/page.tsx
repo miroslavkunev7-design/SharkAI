@@ -16,7 +16,7 @@ import { Inspector } from './inspector';
 import { useReminders, type ReminderInput } from './reminders';
 import { ToolReceipt } from './tool-receipt';
 import {
-  artifactAttachment, artifactDownloadUrl, attachmentInspection, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, CANVAS_SAVE_PREFIX, messageAttachment, projectInProgress, projectStatusLabel, uploadUrl, type Account, type Attachment, type Conversation,
+  artifactAttachment, artifactDownloadUrl, attachmentInspection, AUDIO_MIME_TYPES, CANVAS_CONTENT_LIMIT, CANVAS_MIME_TYPES, CANVAS_SAVE_PREFIX, messageAttachment, projectInProgress, projectStatusLabel, uploadUrl, type Account, type Attachment, type Conversation,
   type InspectorItem, type Message, type Mode, type Model, type Project,
 } from './workspace-types';
 import './workspace.css';
@@ -55,12 +55,15 @@ const PDF_TYPE = 'application/pdf';
 const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const CSV_TYPE = 'text/csv';
-const UPLOAD_TYPES = [...IMAGE_TYPES, PDF_TYPE, DOCX_TYPE, XLSX_TYPE, CSV_TYPE, ...CANVAS_MIME_TYPES];
-const FILE_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf,.docx,.csv,.xlsx,.txt,.md,.json';
+const UPLOAD_TYPES = [...IMAGE_TYPES, PDF_TYPE, DOCX_TYPE, XLSX_TYPE, CSV_TYPE, ...CANVAS_MIME_TYPES, ...AUDIO_MIME_TYPES];
+const AUDIO_ACCEPT = '.wav,.ogg,.m4a,.webm,audio/mp4';
+const MAX_AUDIO_MB = 2;
+const FILE_ACCEPT = `.jpg,.jpeg,.png,.webp,.pdf,.docx,.csv,.xlsx,.txt,.md,.json,${AUDIO_ACCEPT}`;
 const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
   pdf: PDF_TYPE, docx: DOCX_TYPE, xlsx: XLSX_TYPE, csv: CSV_TYPE,
   txt: 'text/plain', md: 'text/markdown', json: 'application/json',
+  wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4', webm: 'audio/webm',
 };
 const INPUT_FILES: Record<string, { types: string[]; accept: string; required: string }> = {
   image: { types: IMAGE_TYPES, accept: '.jpg,.jpeg,.png,.webp', required: 'За този инструмент е нужно изображение.' },
@@ -68,6 +71,7 @@ const INPUT_FILES: Record<string, { types: string[]; accept: string; required: s
   document: { types: [PDF_TYPE, DOCX_TYPE], accept: '.pdf,.docx', required: 'За този инструмент е нужен PDF или DOCX файл.' },
   dataset: { types: [XLSX_TYPE, CSV_TYPE], accept: '.xlsx,.csv', required: 'За този инструмент е нужен CSV или XLSX файл.' },
   textfile: { types: CANVAS_MIME_TYPES, accept: '.txt,.md,.json', required: 'За този инструмент е нужен TXT, Markdown или JSON файл.' },
+  audio: { types: AUDIO_MIME_TYPES, accept: AUDIO_ACCEPT, required: 'Прикачи аудио файл във формат WAV, Ogg, M4A или WebM.' },
 };
 const modeLabel = (mode: Mode) => mode === 'chat' ? 'Чат' : 'Работа';
 const suggestions = [
@@ -79,7 +83,8 @@ const suggestions = [
 function ToolIcon({ tool, size = 17 }: { tool: ChatTool; size?: number }) {
   const id = tool.id;
   const Icon = id.includes('search') ? Globe2 : id.includes('image') ? ImageIcon
-    : id.includes('ocr') ? ScanLine : (tool.input === 'dataset' || id.startsWith('spreadsheet-')) ? Table2 : /pdf|document|textfile/.test(tool.input) ? FileText : AppWindow;
+    : id.startsWith('audio-') ? AudioLines : id.includes('ocr') ? ScanLine
+    : (tool.input === 'dataset' || id.startsWith('spreadsheet-')) ? Table2 : /pdf|document|textfile/.test(tool.input) ? FileText : AppWindow;
   return <Icon size={size} />;
 }
 
@@ -407,10 +412,11 @@ export default function ChatPage() {
 
   async function uploadFile(file: File) {
     const extension = file.name.split('.').pop()?.toLowerCase() || '';
-    const mime = MIME_BY_EXTENSION[extension] || file.type;
+    const mime = MIME_BY_EXTENSION[extension] || (file.type === 'audio/x-wav' ? 'audio/wav' : file.type);
     const allowed = UPLOAD_TYPES.includes(mime);
-    if (!allowed || file.size > 25 * 1024 * 1024) {
-      setProblem(allowed ? 'Файлът трябва да бъде до 25 MB.' : 'Поддържат се JPG, PNG, WebP, PDF, DOCX, CSV, XLSX, TXT, Markdown и JSON.');
+    const limit = AUDIO_MIME_TYPES.includes(mime) ? MAX_AUDIO_MB : 25;
+    if (!allowed || file.size > limit * 1024 * 1024) {
+      setProblem(allowed ? `Файлът трябва да бъде до ${limit} MB.` : 'Поддържат се изображения, PDF, DOCX, CSV, XLSX, текстови файлове и аудио във формат WAV, Ogg, M4A или WebM.');
       return;
     }
     setUploading(true);
@@ -585,7 +591,7 @@ export default function ChatPage() {
     const uploadId = repeat ? options.prior?.imagePath || undefined : attachment?.id;
     const mime = repeat ? options.prior?.attachmentMime || (uploadId ? 'image/jpeg' : '') : attachment?.mimeType;
     const tool = repeat ? options.tool : selectedTool;
-    const message = text.trim() || (tool?.input === 'none' ? tool.label : '');
+    const message = text.trim() || (tool?.id === 'audio-transcribe' ? 'Транскрибирай аудиото' : tool?.input === 'none' ? tool.label : '');
     if (!message && !uploadId) return;
     const requiredFile = tool && INPUT_FILES[tool.input];
     if (requiredFile && (!uploadId || !requiredFile.types.includes(mime || ''))) {
@@ -743,6 +749,7 @@ export default function ChatPage() {
         )}
         {attached && !local && <div className="shark-chat-message-attachments">
           {preview?.type === 'text' && <button type="button" className="shark-chat-attachment-link" onClick={() => openInspector(preview)}><FileText size={16} /> Преглед на прикачения файл</button>}
+          {preview?.type === 'audio' && <button type="button" className="shark-chat-attachment-link" onClick={() => openInspector(preview)}><AudioLines size={16} /> Прослушай записа</button>}
           {preview?.type !== 'image' && <a className="shark-chat-attachment-link" href={artifactDownloadUrl(uploadUrl(attached.id), attached)} download={attached.name}><Download size={16} /> Изтегли прикачения файл</a>}
           <button type="button" disabled={pending} className="shark-chat-attachment-link" onClick={() => attachArtifact(attached, false)}><Paperclip size={16} /> Прикачи файла</button>
           {canEditFile && <button type="button" disabled={pending} className="shark-chat-attachment-link" onClick={() => attachArtifact(attached, true)}><Pencil size={16} /> Използвай файла за редакция</button>}
@@ -803,10 +810,10 @@ export default function ChatPage() {
             {filteredProjects.map((project) => <button type="button" key={project.id} className="shark-chat-rail-row" title={project.name} onClick={() => openInspector({ type: 'project', id: project.id, title: project.name })}><Folder size={16} /><span>{project.name}</span>{project.statusUnknown && <small>Непотвърден статус</small>}</button>)}
           </section>
         </div>
-        <nav className="shark-chat-rail-modules ice-section" data-ice-art="team" aria-label="Работно пространство">
-          <Link href="/dashboard" className="shark-chat-rail-row"><LayoutDashboard size={17} /><span>Обзор</span></Link>
-          <Link href="/dashboard?view=studio" className="shark-chat-rail-row"><AppWindow size={17} /><span>Студио</span></Link>
-          <Link href="/dashboard?view=agents" className="shark-chat-rail-row"><Sparkles size={17} /><span>AI агенти</span></Link>
+        <nav className="shark-chat-rail-modules" aria-label="Работно пространство">
+          <Link href="/dashboard" className="shark-chat-rail-row ice-section" data-ice-art="shark"><LayoutDashboard size={17} /><span>Обзор</span></Link>
+          <Link href="/dashboard?view=studio" className="shark-chat-rail-row ice-section" data-ice-art="studio"><AppWindow size={17} /><span>Студио</span></Link>
+          <Link href="/dashboard?view=agents" className="shark-chat-rail-row ice-section" data-ice-art="team"><Sparkles size={17} /><span>AI агенти</span></Link>
         </nav>
         <div className="shark-chat-profile">
           {account ? popupButton('profile', 'Меню на профила', <>
@@ -869,7 +876,7 @@ export default function ChatPage() {
             <form className="shark-chat-composer ice-section" data-ice-art={mode === 'work' ? 'studio' : 'agent'} onSubmit={formSubmit}>
               {(attachment || selectedTool || branchFrom || uploading || projectContext) && <div className="shark-chat-chips">
                 {attachment && <div className="shark-chat-chip">
-                  {attachmentPreview ? <button type="button" className="shark-chat-chip-preview" aria-label={`Преглед на ${attachment.name}`} onClick={() => openInspector(attachmentPreview)}>{attachmentPreview.type === 'image' ? <img src={attachmentPreview.url} alt="" /> : <FileText size={16} />}{attachment.name}</button> : <span><FileText size={16} />{attachment.name}</span>}
+                  {attachmentPreview ? <button type="button" className="shark-chat-chip-preview" aria-label={`Преглед на ${attachment.name}`} onClick={() => openInspector(attachmentPreview)}>{attachmentPreview.type === 'image' ? <img src={attachmentPreview.url} alt="" /> : attachmentPreview.type === 'audio' ? <AudioLines size={16} /> : <FileText size={16} />}{attachment.name}</button> : <span><FileText size={16} />{attachment.name}</span>}
                   <button type="button" aria-label="Премахни прикачения файл" disabled={sending} onClick={() => setAttachment(null)}><X size={15} /></button>
                 </div>}
                 {selectedTool && <div className="shark-chat-chip"><span><ToolIcon tool={selectedTool} />{selectedTool.label}</span><button type="button" aria-label="Премахни избрания инструмент" disabled={sending} onClick={() => setSelectedTool(null)}><X size={15} /></button></div>}
@@ -893,7 +900,7 @@ export default function ChatPage() {
                       <header className="ice-section" data-ice-art={mode === 'work' ? 'studio' : 'agent'}><span>Още действия</span><button className="shark-chat-icon" type="button" aria-label="Затвори още действия" onClick={() => closePopup(true)}><X size={17} /></button></header>
                       <section>
                         <h2>Прикачване</h2>
-                        <button type="button" disabled={!account || pending} onClick={() => chooseFile()}><Paperclip size={17} /><span><strong>Прикачи файл</strong><small>{account ? 'Изображение, документ, таблица или текст · до 25 MB' : 'Изисква вход в акаунт'}</small></span></button>
+                        <button type="button" disabled={!account || pending} onClick={() => chooseFile()}><Paperclip size={17} /><span><strong>Прикачи файл</strong><small>{account ? `Изображение, документ, таблица или текст до 25 MB · Аудио до ${MAX_AUDIO_MB} MB` : 'Изисква вход в акаунт'}</small></span></button>
                         <button type="button" disabled={!account || !media.camera || pending} onClick={() => void openCamera()}><Camera size={17} /><span><strong>Камера</strong><small>{!account ? 'Изисква вход в акаунт' : !media.camera ? 'Браузърът не предоставя камера' : 'Направи снимка'}</small></span></button>
                         <button type="button" disabled={!account || !media.screen || pending} onClick={() => void captureScreen()}><ScreenShare size={17} /><span><strong>Сподели екран</strong><small>{!account ? 'Изисква вход в акаунт' : !media.screen ? 'Браузърът не поддържа споделяне' : 'Прикачи кадър от избрания екран'}</small></span></button>
                       </section>

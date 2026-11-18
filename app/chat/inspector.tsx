@@ -169,6 +169,16 @@ function TextInspector({ item, save, disabled }: { item: Extract<InspectorItem, 
   );
 }
 
+function AudioInspector({ item }: { item: Extract<InspectorItem, { type: 'audio' }> }) {
+  const [error, setError] = useState(false);
+  return (
+    <>
+      <audio className="shark-chat-inspector-audio" src={item.url} controls preload="metadata" aria-label={`Запис ${item.title}`} onError={() => setError(true)} />
+      {error && <p className="shark-chat-notice" role="alert">Записът не може да се възпроизведе. Опитай да го изтеглиш.</p>}
+    </>
+  );
+}
+
 export function Inspector({ item, close, talk, save, disabled, reminders, createReminder }: {
   item: InspectorItem; close: () => void; talk?: (project: string) => void; save?: SaveCanvas; disabled?: boolean;
   reminders: ReminderStore; createReminder?: (input: ReminderInput) => Promise<void>;
@@ -183,7 +193,9 @@ export function Inspector({ item, close, talk, save, disabled, reminders, create
         <ReminderPanel store={reminders} create={createReminder} writable={!disabled} />
       ) : (
         <>
-          {item.type === 'text' ? <TextInspector key={item.url} item={item} save={save} disabled={disabled} /> : <img className="shark-chat-inspector-image" src={item.url} alt={item.title} />}
+          {item.type === 'text' && <TextInspector key={item.url} item={item} save={save} disabled={disabled} />}
+          {item.type === 'audio' && <AudioInspector key={item.url} item={item} />}
+          {item.type === 'image' && <img className="shark-chat-inspector-image" src={item.url} alt={item.title} />}
           <div className="shark-chat-inspector-links">
             <a href={artifactDownloadUrl(item.url, item.attachment)} download={item.title}><Download size={16} /> Изтегли</a>
           </div>

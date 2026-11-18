@@ -51,6 +51,7 @@ export type InspectorItem =
   | { type: 'project'; id: string; title: string }
   | { type: 'reminders'; title: string }
   | { type: 'image'; url: string; title: string; attachment?: Attachment }
+  | { type: 'audio'; url: string; title: string; attachment: Attachment }
   | { type: 'text'; url: string; title: string; attachment?: Attachment; saved?: boolean };
 
 export const uploadUrl = (id: string) => `/api/upload/${encodeURIComponent(id)}`;
@@ -75,11 +76,15 @@ export const projectInProgress = (project: Project) => !project.statusUnknown &&
 
 export const projectStatusLabel = (project: Project) => project.statusUnknown ? 'Непотвърден статус' : PROJECT_STATUS[project.status] || project.status;
 
+const AUDIO_EXTENSIONS = { 'audio/wav': 'wav', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/webm': 'webm' };
+export const AUDIO_MIME_TYPES = Object.keys(AUDIO_EXTENSIONS);
+
 const FILE_EXTENSIONS: Record<string, string> = {
   'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp',
   'application/pdf': 'pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
   'text/csv': 'csv', 'text/plain': 'txt', 'text/markdown': 'md', 'application/json': 'json',
+  ...AUDIO_EXTENSIONS,
 };
 
 export const CANVAS_MIME_TYPES = ['text/plain', 'text/markdown', 'application/json'];
@@ -95,7 +100,7 @@ export function messageAttachment(message: Message): Attachment | null {
   const mimeType = message.attachmentMime ?? 'image/jpeg';
   const isImage = mimeType.startsWith('image/');
   const extension = message.attachmentMime ? FILE_EXTENSIONS[message.attachmentMime] : undefined;
-  const label = isImage ? 'Прикачено изображение' : 'Прикачен файл';
+  const label = isImage ? 'Прикачено изображение' : AUDIO_MIME_TYPES.includes(mimeType) ? 'Прикачен запис' : 'Прикачен файл';
   return {
     id: message.imagePath, mimeType, name: extension ? `${label}.${extension}` : label,
     previewUrl: isImage ? uploadUrl(message.imagePath) : undefined,
@@ -103,6 +108,7 @@ export function messageAttachment(message: Message): Attachment | null {
 }
 
 export function attachmentInspection(file: Attachment): InspectorItem | null {
+  if (file.mimeType && AUDIO_MIME_TYPES.includes(file.mimeType)) return { type: 'audio', url: uploadUrl(file.id), title: file.name, attachment: file };
   if (file.previewUrl) return { type: 'image', url: file.previewUrl, title: file.name, attachment: file };
   return file.mimeType && isTextArtifact(file.mimeType)
     ? { type: 'text', url: uploadUrl(file.id), title: file.name, attachment: file }

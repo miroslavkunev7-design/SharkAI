@@ -366,7 +366,7 @@ function StudioForm({ featureParam, user, loading, onCreated }: {
 
   return (
     <div className="module-columns">
-      <section className="ice-section module-panel" data-ice-art="studio">
+      <section className="ice-section module-panel module-panel--form" data-ice-art="studio">
         <div className="module-heading"><h2>Нов проект</h2></div>
         {loading ? <p role="status">Зареждане на акаунта…</p> : !user ? (
           <>
@@ -420,7 +420,7 @@ function StudioForm({ featureParam, user, loading, onCreated }: {
       </section>
       <section className="ice-section module-panel" data-ice-art="agent">
         <div className="module-heading"><h2>Визуална референция</h2></div>
-        <div className="module-upload-preview">
+        <div className={`module-upload-preview${upload?.previewUrl ? '' : ' module-upload-preview--empty'}`}>
           {upload?.previewUrl
             ? <Image src={upload.previewUrl} alt="Качена визуална референция" width={800} height={450} unoptimized />
             : <div><ImageIcon size={27} /><p>{needsReference ? 'Каченото изображение ще се покаже тук.' : 'Този тип проект използва описание.'}</p></div>}
@@ -523,7 +523,7 @@ function Agents({ user }: { user: User | null }) {
   return (
     <>
       <Banner view="agents">Задачи в Студиото и последни резултати от твоите проекти.</Banner>
-      <section className="ice-section module-panel" data-ice-art="agent">
+      <section className="ice-section module-panel module-brain-panel" data-ice-art="agent">
         <div className="module-heading">
           <div className="module-brain"><Logo size="md" /><div><h2>{SUPREME_BRAIN.name}</h2><p>{SUPREME_BRAIN.description}</p></div></div>
           <Link className="module-link" href={VIEWS.studio.href}>Студио <ArrowRight size={16} /></Link>
@@ -592,7 +592,7 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
   return (
     <>
       <Banner view="settings">Акаунт, права и абонамент.</Banner>
-      <section className="ice-section module-panel" data-ice-art="shark">
+      <section className="ice-section module-panel module-profile" data-ice-art="shark">
         <div className="module-heading"><h2>Профил</h2></div>
         {loading ? <p role="status">Зареждане на профила…</p> : error ? <p role="alert">{error}</p> : !user
           ? <Link className="shark-action" href={signIn(VIEWS.settings.href)}>Вход <ArrowRight size={17} /></Link>
@@ -629,7 +629,7 @@ function Automotive() {
         <Image src="/assets/image-1.png" className="module-car" alt="Сребрист автомобил от проектните материали на SharkAI" width={420} height={420} />
       </section>
       <div className="module-columns">
-        <section className="ice-section module-panel module-diagnostics" data-ice-art="car">
+        <section className="ice-section module-panel module-note module-diagnostics" data-ice-art="car">
           <div className="module-heading"><h2>Диагностика</h2></div>
           <p>Няма свързан източник за VIN, OBD диагностичен адаптер или интерактивен 3D модел.</p>
         </section>
@@ -720,7 +720,7 @@ function DashboardContent() {
   return (
     <div className="module-workspace">
       <a className="module-skip" href="#workspace-content">Към съдържанието</a>
-      <aside className="module-sidebar shark-glass">
+      <aside className="module-sidebar ice-section ice-section--dark" data-ice-art={WORKSPACE_ART[view] ?? 'shark'}>
         <WorkspaceBrand />
         <WorkspaceNav view={view} />
         <Link className="module-sidebar-account" href={data?.user ? VIEWS.settings.href : signIn('/dashboard')}>
@@ -757,7 +757,7 @@ function DashboardContent() {
           {view === 'automotive' && <Automotive />}
           {view === 'investments' && <>
             <Banner view="investments">Състояние на свързания портфейл.</Banner>
-            <section className="ice-section module-panel" data-ice-art="markets">
+            <section className="ice-section module-panel module-note" data-ice-art="markets">
               <div className="module-heading"><h2><CircleHelp size={19} /> Няма свързан източник</h2></div>
               <p>За портфейл, наличности и движения е нужен конфигуриран доставчик с достъп за четене.</p>
             </section>
@@ -765,7 +765,7 @@ function DashboardContent() {
           {view === 'settings' && <Account user={data?.user ?? null} loading={loading} error={error} />}
         </main>
       </div>
-      <dialog ref={dialog} className="module-drawer shark-glass" aria-label="Навигация" onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
+      <dialog ref={dialog} className="module-drawer ice-section ice-section--dark" data-ice-art={WORKSPACE_ART[view] ?? 'shark'} aria-label="Навигация" onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
         <div className="module-drawer-content">
           <div className="module-drawer-head">
             <WorkspaceBrand />

@@ -4,7 +4,7 @@ import { simulateReadableStream } from 'ai';
 import { MockLanguageModelV3 } from 'ai/test';
 import type { LanguageModelV3StreamPart } from '@ai-sdk/provider';
 import { createNativeToolRouter, NativeToolSelectionError, streamWorkspaceReply } from '../lib/ai/workspace-tool-routing';
-import { inferChatTool } from '../lib/chat-tools.server';
+import { getChatToolIntent, inferChatTool, matchesRememberedToolFile } from '../lib/chat-tools.server';
 import type { ChatTool } from '../lib/chat-tools';
 
 const registry = [
@@ -84,6 +84,19 @@ test('preserves the user’s grouped analysis and rejects model-invented groups 
   const ordinary = createNativeToolRouter(registry, 'text/csv', false, 'Show the column summary.')!;
   assert.equal(ordinary.validate('analyze_table', { command: 'Sum "Expense" by "Region"' }), null);
   assert.equal(ordinary.validate('analyze_table', { command: 'sum; column: "Cost by city"' })?.toolId, 'dataset-analysis');
+});
+
+test('routes private audio file actions and only reuses compatible files', () => {
+  const transcribe = 'Моля, можеш ли да транскрибираш аудиото на английски?';
+  assert.deepEqual(getChatToolIntent(undefined, transcribe, false), { id: 'audio-transcribe', metered: false, needsFile: true });
+  assert.equal(inferChatTool('Transcribe this recording in English.', true, 'audio/wav'), 'audio-transcribe');
+  assert.equal(matchesRememberedToolFile('audio-transcribe', transcribe, 'audio/wav'), true);
+  assert.equal(matchesRememberedToolFile('audio-transcribe', transcribe, 'audio/webm'), true);
+  assert.equal(matchesRememberedToolFile('audio-transcribe', transcribe, 'video/webm'), false);
+  assert.equal(matchesRememberedToolFile('audio-transcribe', transcribe, 'text/plain'), false);
+  assert.deepEqual(getChatToolIntent(undefined, 'Озвучи предишния отговор на английски', false),
+    { id: 'audio-synthesize', metered: false, needsFile: false });
+  assert.equal(inferChatTool('How do I transcribe an audio recording?', false), undefined);
 });
 
 test('suppresses text around a tool call, captures usage and emits one validated action', async () => {

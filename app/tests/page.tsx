@@ -70,7 +70,7 @@ export default function TestsPage() {
   }
 
   return (
-    <main className="operator-workspace mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
+    <main className="operator-workspace operator-tests mx-auto max-w-4xl px-3 py-4 sm:px-6 sm:py-6">
       <nav className="operator-topbar" aria-label="Проверки">
         <div className="flex min-w-0 items-center gap-2.5">
           <Link href="/dashboard" aria-label="Към обзора" className="shark-action-secondary operator-icon-button"><ArrowLeft size={17} aria-hidden="true" /></Link>
@@ -89,8 +89,12 @@ export default function TestsPage() {
           <p>Тестове на приложението и отчети за резултатите.</p>
         </div>
       </header>
-      {loading && <p role="status" className="operator-status shark-glass text-sm text-white/75">Зареждам резултатите…</p>}
-      {error && <p role="alert" className="operator-status shark-glass text-sm text-rose-200">{error}</p>}
+      {loading && <div className="ice-section operator-status operator-test-status" data-ice-art="agent">
+        <p role="status">Зареждам резултатите…</p>
+      </div>}
+      {error && <div className="ice-section operator-status operator-test-status" data-ice-art="agent">
+        <p role="alert" className="text-rose-950">{error}</p>
+      </div>}
       {authorized && (
         <section aria-label="Резултати" aria-busy={!!running} className="grid gap-3">
           {summary && (
@@ -110,7 +114,9 @@ export default function TestsPage() {
               <p className="text-xs text-white/65">Последно изпълнение {new Date(summary.ranAt).toLocaleString('bg-BG')}</p>
             </div>
           )}
-          {!runnerAvailable && <p className="operator-status shark-glass text-sm text-amber-200">Тестовият runner не е наличен в тази среда.</p>}
+          {!runnerAvailable && <div className="ice-section operator-status operator-test-status" data-ice-art="studio">
+            <p className="text-amber-950">Тестовият runner не е наличен в тази среда.</p>
+          </div>}
           <ul className="space-y-2">
             {cases.map(test => {
               const result = summary?.results.find(row => row.id === test.id);

@@ -113,7 +113,7 @@ export default function PricingPage() {
           <Link className="shark-entry-inline-link" href="/chat">Започни без абонамент <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
       </section>
-      {(notice || error) && <div className="shark-entry-price-message ice-section">
+      {(notice || error) && <div className="shark-entry-price-message ice-section" data-ice-art="agent">
         {notice && <p role="status">{notice}</p>}
         {error && <p role="alert" className="shark-entry-error">{error}</p>}
       </div>}

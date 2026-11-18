@@ -5,6 +5,7 @@ import { getHostedOpenAI, HostedWebSearchError, runHostedWebSearch, type HostedO
 import { ImageJobError, stageImageJob } from './image-jobs';
 import { remainingChatTokens, workspaceModels } from './ai/workspace-chat';
 import type { AccountSession } from './auth';
+import { inferVoiceFileTool, runVoiceFileTool } from './chat-audio-files.server';
 import { DataToolError, runOpenAIDataTool } from './chat-data-tools.server';
 import { parseDocumentTranslationRequest, translateChatDocument } from './chat-document-translation.server';
 import { LocalDocumentError, isLocalDocumentEdit, runLocalDocumentTool } from './chat-documents.server';
@@ -23,6 +24,7 @@ import { createReminder, createReminderFromPrompt, ReminderInputError } from './
 import type { ReminderInput } from './reminder-input';
 import { ResearchInputError, quickPublicSearch, startResearch } from './research';
 import type { ChatTool, ChatToolResult } from './chat-tools';
+import { voiceCapabilities, VoiceError, voiceMimes } from './chat-voice.server';
 import { ProjectInputError, startProject } from './projects';
 import { readOwnedUpload, saveUpload } from './uploads';
 import { analyzeImageBase64 } from './vision-local';
@@ -52,6 +54,7 @@ interface ToolRequest {
 
 interface ToolExecution extends ToolRequest {
   openai: OpenAI | null;
+  voice?: Awaited<ReturnType<typeof voiceCapabilities>>;
 }
 
 export class ChatToolError extends Error {
@@ -276,6 +279,10 @@ async function scheduleReminder({ session, requestId, reminder, prompt }: ToolEx
 }
 
 const coreTools: ToolRegistration[] = [
+  { id: 'audio-transcribe', label: 'Транскрибирай аудио', description: 'Връща TXT от WAV, OGG, M4A или аудио WebM до 20 секунди. Можеш да напишеш „Транскрибирай аудиото на български“.', group: 'Глас и аудио', input: 'audio',
+    execute: (input) => runVoiceFileTool('audio-transcribe', input) },
+  { id: 'audio-synthesize', label: 'Озвучи текст във WAV', description: 'Записва WAV на български или английски. Например „Озвучи на български: Здравей!“', group: 'Глас и аудио', input: 'prompt',
+    execute: (input) => runVoiceFileTool('audio-synthesize', input) },
   { id: 'web-search', label: 'Търси в интернет', description: 'Търси в Wikipedia и Crossref или в мрежата чрез конфигурирания OpenAI доставчик.', group: 'Проучване', input: 'prompt', optionalOpenAI: true, execute: webSearch },
   { id: 'deep-research', label: 'Задълбочено проучване', description: 'Връща доклад с източници от Wikipedia и Crossref, както и от публичната мрежа при настроено уеб търсене на OpenAI.', group: 'Проучване', input: 'prompt', execute: async ({ session, prompt, requestId }) => {
     const job = await startResearch(session.id, prompt, requestId);
@@ -346,11 +353,16 @@ interface LocalCapabilities {
   tables?: boolean;
   documents?: Awaited<ReturnType<typeof getLocalDocumentTools>>;
   textUnavailable?: string | null;
+  voice?: Awaited<ReturnType<typeof voiceCapabilities>>;
 }
 
 function unavailableReason(tool: ToolRegistration, session: AccountSession | null, hasOpenAI: boolean, local: LocalCapabilities) {
   if (!session) return 'Влез в SharkAI, за да използваш инструмента.';
   if (tool.unavailable) return tool.unavailable;
+  if (tool.id === 'audio-transcribe' && !(local.voice?.transcription && local.voice.completeClip)) {
+    return 'Необходим е обновен и достъпен работник за транскрипция на пълния запис.';
+  }
+  if (tool.id === 'audio-synthesize' && !local.voice?.speech.length) return 'Необходим е достъпен работник с настроен глас.';
   if (tool.id === 'document-translate') {
     if (remainingChatTokens(session) <= 0) return quotaReached;
     if (local.textUnavailable) return local.textUnavailable;
@@ -366,13 +378,13 @@ function unavailableReason(tool: ToolRegistration, session: AccountSession | nul
 }
 
 export async function listChatTools(session: AccountSession | null): Promise<ChatTool[]> {
-  const [hosted, images, tables, documents, text] = session
-    ? await Promise.all([getHostedOpenAI(), hasLocalImageProvider(), hasIsolatedTableWorker(), getLocalDocumentTools(), workspaceModels(session)])
-    : [null, false, false, undefined, undefined] as const;
+  const [hosted, images, tables, documents, text, voice] = session
+    ? await Promise.all([getHostedOpenAI(), hasLocalImageProvider(), hasIsolatedTableWorker(), getLocalDocumentTools(), workspaceModels(session), voiceCapabilities()])
+    : [null, false, false, undefined, undefined, undefined] as const;
   const hasOpenAI = !!session && !!hosted && remainingChatTokens(session) > 0;
   const textUnavailable = text?.reason && !(await localBulgarianTranslatorReady()) ? text.reason : null;
   return registry().map((tool) => {
-    const reason = unavailableReason(tool, session, hasOpenAI, { images, tables, documents, textUnavailable });
+    const reason = unavailableReason(tool, session, hasOpenAI, { images, tables, documents, textUnavailable, voice });
     const { id, label, description, group, input } = tool;
     return { id, label, description, group, input, platforms, available: !reason, reason };
   });
@@ -410,6 +422,8 @@ const screenshotTargets: Array<[string, RegExp]> = [
 ];
 
 export function inferChatTool(prompt: string, hasUpload: boolean, mimeType?: string): string | undefined {
+  const audio = inferVoiceFileTool(prompt);
+  if (audio) return audio;
   const request = prompt.trim()
     .replace(/^(?:моля|please)[,\s]+/iu, '')
     .replace(/^(?:можеш ли да|би ли|can you|could you|would you)\s+/iu, '');
@@ -462,6 +476,7 @@ const fileRequirements = {
     document: { label: 'PDF или DOCX', matches: (mime: string) => ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'].includes(mime) },
     textfile: { label: 'TXT, Markdown или JSON', matches: (mime: string) => Object.values(textFileFormats).includes(mime) },
     dataset: { label: 'CSV или XLSX', matches: (mime: string) => ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(mime) },
+    audio: { label: 'аудио в WAV, OGG, M4A или WebM', matches: (mime: string) => voiceMimes.some((type) => type === mime) },
 };
 
 export function matchesRememberedToolFile(toolId: string, prompt: string, mime: string) {
@@ -507,20 +522,22 @@ export async function dispatchChatTool(request: ToolRequest): Promise<ChatToolRe
   const localImages = !!tool.imageProvider && !openai && await hasLocalImageProvider();
   const localDocs = tool.extraction && !openai ? await getLocalDocumentTools() : undefined;
   const tables = tool.id === 'dataset-analysis' && !openai && await hasIsolatedTableWorker();
-  const reason = unavailableReason(tool, request.session, !!openai, { images: localImages, tables, documents: localDocs });
+  const voice = tool.id === 'audio-transcribe' || tool.id === 'audio-synthesize' ? await voiceCapabilities() : undefined;
+  const reason = unavailableReason(tool, request.session, !!openai, { images: localImages, tables, documents: localDocs, voice });
   if (reason || !tool.execute) throw new ChatToolError(reason || 'Инструментът не е наличен.', reason === quotaReached ? 429 : 503);
   if (!request.prompt.trim()) throw new ChatToolError('Въведи заявка за инструмента.');
   const file = await resolveInputFile(tool, request);
   request.signal?.throwIfAborted();
 
   try {
-    const output = await tool.execute({ ...request, openai, file });
+    const output = await tool.execute({ ...request, openai, file, voice });
     return { ...output, id: output.id ?? randomUUID(), toolId: id, label: tool.label };
   } catch (error) {
     if (request.signal?.aborted || error instanceof ChatToolError) throw error;
     if (error instanceof LocalDocumentError || error instanceof LocalImageError || error instanceof LocalImageEditError
       || error instanceof OcrError || error instanceof TextFileError || error instanceof LocalTableError || error instanceof SpreadsheetInputError
       || error instanceof ImageJobError
+      || error instanceof VoiceError
       || error instanceof HostedWebSearchError || error instanceof ResearchInputError || error instanceof ReminderInputError || error instanceof DataToolError) {
       throw new ChatToolError(error.message, error.status);
     }

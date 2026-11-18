@@ -6,8 +6,8 @@ export const maxSpokenText = 1000;
 const maxVoiceOutput = 4 * 1024 * 1024;
 
 const languages = z.enum(['bg', 'en']);
-const voiceCapability = z.object({ transcription: z.boolean(), speech: z.array(languages).max(2) });
-const noVoice = { transcription: false, speech: [] as ('bg' | 'en')[] };
+const voiceCapability = z.object({ transcription: z.boolean(), completeClip: z.boolean().default(false), speech: z.array(languages).max(2) });
+const noVoice = { transcription: false, completeClip: false, speech: [] as ('bg' | 'en')[] };
 
 export class VoiceError extends Error {
   constructor(message: string, readonly status: number) { super(message); }
@@ -40,8 +40,12 @@ async function requestWorker(path: string, options: RequestInit = {}, clientSign
     if (deadline.aborted) throw new VoiceError('Гласовата заявка отне твърде много време.', 504);
     throw new VoiceError('Сървърът за глас временно е недостъпен.', 503);
   }
-  if (response.headers.get('x-sharkai-voice-worker') !== '1' || response.status !== 200) {
+  const recognizedWorker = response.headers.get('x-sharkai-voice-worker') === '1';
+  if (!recognizedWorker || response.status !== 200) {
     await response.body?.cancel().catch(() => {});
+    if (recognizedWorker && response.status === 413 && response.headers.get('x-sharkai-voice-limit') === 'duration') {
+      throw new VoiceError('Аудиофайлът надхвърля 20 секунди. Прикачи по-кратък запис.', 413);
+    }
     if (response.status === 413) throw new VoiceError('Записът надхвърля допустимия размер.', 413);
     if (response.status === 422) throw new VoiceError('В записа няма разпознаваема реч или форматът не се поддържа.', 422);
     if (response.status === 429) throw new VoiceError('Гласовата услуга обработва друга заявка. Опитай отново.', 429);
@@ -79,10 +83,18 @@ export async function voiceCapabilities() {
   } catch { return noVoice; }
 }
 
-export async function transcribeVoice(data: Buffer, mime: string, language: 'bg' | 'en' | 'auto', signal: AbortSignal) {
+export async function transcribeVoice(
+  data: Buffer, mime: string, language: 'bg' | 'en' | 'auto', signal: AbortSignal, { completeClip = false } = {},
+) {
+  const headers = new Headers({ 'Content-Type': mime, 'X-SharkAI-Language': language });
+  if (completeClip) headers.set('X-SharkAI-Full-Clip', '1');
   const response = await requestWorker('/transcribe', {
-    method: 'POST', body: new Uint8Array(data), headers: { 'Content-Type': mime, 'X-SharkAI-Language': language },
+    method: 'POST', body: new Uint8Array(data), headers,
   }, signal);
+  if (completeClip && response.headers.get('x-sharkai-full-clip') !== '1') {
+    await response.body?.cancel().catch(() => {});
+    throw new VoiceError('Сървърът за глас трябва да поддържа транскрипция на целия аудиофайл.', 503);
+  }
   const transcript = z.object({ text: z.string().trim().min(1).max(6000) })
     .safeParse(JSON.parse((await boundedVoiceBody(response.body, 24_000)).toString('utf8')));
   if (!transcript.success) throw new VoiceError('Гласовата услуга не върна разпознат текст.', 502);

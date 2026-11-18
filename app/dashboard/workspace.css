@@ -12,7 +12,6 @@
 }
 
 .module-sidebar {
-  position: sticky;
   top: 12px;
   display: flex;
   flex-direction: column;
@@ -22,6 +21,13 @@
   margin: 12px 0 12px 12px;
   padding: 13px 10px;
   border-radius: 18px;
+}
+
+.module-sidebar.ice-section { position: sticky; }
+.module-sidebar.ice-section--dark, .module-drawer.ice-section--dark {
+  --ice-art-extent: 60%;
+  --ice-art-position: right 35%;
+  --ice-art-opacity: .34;
 }
 
 .module-brand {
@@ -172,11 +178,6 @@
 }
 .module-overview-hero .shark-action-secondary { background: #12233bd9; border-color: #6c8bb65c; color: #f4f7ff; }
 
-.module-workspace .ice-section { color: var(--workspace-ink); }
-.module-workspace .ice-section :focus-visible { outline-color: #154292; }
-.module-workspace .ice-section .shark-action:focus-visible,
-.module-workspace .ice-section .shark-action-secondary:focus-visible { outline-color: #154292; }
-
 .module-banner {
   display: flex;
   align-items: center;
@@ -197,6 +198,9 @@
 .module-banner svg { color: #164b80; }
 .module-banner p { max-width: 38ch; color: var(--workspace-copy); margin-top: 8px; line-height: 1.43; }
 .module-banner[data-ice-art='shark'] { --ice-art-size: 115% auto; --ice-art-position: right 42%; }
+.module-banner[data-ice-art='studio'] { --ice-art-position: right 51%; }
+.module-banner[data-ice-art='team'] { --ice-art-position: right 56%; }
+.module-banner[data-ice-art='markets'] { --ice-art-position: right 32%; }
 
 .module-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 16px; }
 .module-link { display: inline-flex; align-items: center; gap: 6px; color: #a8d5ff; font-weight: 690; font-size: .84rem; }
@@ -245,9 +249,9 @@
 .module-section-title { margin: 0 0 9px 3px; font-size: 1.23rem; font-weight: 790; letter-spacing: -.025em; line-height: 1.15; }
 .module-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .module-tile {
-  --ice-art-extent: 58%;
+  --ice-art-extent: 61%;
   --ice-art-position: right center;
-  --ice-art-mask: linear-gradient(to right, transparent, #0009 30%, #000 53%);
+  --ice-art-mask: linear-gradient(to right, transparent, #0004 22%, #000 57%);
   display: flex;
   align-items: center;
   min-height: 110px;
@@ -260,23 +264,22 @@
 .module-tile:hover { border-color: #d7f7ff; box-shadow: inset 0 1px 1px #fff, 0 0 0 2px #a2ebff65; }
 .module-tile strong { display: block; font-size: 1.22rem; line-height: 1.07; font-weight: 800; letter-spacing: -.031em; }
 .module-tile p { color: #0a2338; font-size: .82rem; font-weight: 560; margin-top: 4px; line-height: 1.2; text-wrap: pretty; }
-.module-tile[data-ice-art='agent'] { --ice-art-size: 145% auto; }
-.module-tile[data-ice-art='studio'] { --ice-art-size: 128% auto; }
-.module-tile[data-ice-art='team'] { --ice-art-size: 118% auto; }
-.module-tile[data-ice-art='markets'] { --ice-art-size: 118% auto; }
+.module-tile[data-ice-art='agent'] { --ice-art-size: max(130%, 248px) auto; --ice-art-position: right 47%; }
+.module-tile[data-ice-art='studio'] { --ice-art-size: max(124%, 245px) auto; --ice-art-position: right 55%; }
+.module-tile[data-ice-art='team'] { --ice-art-size: max(118%, 233px) auto; --ice-art-position: right 53%; }
+.module-tile[data-ice-art='markets'] { --ice-art-size: max(118%, 233px) auto; --ice-art-position: right 35%; }
 
 .module-columns { display: grid; gap: 13px; align-items: start; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .module-panel { min-width: 0; border-radius: 16px; padding: clamp(14px, 2vw, 21px); overflow-wrap: anywhere; }
 .module-panel[data-ice-art], .module-search-dialog[data-ice-art] {
-  --module-art-height: 105px;
-  --ice-art-extent: 57%;
-  --ice-art-position: right 47%;
+  --module-art-height: clamp(135px, 54%, 260px);
+  --ice-art-extent: 56%;
+  --ice-art-position: right 44%;
   --ice-art-size: cover;
-  --ice-art-mask: linear-gradient(90deg, transparent 0 12%, #0007 37%, #000 57%),
-    linear-gradient(180deg, #000 0 52%, transparent);
+  --ice-art-mask: linear-gradient(90deg, transparent 0 14%, #0005 35%, #000 60%),
+    linear-gradient(180deg, #000 0 57%, transparent 100%);
 }
-.module-workspace .module-panel[data-ice-art]::before,
-.module-workspace .module-search-dialog[data-ice-art]::before {
+.module-panel[data-ice-art]::before, .module-search-dialog[data-ice-art]::before {
   bottom: auto;
   height: min(100%, var(--module-art-height));
   border-bottom-left-radius: 0;
@@ -294,11 +297,31 @@
   flex-wrap: wrap;
   gap: 4px 12px;
 }
+.module-panel--form[data-ice-art], .module-profile[data-ice-art], .module-memory[data-ice-art] {
+  --ice-art-opacity: .82;
+}
+.module-profile[data-ice-art] { --ice-art-position: right 40%; }
+.module-panel.module-note[data-ice-art], .module-brain-panel:not(:has(.module-agent-receipt)) {
+  --module-art-height: 100%;
+  --ice-art-mask: linear-gradient(90deg, transparent 0 9%, #0005 32%, #000 61%);
+}
+.module-panel.module-note[data-ice-art]::before, .module-brain-panel:not(:has(.module-agent-receipt))::before {
+  border-bottom-right-radius: inherit;
+}
+.module-note.module-panel > .module-heading { min-height: 0; margin-bottom: 7px; }
+.module-note.module-panel > p { width: 53%; text-wrap: pretty; }
 .module-panel p, .module-search-content p { color: var(--workspace-copy); font-size: .87rem; line-height: 1.5; }
+.module-panel:not(.module-note) > p, .module-memory-toggle, .module-memory-notes > li {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #eafbffe0;
+}
+.module-panel:not(.module-note) > p { width: fit-content; max-width: 100%; }
 .module-panel > .shark-action { margin-top: 12px; }
 .module-copy + .module-copy { margin-top: 8px; }
 .module-error { color: #ffc4d4; }
 .ice-section .module-error, .module-panel .module-error { color: #782440; }
+.module-project-list { border: 1px solid var(--workspace-line); border-radius: 11px; background: #edfaffd9; }
 .module-project-list > li + li { border-top: 1px solid var(--workspace-line); }
 .module-project-list a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 43px; padding: 6px; border-radius: 8px; }
 .module-project-list a:hover { background: #f3fcff7d; }
@@ -338,7 +361,7 @@
   padding: 15px 12px;
   border: 1px dashed #588daa;
   border-radius: 13px;
-  background: #f0fbff85;
+  background: #f0fbffca;
   overflow-wrap: anywhere;
 }
 .module-upload svg { color: #255b87; }
@@ -346,6 +369,7 @@
 .module-upload input:focus-visible + label { outline: 2px solid #154292; outline-offset: 3px; }
 .module-upload button { margin-top: 8px; }
 .module-upload-preview { display: grid; min-height: 218px; place-items: center; border: 1px solid #6d9ab18c; border-radius: 14px; background: #e8f9ff90; overflow: hidden; }
+.module-upload-preview--empty { place-items: center start; background: #e8f9ffd9; }
 .module-upload-preview > div { display: grid; gap: 7px; justify-items: center; text-align: center; padding: 14px; color: #31628d; }
 .module-upload-preview img { width: 100%; height: auto; max-height: 490px; object-fit: contain; }
 .module-disclosure { margin-top: 7px; border-top: 1px solid var(--workspace-line); padding-top: 9px; color: #223f59; }
@@ -359,7 +383,13 @@
 .module-agents li:nth-child(3n) .module-agent-icon { background: linear-gradient(145deg, #bcabef, #7655c8); color: #f7f2ff; }
 .module-agents strong { display: block; font-size: .87rem; }
 .module-agents p { margin-top: 2px; font-size: .8rem; }
-.module-workspace .module-role-card[data-ice-art] { --module-art-height: 128px; }
+.module-role-card[data-ice-art] { --module-art-height: clamp(132px, 60%, 205px); }
+.module-role-card[data-ice-art]:not(:has(.module-agent-receipt)) {
+  --module-art-height: 100%;
+  --ice-art-position: right center;
+  --ice-art-mask: linear-gradient(90deg, transparent 0 23%, #0007 46%, #000 73%);
+}
+.module-role-card[data-ice-art]:not(:has(.module-agent-receipt))::before { border-bottom-right-radius: inherit; }
 .module-role-heading { min-height: 102px; align-items: flex-start; padding-inline-end: 41%; }
 .module-role-heading > div { min-width: 0; }
 .module-role-heading .module-link { flex-wrap: wrap; gap: 4px; }
@@ -369,8 +399,9 @@
 .module-agent-receipt > .module-link { display: flex; width: fit-content; }
 .module-receipt-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .module-agent-receipt time { display: block; margin-top: 4px; color: var(--workspace-copy); }
-.module-account { display: grid; gap: 9px; }
-.module-account > div { display: grid; gap: 8px; grid-template-columns: minmax(100px, 145px) minmax(0, 1fr); padding: 9px 0; border-bottom: 1px solid var(--workspace-line); }
+.module-account { display: grid; background: #effbffdc; border: 1px solid var(--workspace-line); border-radius: 11px; }
+.module-account > div { display: grid; gap: 8px; grid-template-columns: minmax(100px, 145px) minmax(0, 1fr); padding: 10px 12px; }
+.module-account > div + div { border-top: 1px solid var(--workspace-line); }
 .module-account dt { color: var(--workspace-copy); font-size: .85rem; }
 .module-account dd { font-weight: 670; }
 .module-memory { display: grid; gap: 12px; }
@@ -402,11 +433,11 @@
   object-position: 56% center;
   mask-image: linear-gradient(to right, transparent, #000 40%);
 }
-.module-drawer { position: fixed; inset: 0 auto 0 0; margin: 0; border-radius: 0 18px 18px 0; width: min(335px, 87vw); height: 100dvh; max-height: none; color: inherit; }
+.module-drawer.ice-section { position: fixed; inset: 0 auto 0 0; margin: 0; border-radius: 0 18px 18px 0; width: min(335px, 87vw); height: 100dvh; max-height: none; }
 .module-drawer::backdrop, .module-search-dialog::backdrop { background: #040b17bd; backdrop-filter: blur(3px); }
 .module-drawer-content { min-height: 100%; padding: max(15px, env(safe-area-inset-top)) 12px max(15px, env(safe-area-inset-bottom)); }
 .module-drawer-head { display: flex; justify-content: space-between; gap: 8px; }
-.module-search-dialog {
+.module-search-dialog.ice-section {
   position: fixed;
   inset: 0;
   padding: 0;
@@ -490,7 +521,7 @@
   .module-metric dd { font-size: 1.28rem; }
   .module-section-title { margin: 1px 0 7px 3px; font-size: 1.12rem; }
   .module-tiles { gap: 6px; }
-  .module-tile { min-height: 69px; padding: 8px 13px 8px clamp(13px, 5vw, 20px); border-radius: 14px; }
+  .module-tile { min-height: 67px; padding: 8px 13px 8px clamp(13px, 5vw, 20px); border-radius: 14px; }
   .module-tile strong { font-size: 1.05rem; }
   .module-tile p { font-size: .74rem; }
   .module-tile > div { width: 52%; min-width: min(100%, 145px); }

@@ -1,5 +1,5 @@
 export type ChatToolPlatform = 'web-desktop' | 'web-mobile' | 'windows';
-export type ChatToolInput = 'prompt' | 'image' | 'pdf' | 'dataset' | 'document' | 'textfile' | 'none';
+export type ChatToolInput = 'prompt' | 'image' | 'pdf' | 'dataset' | 'document' | 'textfile' | 'audio' | 'none';
 
 export interface ChatTool {
   id: string;

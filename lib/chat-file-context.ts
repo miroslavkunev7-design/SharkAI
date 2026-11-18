@@ -26,6 +26,10 @@ const fileMime: Record<string, string> = {
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
   webp: 'image/webp',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  m4a: 'audio/mp4',
+  webm: 'audio/webm',
 };
 
 function attachedFile(entry: HistoryEntry): ChatFile | null {
@@ -56,13 +60,16 @@ function openingInstruction(prompt: string) {
 export function chatFileReference(prompt: string) {
   // Later clauses can name a new output format. Ignore quoted replacement text.
   const source = openingInstruction(prompt).replace(/["„“][^"”\r\n]*["”]/gu, ' ');
-  const format = /\b(pdf|docx|xlsx|excel|csv|txt|markdown|md|json|png|jpe?g|webp)\b/iu.exec(source)?.[1].toLowerCase();
+  const format = /\b(pdf|docx|xlsx|excel|csv|txt|markdown|md|json|png|jpe?g|webp|wav|ogg|m4a|webm)\b/iu.exec(source)?.[1].toLowerCase();
   if (format && Object.hasOwn(fileMime, format)) {
     const mime = fileMime[format];
     return { matches: (candidate: string) => candidate === mime };
   }
   if (/\b(?:image|photo|picture)\b|(?<!\p{L})(?:изображени(?:е|ето)|снимка(?:та)?|картинка(?:та)?)(?!\p{L})/iu.test(source)) {
     return { matches: (candidate: string) => candidate.startsWith('image/') };
+  }
+  if (/\b(?:audio|recording)\b|(?<!\p{L})(?:аудио(?:то)?|(?:аудио)?запис(?:а|ът)?)(?!\p{L})/iu.test(source)) {
+    return { matches: (candidate: string) => candidate.startsWith('audio/') };
   }
   if (/\b(?:spreadsheet|table|workbook)\b|(?<!\p{L})таблица(?:та)?(?!\p{L})/iu.test(source)) {
     return { matches: (candidate: string) => candidate === fileMime.csv || candidate === fileMime.xlsx };
@@ -75,8 +82,8 @@ export function chatFileReference(prompt: string) {
 
 export function specifiesParticularChatFile(prompt: string) {
   const source = openingInstruction(prompt);
-  return /[\p{L}\p{N}_-]\.(?:pdf|docx|xlsx|csv|txt|md|json|png|jpe?g|webp)\b/iu.test(source)
-    || /\b(?:first|second|third|oldest|earliest)\s+(?:file|image|photo|document|pdf|docx|xlsx|csv|spreadsheet)\b|(?:първ(?:ия|ията|ата|ото)|втор(?:ия|ата|ото)|най-стар(?:ия|ата|ото))\s+(?:файл|изображение|снимка|документ|pdf|docx|xlsx|csv|таблица)/iu.test(source);
+  return /[\p{L}\p{N}_-]\.(?:pdf|docx|xlsx|csv|txt|md|json|png|jpe?g|webp|wav|ogg|m4a|webm)\b/iu.test(source)
+    || /\b(?:first|second|third|oldest|earliest)\s+(?:file|image|photo|document|pdf|docx|xlsx|csv|spreadsheet|audio|recording)\b|(?:първ(?:ия|ията|ата|ото)|втор(?:ия|ата|ото)|най-стар(?:ия|ата|ото))\s+(?:файл|изображение|снимка|документ|pdf|docx|xlsx|csv|таблица|аудио|запис)/iu.test(source);
 }
 
 export function isFileFollowUp(prompt: string) {

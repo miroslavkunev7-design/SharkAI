@@ -11,7 +11,8 @@ const headers = { 'Cache-Control': 'private, no-store', 'X-Content-Type-Options'
 
 export async function GET() {
   if (!await getSession()) return NextResponse.json({ error: 'Влез, за да използваш гласовите функции.' }, { status: 401, headers });
-  return NextResponse.json(await voiceCapabilities(), { headers });
+  const { transcription, speech } = await voiceCapabilities();
+  return NextResponse.json({ transcription, speech }, { headers });
 }
 
 export async function POST(req: NextRequest) {

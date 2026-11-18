@@ -108,7 +108,7 @@ export default function AdminPage() {
   ] : [];
 
   return (
-    <main className="operator-workspace mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6">
+    <main className="operator-workspace operator-admin mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6">
       <nav className="operator-topbar" aria-label="Администрация">
         <div className="flex min-w-0 items-center gap-2.5">
           <Link href="/dashboard?view=settings" className="shark-action-secondary operator-icon-button" aria-label="Към настройките на акаунта"><ArrowLeft size={18} aria-hidden="true" /></Link>
@@ -125,9 +125,9 @@ export default function AdminPage() {
           {data && <span className="operator-plan"><Shield size={13} aria-hidden="true" /> Текущ план {data.account.plan}</span>}
         </div>
       </header>
-      {loading && <p role="status" className="operator-status shark-glass text-sm text-white/75">Зареждане на административните данни…</p>}
-      {error && <p role="alert" className="operator-status shark-glass text-sm text-rose-200">{error}</p>}
-      {status && <p role="status" className="operator-status shark-glass text-sm text-cyan-200">{status}</p>}
+      {loading && <div role="status" className="ice-section operator-admin-notice" data-ice-art="team"><p>Зареждане на административните данни…</p></div>}
+      {error && <div role="alert" className="ice-section operator-admin-notice" data-ice-art="agent"><p className="operator-admin-error">{error}</p></div>}
+      {status && <div role="status" className="ice-section operator-admin-notice" data-ice-art="agent"><p>{status}</p></div>}
       {data && (
         <>
           <dl className="operator-metrics grid-cols-2 md:grid-cols-4" aria-label="Обобщение">
@@ -140,13 +140,15 @@ export default function AdminPage() {
           </dl>
           <div className="grid gap-3 lg:grid-cols-2">
             <section id="settings" className="ice-section operator-panel min-w-0" data-ice-art="agent">
-              <h2 className="operator-panel-title"><KeyRound size={19} aria-hidden="true" /> AI доставчици</h2>
-              <form className="grid gap-4" onSubmit={saveSettings}>
+              <header className="operator-admin-panel-heading">
+                <h2 className="operator-panel-title"><KeyRound size={19} aria-hidden="true" /> AI доставчици</h2>
+                <p className="operator-muted text-sm">{data.ai.aiConfigured ? 'Има конфигуриран доставчик.' : 'Няма разрешен и конфигуриран доставчик.'}</p>
+              </header>
+              <form className="operator-admin-panel-data grid gap-4" onSubmit={saveSettings}>
                 <label className="flex gap-3 items-center min-h-11">
                   <input type="checkbox" className="h-5 w-5 shrink-0 accent-blue-700" checked={paidAI} onChange={(event) => setPaidAI(event.target.checked)} />
                   Разреши конфигурираните AI услуги
                 </label>
-                <p className="operator-muted text-sm">{data.ai.aiConfigured ? 'Има конфигуриран доставчик.' : 'Няма разрешен и конфигуриран доставчик.'}</p>
                 <label className="grid gap-2 text-sm">OpenAI API ключ
                   {data.ai.openai.hasKey && <small className="operator-muted">Запазен ключ</small>}
                   <input type="password" value={openaiKey} onChange={(event) => setOpenaiKey(event.target.value)} className="operator-input" autoComplete="off" />
@@ -164,9 +166,11 @@ export default function AdminPage() {
               </form>
             </section>
             <section className="ice-section operator-panel min-w-0" data-ice-art="team">
-              <h2 className="operator-panel-title"><Users size={19} aria-hidden="true" /> Потребители</h2>
-              {!data.users.length ? <p className="operator-muted text-sm">Няма потребителски записи.</p> : (
-                <div className="operator-table max-h-96 overflow-auto">
+              <header className="operator-admin-panel-heading">
+                <h2 className="operator-panel-title"><Users size={19} aria-hidden="true" /> Потребители</h2>
+              </header>
+              {!data.users.length ? <p className="operator-admin-panel-data operator-muted text-sm">Няма потребителски записи.</p> : (
+                <div className="operator-admin-panel-data operator-table max-h-96 overflow-auto">
                   <table className="w-full table-fixed text-left text-sm"><thead><tr><th className="p-2">Имейл</th><th className="w-[34%] p-2">План в профила</th></tr></thead>
                     <tbody>{data.users.map((user) => <tr key={user.id} className="border-t border-sky-950/20"><td className="p-2 break-all">{user.email}</td><td className="operator-muted p-2 font-semibold">{user.plan}</td></tr>)}</tbody>
                   </table>
@@ -174,12 +178,14 @@ export default function AdminPage() {
               )}
             </section>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href="/chat" className="shark-action-secondary">AI чат</Link>
-            <Link href="/dashboard?view=studio" className="shark-action-secondary">Студио</Link>
-            <Link href="/pricing" className="shark-action-secondary">Планове</Link>
-            <Link href="/tests" className="shark-action-secondary">Проверки</Link>
-          </div>
+          <nav className="ice-section operator-admin-links" data-ice-art="studio" aria-label="Операторски инструменти">
+            <div>
+              <Link href="/chat" className="shark-action-secondary">AI чат</Link>
+              <Link href="/dashboard?view=studio" className="shark-action-secondary">Студио</Link>
+              <Link href="/pricing" className="shark-action-secondary">Планове</Link>
+              <Link href="/tests" className="shark-action-secondary">Проверки</Link>
+            </div>
+          </nav>
         </>
       )}
     </main>

@@ -44,8 +44,8 @@
 
 .shark-entry-module {
   --ice-radius: 16px;
-  --ice-art-extent: 58%;
-  --ice-art-mask: linear-gradient(to right, transparent, #000 41%);
+  --ice-art-extent: 56%;
+  --ice-art-mask: linear-gradient(to right, transparent 0%, #0004 13%, #000 38%);
   position: relative;
   display: flex;
   align-items: center;
@@ -58,7 +58,7 @@
 .shark-entry-module-copy {
   position: relative;
   z-index: 2;
-  width: min(210px, 58%);
+  width: min(210px, 55%);
 }
 
 .shark-entry-module-heading {
@@ -133,9 +133,9 @@
 
 .shark-entry-feature {
   --ice-radius: clamp(22px, 3vw, 36px);
-  --ice-art-extent: 62%;
+  --ice-art-extent: 57%;
   --ice-art-position: 56% center;
-  --ice-art-mask: linear-gradient(to right, transparent 0%, #0005 23%, #000 52%);
+  --ice-art-mask: linear-gradient(to right, transparent 0%, #0005 16%, #000 44%);
   display: flex;
   align-items: center;
   width: min(100%, 1150px);
@@ -145,7 +145,7 @@
 .shark-entry-feature-copy {
   position: relative;
   z-index: 2;
-  width: 54%;
+  width: 52%;
   max-width: 560px;
   padding: clamp(27px, 5vw, 65px);
 }
@@ -287,7 +287,7 @@
   --ice-radius: 22px;
   --ice-art-extent: 55%;
   --ice-art-position: 54% 50%;
-  --ice-art-mask: linear-gradient(to right, transparent, #000 45%);
+  --ice-art-mask: linear-gradient(to right, transparent, #0005 15%, #000 44%);
   min-height: 214px;
   padding: clamp(17px, 3.7vw, 39px) clamp(17px, 5vw, 62px);
 }
@@ -315,8 +315,14 @@
 }
 
 .shark-entry-price-message {
+  --ice-art-extent: 48%;
+  --ice-art-opacity: .62;
   padding: 12px 20px;
   font-weight: 670;
+}
+
+.shark-entry-price-message > * {
+  max-width: min(58ch, 64%);
 }
 
 .shark-entry-price-grid {
@@ -327,8 +333,8 @@
 
 .shark-entry-plan {
   --ice-radius: 21px;
-  --ice-art-extent: 54%;
-  --ice-art-mask: linear-gradient(to right, transparent 0%, #0004 24%, #000 72%);
+  --ice-art-extent: 53%;
+  --ice-art-mask: linear-gradient(to right, transparent 0%, #0003 16%, #000 53%);
   padding: clamp(17px, 2.5vw, 34px);
 }
 
@@ -468,34 +474,67 @@
   }
 
   .shark-entry-module-copy {
-    width: min(245px, 60%);
+    width: min(245px, 57%);
   }
 
   .shark-entry-feature {
-    align-items: end;
-    min-height: 0;
+    --ice-art-extent: 55%;
+    --ice-art-position: 61% center;
+    --ice-art-mask: linear-gradient(to right, transparent, #0005 20%, #000 50%);
+    min-height: 380px;
   }
 
-  .shark-entry-feature.ice-section[data-ice-art]::before {
+  .shark-entry-auth-panel {
+    --ice-art-extent: 56%;
     --ice-art-position: 57% 43%;
-    --ice-art-mask: linear-gradient(to bottom, #000 50%, transparent 98%);
-    inset: 0 0 auto;
-    width: 100%;
-    height: clamp(216px, 65vw, 337px);
+    --ice-art-mask: linear-gradient(to right, transparent, #0005 22%, #000 58%),
+      linear-gradient(to bottom, #000 30%, #0004 73%, transparent 96%);
+  }
+
+  .shark-entry-auth-panel.ice-section[data-ice-art]::before {
+    height: 100%;
+    mask-composite: intersect;
+  }
+
+  .shark-entry-download .shark-entry-feature {
+    --ice-art-mask: linear-gradient(to right, transparent, #0003 23%, #000 51%);
   }
 
   .shark-entry-feature-copy {
-    width: 100%;
+    width: 66%;
     max-width: none;
-    padding: clamp(190px, 59vw, 295px) clamp(18px, 7.5vw, 52px) 26px;
+    padding: 23px 15px 23px 19px;
+  }
+
+  .shark-entry-auth-copy {
+    width: 100%;
+    padding: 21px clamp(18px, 6vw, 41px);
+  }
+
+  .shark-entry-auth h1 {
+    max-width: 54%;
+    margin: 10px 0 14px;
   }
 
   .shark-entry-form {
     max-width: none;
   }
 
-  .shark-entry-download h1 span {
-    display: inline;
+  .shark-entry-download-copy .shark-action {
+    padding-inline: 10px;
+    font-size: .84rem;
+    gap: 6px;
+    text-align: left;
+  }
+
+  .shark-entry-download-copy .shark-action svg {
+    flex: none;
+    width: 17px;
+    height: 17px;
+  }
+
+  .shark-entry-download-copy .shark-entry-installer p {
+    font-size: .79rem;
   }
 
   .shark-entry-price-grid {
@@ -517,7 +556,7 @@
   }
 
   .shark-entry-plan-copy {
-    width: min(280px, 63%);
+    width: min(280px, 61%);
   }
 }
 
