@@ -166,7 +166,7 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
       const unsupportedAttachment = Boolean(upload && (!upload.mimeType.startsWith('image/') || !selected.imageInput));
       const candidateMime = upload?.mimeType ?? priorFile?.mime ?? undefined;
       const router = mode === 'work' && selected.nativeToolCalls && message.trim()
-        ? createNativeToolRouter(await listChatTools(account), candidateMime, !unsupportedAttachment)
+        ? createNativeToolRouter(await listChatTools(account), candidateMime, !unsupportedAttachment, message)
         : undefined;
       const unsupported = 'Моделът не обработва този тип файл. Избери подходящ инструмент от менюто „+“.';
       if (unsupportedAttachment && !router) throw new ChatError(unsupported, 415);

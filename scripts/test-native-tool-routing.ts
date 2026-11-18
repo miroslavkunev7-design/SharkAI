@@ -58,14 +58,13 @@ test('routes explicit spreadsheet output and edits separately from ordinary tabu
   assert.equal(inferChatTool('Промени клетка B2 на 125', true, 'text/csv'), 'spreadsheet-edit');
   assert.equal(inferChatTool('Начертай графика по колона Цена', true, 'text/csv'), 'dataset-analysis');
 
-  const router = createNativeToolRouter(registry, 'text/csv')!;
-  const data = { headers: ['Име', 'Цена'], rows: [['Чай', 2.5]], sheetName: null };
-  const content = JSON.stringify(data);
-  const selected = router.validate('export_spreadsheet', { format: 'xlsx', content });
+  const prompt = 'Може ли изтегляем XLSX с колони Име и Цена? Добави Чай със стойност 2.5.';
+  const router = createNativeToolRouter(registry, 'text/csv', true, prompt)!;
+  const selected = router.validate('export_spreadsheet', {});
   assert.equal(selected?.toolId, 'spreadsheet-export');
-  assert.equal(selected?.prompt, `Създай XLSX с данни:\n${content}`);
-  assert.equal(router.validate('export_spreadsheet', { format: 'pdf', content }), null);
-  assert.equal(router.validate('export_spreadsheet', { format: 'xlsx', content: 'not JSON' }), null);
+  assert.equal(selected?.prompt, prompt);
+  assert.equal(router.validate('export_spreadsheet', { format: 'pdf', content: 'untrusted' }), null);
+  assert.equal(createNativeToolRouter(registry, 'text/csv', true, 'Дай ми таблица в отговора.')?.validate('export_spreadsheet', {}), null);
   assert.equal(router.validate('edit_spreadsheet', { command: 'Set cell B2 to 4', fileId: 'foreign' }), null);
   assert.equal(router.validate('edit_spreadsheet', { command: 'Set cell B2 to 4' })?.needsFile, true);
 });

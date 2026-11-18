@@ -2,7 +2,7 @@ import { stepCountIs, streamText, tool, type LanguageModel, type ModelMessage, t
 import { z } from 'zod';
 import { isLocalDocumentEdit } from '../chat-documents.server';
 import { parseLocalImageEdit } from '../chat-image-edits.server';
-import { isLocalSpreadsheetEdit, spreadsheetInputSchema } from '../chat-spreadsheets.server';
+import { isLocalSpreadsheetEdit } from '../chat-spreadsheets.server';
 import { supportsLocalTableAnalysis } from '../chat-tables.server';
 import type { ChatTool } from '../chat-tools';
 
@@ -19,7 +19,7 @@ const pdf = 'application/pdf';
 const xlsx = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const images = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp']);
 
-export function createNativeToolRouter(registry: ChatTool[], mimeType?: string, allowExport = true): Router | undefined {
+export function createNativeToolRouter(registry: ChatTool[], mimeType?: string, allowExport = true, latestRequest = ''): Router | undefined {
   const available = new Set(registry.filter((entry) => entry.available).map((entry) => entry.id));
   const tools: ToolSet = {};
   const validators = new Map<string, Validation>();
@@ -50,21 +50,11 @@ export function createNativeToolRouter(registry: ChatTool[], mimeType?: string, 
       'Create a new private downloadable TXT, Markdown or JSON file when explicitly requested. An ordinary reply does not need a file.',
       z.object({ format: z.enum(['txt', 'md', 'json']), content: draft }).strict(),
       ({ format, content }) => `Създай ${format} със съдържание:\n${content}`);
-    offer('export_spreadsheet', 'spreadsheet-export', false,
-      'Create a real downloadable CSV or Excel (XLSX) file when explicitly requested. Supply one JSON object encoded as text. An ordinary table in an answer does not need an export.',
-      z.object({
-        format: z.enum(['csv', 'xlsx']),
-        content: draft.describe('JSON with headers, rows, and optional sheetName. Example: {"headers":["Item","Count"],"rows":[["Tea",1]]}. Use null for unavailable values.'),
-      }).strict(),
-      ({ format, content }) => {
-        try {
-          const data = spreadsheetInputSchema.safeParse(JSON.parse(content));
-          if (!data.success || data.data.rows.some((row) => row.length !== data.data.headers.length)) return null;
-          return `Създай ${format.toUpperCase()} с данни:\n${JSON.stringify(data.data)}`;
-        } catch {
-          return null;
-        }
-      });
+    if (/\b(?:csv|excel|xlsx)\b/iu.test(latestRequest)) {
+      offer('export_spreadsheet', 'spreadsheet-export', false,
+        'Create a downloadable CSV or Excel file from the latest request. Call only if the user asks for a new file, not an ordinary table, analysis, or edit.',
+        noArgs, () => latestRequest);
+    }
   }
 
   if (mimeType && images.has(mimeType)) {
