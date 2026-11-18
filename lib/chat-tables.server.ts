@@ -1,10 +1,10 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { z } from 'zod';
-import { supportsLocalTableAnalysis } from './table-request.mjs';
+import { groupedTableRequestHelp, isGroupedTableCommand, parseGroupedTableRequest, supportsLocalTableAnalysis } from './table-request.mjs';
 import { saveUpload, validateUpload } from './uploads';
 
-export { supportsLocalTableAnalysis };
+export { groupedTableRequestHelp, isGroupedTableCommand, supportsLocalTableAnalysis };
 
 const maxInputBytes = 4 * 1024 * 1024;
 const maxOutputBytes = 1 * 1024 * 1024;
@@ -67,7 +67,7 @@ const outcome = z.union([
   z.object({ result: z.object({
     text: z.string().min(1).max(16_000),
     mimeType: z.enum([csvMime, 'image/png']),
-    filename: z.enum(['sharkai-table-summary.csv', 'sharkai-chart.png']),
+    filename: z.enum(['sharkai-table-summary.csv', 'sharkai-grouped-analysis.csv', 'sharkai-chart.png']),
     artifact: z.string().min(1).max(Math.ceil(maxOutputBytes / 3) * 4).regex(/^[A-Za-z0-9+/]+={0,2}$/),
   }) }),
   z.object({ failure: z.object({ message: z.string().min(1).max(280), status: z.union([z.literal(413), z.literal(422)]) }) }),
@@ -82,8 +82,12 @@ export async function runLocalTableAnalysis({
   signal?: AbortSignal;
 }) {
   signal?.throwIfAborted();
-  if (!supportsLocalTableAnalysis(prompt)) {
-    throw new LocalTableError('Локалната справка поддържа сума, средно, минимум, максимум, празни клетки и графика по стойности. За друго изчисление използвай разширения анализ.');
+  const plan = parseGroupedTableRequest(prompt) ?? undefined;
+  if (!plan && !supportsLocalTableAnalysis(prompt)) {
+    const help = isGroupedTableCommand(prompt)
+      ? groupedTableRequestHelp
+      : 'Локалната справка поддържа обобщения, групиране, филтри и графики. За друго изчисление използвай разширения анализ.';
+    throw new LocalTableError(help);
   }
   if (file.data.length > maxInputBytes) throw new LocalTableError('Локалният анализ приема таблици до 4 MB.', 413);
   if (![csvMime, xlsxMime].includes(file.mimeType)) throw new LocalTableError('Прикачи CSV или XLSX файл.');
@@ -96,7 +100,7 @@ export async function runLocalTableAnalysis({
   activeWorkers += 1;
   let output;
   try {
-    const frame = Buffer.from(JSON.stringify({ prompt, mimeType: file.mimeType }) + '\n');
+    const frame = Buffer.from(JSON.stringify({ prompt, mimeType: file.mimeType, plan }) + '\n');
     const stdout = await runWorker(Buffer.concat([frame, file.data]), signal);
     const parsed = outcome.safeParse(JSON.parse(stdout));
     if (!parsed.success) throw new LocalTableError('Изолираната среда не върна валиден табличен резултат.', 502);

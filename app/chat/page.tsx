@@ -145,6 +145,7 @@ export default function ChatPage() {
 
   const reminders = useReminders(account?.email ?? null);
   const reminderTool = tools.find(({ id, available }) => id === 'scheduled-task' && available);
+  const datasetExample = selectedTool?.id === 'dataset-analysis' ? 'Сумирай „Приход“ по „Град“' : null;
   const attachmentPreview = attachment ? attachmentInspection(attachment) : null;
   const model = models.find((option) => option.id === modelId) ?? models[0];
   const voiceUnavailable = media.voiceReason || (!model ? 'Няма достъпен модел за гласов отговор.' : '');
@@ -877,8 +878,10 @@ export default function ChatPage() {
                 {uploading && <div className="shark-chat-chip" role="status"><LoaderCircle size={15} className="shark-chat-spinner" /> Качване…</div>}
               </div>}
               <label className="shark-chat-sr" htmlFor="chat-input">Съобщение</label>
+              {datasetExample && <span className="shark-chat-sr" id="chat-dataset-example">Пример за групиране. {datasetExample}. Използвай точните имена на колоните от таблицата.</span>}
               <textarea id="chat-input" ref={inputRef} value={input} rows={2} maxLength={12000} disabled={pending || !canSend || !!loadProblem}
-                placeholder={mode === 'work' ? 'Опиши задачата си…' : 'Напиши съобщение…'}
+                aria-describedby={datasetExample ? 'chat-dataset-example' : undefined}
+                placeholder={datasetExample ?? (mode === 'work' ? 'Опиши задачата си…' : 'Напиши съобщение…')}
                 onChange={(event) => { setInput(event.target.value); setProblem(''); }}
                 onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }} />
               <div className="shark-chat-composer-actions">

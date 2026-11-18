@@ -9,7 +9,9 @@ import { DataToolError, runOpenAIDataTool } from './chat-data-tools.server';
 import { parseDocumentTranslationRequest, translateChatDocument } from './chat-document-translation.server';
 import { LocalDocumentError, isLocalDocumentEdit, runLocalDocumentTool } from './chat-documents.server';
 import { LocalImageEditError, parseLocalImageEdit, runLocalImageEdit } from './chat-image-edits.server';
-import { LocalTableError, hasIsolatedTableWorker, runLocalTableAnalysis, supportsLocalTableAnalysis } from './chat-tables.server';
+import {
+  groupedTableRequestHelp, hasIsolatedTableWorker, isGroupedTableCommand, LocalTableError, runLocalTableAnalysis, supportsLocalTableAnalysis,
+} from './chat-tables.server';
 import { LocalDocumentError as OcrError, getLocalDocumentTools, isLocalExtractionRequest, readLocalDocument } from './chat-ocr.server';
 import {
   hasExplicitSpreadsheetData, isLocalSpreadsheetEdit, runLocalSpreadsheetTool, validateSpreadsheetDraft, SpreadsheetInputError,
@@ -183,6 +185,9 @@ async function createImage({ openai, prompt, file, session, signal, asyncImage, 
 function executeDataTool(operation: Parameters<typeof runOpenAIDataTool>[0]) {
   return async (input: ToolExecution): Promise<ToolOutput> => {
     const { prompt, file, session, signal, openai } = input;
+    if (operation === 'dataset' && isGroupedTableCommand(prompt) && !supportsLocalTableAnalysis(prompt)) {
+      throw new ChatToolError(groupedTableRequestHelp, 422);
+    }
     if (operation === 'dataset' && file && supportsLocalTableAnalysis(prompt) && await hasIsolatedTableWorker()) {
       const local = await runLocalTableAnalysis({ prompt, file, userId: session.id, signal });
       if (local) return { ...local, status: 'completed' };
@@ -197,7 +202,7 @@ function executeDataTool(operation: Parameters<typeof runOpenAIDataTool>[0]) {
         throw new ChatToolError('Точните замени и добавянето на абзаци са достъпни локално. За редакция по описание свържи текстов модел или OpenAI Code Interpreter.', 503);
       }
       const limitation = operation === 'dataset'
-        ? 'Локално са налични обобщения, изчисления по колони и графики.'
+        ? 'Локално са налични обобщения, групиране, филтри и графики.'
         : 'Локално са налични създаване на документ, текстови замени в DOCX и добавяне на надписи, завъртане или премахване на страници в PDF.';
       throw new ChatToolError(limitation + ' За поисканата операция е необходим OpenAI Code Interpreter.', 503);
     }
@@ -294,7 +299,7 @@ const coreTools: ToolRegistration[] = [
   { id: 'spreadsheet-export', label: 'Създай CSV или Excel таблица', description: 'Прикачва таблица от описаните колони и редове или от въведени CSV или JSON данни.', group: 'Документи и данни', input: 'prompt', execute: createSpreadsheet },
   { id: 'spreadsheet-edit', label: 'Редактирай CSV или Excel таблица', description: 'Записва отделно копие. Например „Промени клетка B2 на 125“.', group: 'Документи и данни', input: 'dataset', execute: ({ session, prompt, file, signal }) =>
     runLocalSpreadsheetTool({ operation: 'edit', userId: session.id, prompt, file, signal }) },
-  { id: 'dataset-analysis', label: 'Анализирай CSV или XLSX', description: 'Изчислява сума, средно, минимум, максимум и липсващи стойности. Връща CSV справка или PNG графика.', group: 'Документи и данни', input: 'dataset', optionalOpenAI: true, execute: executeDataTool('dataset') },
+  { id: 'dataset-analysis', label: 'Анализирай CSV или XLSX', description: 'Изчислява обобщения, групира и филтрира данни. Връща CSV справка или PNG графика.', group: 'Документи и данни', input: 'dataset', optionalOpenAI: true, execute: executeDataTool('dataset') },
   { id: 'text-file-create', label: 'Създай текстов файл', description: 'Записва TXT, Markdown или валиден JSON. Може да използва и предишния отговор.', group: 'Документи и данни', input: 'prompt', execute: writeChatTextFile },
   { id: 'text-file-edit', label: 'Редактирай текстов файл', description: 'Запазва коригирано копие в същия формат.', group: 'Документи и данни', input: 'textfile', execute: writeChatTextFile },
   { id: 'dataset-advanced', label: 'Разширен анализ на таблица', description: 'Изпълнява заявеното изчисление с OpenAI Code Interpreter и връща резултата в разговора.', group: 'Документи и данни', input: 'dataset', requiresOpenAI: true, execute: async ({ prompt, file, session, signal }) => ({ status: 'completed', ...await runOpenAIDataTool('dataset', { prompt, file, userId: session.id, signal }) }) },
@@ -389,7 +394,7 @@ const intentMatchers: Array<[string, RegExp]> = [
   ['image-edit', /^(?:редактирай (?:снимката|изображението)|промени (?:снимката|изображението)|edit (?:this|the) (?:image|photo))(?=\s|[:.,!?]|$)/iu],
   ['image-generate', /^(?:(?:генерирай|създай|нарисувай) (?:ми )?(?:изображение|илюстрация|снимка)|(?:generate|create|draw) (?:an? )?(?:image|illustration))(?=\s|[:.,!?]|$)/iu],
   ['image-properties', /^(?:свойства на изображение|размери на снимката|покажи цветовете на снимката|image properties)(?=\s|[:.,!?]|$)/iu],
-  ['dataset-analysis', /^(?:анализирай (?:прикачения )?(?:csv|xlsx)|направи графика от (?:csv|xlsx)|analyze (?:the )?(?:csv|xlsx)|chart (?:the )?(?:csv|xlsx))(?=\s|[:.,!?]|$)/iu],
+  ['dataset-analysis', /^(?:анализирай (?:прикачения )?(?:csv|xlsx)|направи графика от (?:csv|xlsx)|analyze (?:the )?(?:csv|xlsx)|chart (?:the )?(?:csv|xlsx))(?=\s|[;:.,!?]|$)/iu],
   ['document-export', /^(?:(?:създай|направи|запази|експортирай) (?:ми )?(?:pdf|docx)|(?:create|export) (?:a )?(?:pdf|docx))(?=\s|[:.,!?]|$)/iu],
   ['scheduled-task', /^(?:напомни ми|планирай задача|планирай напомняне|създай напомняне|remind me|schedule a task)(?=\s|[:.,!?]|$)/iu],
   ['automotive-data', /^(?:провери vin|проверка по vin|диагностика на автомобил|check vin|look up vin)(?=\s|[:.,!?]|$)/iu],
@@ -408,11 +413,13 @@ export function inferChatTool(prompt: string, hasUpload: boolean, mimeType?: str
   const request = prompt.trim()
     .replace(/^(?:моля|please)[,\s]+/iu, '')
     .replace(/^(?:можеш ли да|би ли|can you|could you|would you)\s+/iu, '');
+  const table = mimeType === 'text/csv' || mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   if (parseDocumentTranslationRequest(request)) return 'document-translate';
+  if (isGroupedTableCommand(prompt) && (table || supportsLocalTableAnalysis(prompt)
+    || /\b(?:csv|xlsx|spreadsheet|worksheet|columns?|rows?)\b|(?<!\p{L})(?:таблица(?:та)?|колона(?:та)?|редовете)(?!\p{L})/iu.test(request))) return 'dataset-analysis';
   if ((!mimeType || mimeType.startsWith('image/')) && parseLocalImageEdit(request)) return 'image-transform';
   if (mimeType?.startsWith('image/') && /^(?:(?:смени|промени)\s+(?:фона|осветлението|стила)|(?:прерисувай|преобразувай)\s|превърни\s+(?:я|го|изображението|снимката)\s+в|(?:change|replace)\s+(?:(?:the|its)\s+)?(?:background|lighting|style)\b|(?:restyle|redraw|reimagine)\s|(?:turn|transform|convert)\s+(?:(?:the|this)\s+)?(?:image|photo|picture|it)\s+into\b)/iu.test(request)) return 'image-edit';
   if (/^(?:създай|създадеш|направи|направиш|генерирай|генерираш|запази|запазиш|експортирай|експортираш|create|make|generate|export|save)\s+(?:(?:ми|a|an|as|като)\s+)*(?:(?:файл|таблица|file|spreadsheet|table)\s+)?(?:(?:в|in|като|as)\s+)?(?:[\p{L}\p{N}_.-]+\.)?(?:csv|xlsx|excel)\b/iu.test(request)) return 'spreadsheet-export';
-  const table = mimeType === 'text/csv' || mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
   if (isLocalSpreadsheetEdit(request) || /^(?:редактирай|редактираш|поправи|edit|revise)\s+(?:(?:прикачения|прикачената|this|the|attached)\s+)*(?:csv|xlsx|excel)\b/iu.test(request)) return 'spreadsheet-edit';
   if (table && /^(?:промени|смени|поправи|изтрий|редактирай|set|change|replace|clear|edit)\s+(?:клетка(?:та)?|cell)\s/iu.test(request)) return 'spreadsheet-edit';
   if (/^(?:създай|направи|запази|експортирай|create|export|save)\s+(?:(?:ми|a|as|a new)\s+)*(?:файл|file)\s+[\w.-]*\b(?:docx|pdf)\b/iu.test(request)) return 'document-export';
@@ -472,7 +479,7 @@ export function isExactRememberedFileCommand(prompt: string, mime?: string) {
   if (fileRequirements.textfile.matches(mime) && isExactTextFileEdit(prompt)
     && /^(?:замени|добави|replace|append)\s*[:\s]/iu.test(prompt.trim())) return true;
   return fileRequirements.dataset.matches(mime) && supportsLocalTableAnalysis(prompt)
-    && /^(?:анализирай|обобщи|сметни|изчисли|начертай|analy[sz]e|summari[sz]e|calculate|plot|chart)\s/iu.test(prompt.trim());
+    && /^(?:анализирай|обобщи|сметни|изчисли|начертай|направи графика|analy[sz]e|summari[sz]e|calculate|plot|chart)(?=\s|[;:]|$)/iu.test(prompt.trim());
 }
 
 async function resolveInputFile(tool: ToolRegistration, request: ToolRequest) {

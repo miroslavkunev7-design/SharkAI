@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { isLocalDocumentEdit } from '../chat-documents.server';
 import { parseLocalImageEdit } from '../chat-image-edits.server';
 import { isLocalSpreadsheetEdit } from '../chat-spreadsheets.server';
-import { supportsLocalTableAnalysis } from '../chat-tables.server';
+import { isGroupedTableCommand, supportsLocalTableAnalysis } from '../chat-tables.server';
 import type { ChatTool } from '../chat-tools';
 
 type Selection = { toolId: string; prompt: string; needsFile: boolean };
@@ -84,7 +84,12 @@ export function createNativeToolRouter(registry: ChatTool[], mimeType?: string, 
   if (mimeType === 'text/csv' || mimeType === xlsx) {
     offer('analyze_table', 'dataset-analysis', true,
       'Run a bounded local analysis of the available table when requested. Commands: summary; summary; column: "Exact header"; chart; column: "Exact header". Optional sheet: "Exact sheet" is XLSX only. Supports count, sum, average, minimum, maximum, missing cells and a chart of column values.',
-      command, ({ command }) => supportsLocalTableAnalysis(command) ? command : null);
+      command, ({ command }) => {
+        if (isGroupedTableCommand(command) || isGroupedTableCommand(latestRequest)) {
+          return isGroupedTableCommand(latestRequest) && supportsLocalTableAnalysis(latestRequest) ? latestRequest : null;
+        }
+        return supportsLocalTableAnalysis(command) ? command : null;
+      });
     offer('edit_spreadsheet', 'spreadsheet-edit', true,
       'Edit one specified cell in a CSV or Excel file, saving a separate copy. Command: Set cell B2 to 125. Preserve the user’s addresses and exact values.',
       command, ({ command }) => isLocalSpreadsheetEdit(command) ? command : null);

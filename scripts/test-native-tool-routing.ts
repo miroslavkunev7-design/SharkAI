@@ -73,6 +73,19 @@ test('routes explicit spreadsheet output and edits separately from ordinary tabu
   assert.equal(router.validate('edit_spreadsheet', { command: 'Set cell B2 to 4' })?.needsFile, true);
 });
 
+test('preserves the user’s grouped analysis and rejects model-invented groups or filters', () => {
+  const query = 'Сумирай „Приход“ по „Град“, от 2026-10-01 до 2026-10-31 по „Дата“.';
+  assert.equal(inferChatTool(query, false), 'dataset-analysis');
+  assert.equal(inferChatTool('Направи графика от CSV; колона: „Сума Приход“', false), 'dataset-analysis');
+  assert.equal(inferChatTool('Сумирай „Приход“ по „Град“, от 2026-10-01 до 2026-09-01 по „Дата“.', true, 'text/csv'), 'dataset-analysis');
+  assert.equal(inferChatTool('Count words by frequency in this sentence.', false), undefined);
+  const router = createNativeToolRouter(registry, 'text/csv', false, query)!;
+  assert.equal(router.validate('analyze_table', { command: 'Sum "Expense" by "Region"' })?.prompt, query);
+  const ordinary = createNativeToolRouter(registry, 'text/csv', false, 'Show the column summary.')!;
+  assert.equal(ordinary.validate('analyze_table', { command: 'Sum "Expense" by "Region"' }), null);
+  assert.equal(ordinary.validate('analyze_table', { command: 'sum; column: "Cost by city"' })?.toolId, 'dataset-analysis');
+});
+
 test('suppresses text around a tool call, captures usage and emits one validated action', async () => {
   const model = testModel([
     { type: 'text-start', id: 'text' },
