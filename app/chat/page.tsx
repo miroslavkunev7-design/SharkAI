@@ -1,300 +1,851 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
+import type { ChatTool, ChatToolResult } from '@/lib/chat-tools';
 import {
-  Send, ImageIcon, Loader2, Brain, Sparkles,
-  LayoutDashboard, Shield, Settings, X, Rocket,
+  AppWindow, ArrowUp, AudioLines, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, ExternalLink,
+  FileText, Folder, Globe2, Image as ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare,
+  Mic, PanelLeftClose, PanelLeftOpen, Paperclip, Pencil, Plus, RotateCcw, ScanLine, ScreenShare,
+  Search, Settings, Shield, Sparkles, Square, Table2, X,
 } from 'lucide-react';
+import { captureFrame, useChatMedia } from './chat-media';
+import { readChatResponse } from './chat-response';
+import { Inspector } from './inspector';
+import {
+  imageUrl, projectInProgress, PROJECT_STATUS, safeLink, type Account, type Attachment, type Conversation,
+  type InspectorItem, type Message, type Mode, type Model, type Project,
+} from './workspace-types';
+import './workspace.css';
 
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  imageUrl?: string;
+type Popup = 'tools' | 'model' | 'mode' | 'profile';
+type BranchFrom = { conversationId: string; messageId: string };
+
+interface ChatData {
+  messages?: Message[];
+  conversations?: Conversation[];
+  conversationId?: string | null;
+  conversationMode?: Mode;
+  projectId?: string | null;
+  user?: Account | null;
+  capabilities?: { models?: Model[]; reason?: string };
+  error?: string;
+}
+
+interface ChatRequest {
+  message: string;
+  conversationId: string;
+  requestId: string;
+  mode: Mode;
+  model?: string;
+  reasoning?: string;
+  uploadId?: string;
+  toolId?: string;
+  projectId?: string;
+  branchFrom?: BranchFrom;
+}
+
+const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const PDF_TYPE = 'application/pdf';
+const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const CSV_TYPE = 'text/csv';
+const WORK_TYPES = [...IMAGE_TYPES, PDF_TYPE, DOCX_TYPE, XLSX_TYPE, CSV_TYPE];
+const MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+  pdf: PDF_TYPE, docx: DOCX_TYPE, xlsx: XLSX_TYPE, csv: CSV_TYPE,
+};
+const INPUT_FILES: Record<string, { types: string[]; accept: string; required: string }> = {
+  image: { types: IMAGE_TYPES, accept: '.jpg,.jpeg,.png,.webp', required: 'За този инструмент е нужно изображение.' },
+  pdf: { types: [PDF_TYPE], accept: '.pdf', required: 'За този инструмент е нужен PDF файл.' },
+  document: { types: [PDF_TYPE, DOCX_TYPE], accept: '.pdf,.docx', required: 'За този инструмент е нужен PDF или DOCX файл.' },
+  dataset: { types: [XLSX_TYPE, CSV_TYPE], accept: '.xlsx,.csv', required: 'За този инструмент е нужен CSV или XLSX файл.' },
+};
+const modeLabel = (mode: Mode) => mode === 'chat' ? 'Чат' : 'Работа';
+const suggestions = [
+  { label: 'Разгледай една идея', text: 'Помогни ми да развия идея. Какви въпроси ще ми зададеш първо?', icon: Sparkles },
+  { label: 'Организирай работата ми', text: 'Помогни ми да подредя задачите си за седмицата. Предложи проста структура.', icon: BriefcaseBusiness },
+  { label: 'Подготви ми чернова', text: 'Помогни ми да подготвя чернова. Каква информация ти е нужна за начало?', icon: FileText },
+];
+
+function ToolIcon({ tool, size = 17 }: { tool: ChatTool; size?: number }) {
+  const id = tool.id;
+  const Icon = id.includes('search') ? Globe2 : id.includes('image') ? ImageIcon
+    : id.includes('ocr') ? ScanLine : tool.input === 'dataset' ? Table2 : /pdf|document/.test(tool.input) ? FileText : AppWindow;
+  return <Icon size={size} />;
+}
+
+function ToolReceipt({ result, open, projectStatus }: { result: ChatToolResult; open: (item: InspectorItem) => void; projectStatus?: string }) {
+  const url = result.url ? safeLink(result.url) : null;
+  const artifactUrl = result.artifact?.url ? safeLink(result.artifact.url) : null;
+  const projectId = result.projectId;
+  return (
+    <div className="shark-chat-receipt">
+      <div><Sparkles size={16} /><strong>{result.label}</strong><span>{projectStatus ? PROJECT_STATUS[projectStatus] || projectStatus : result.status === 'started' ? 'Стартиран' : 'Завършен'}</span></div>
+      {projectId && <button type="button" onClick={() => open({ type: 'project', id: projectId, title: result.label })}>Виж статуса <ExternalLink size={15} /></button>}
+      {artifactUrl && result.artifact?.mimeType.startsWith('image/') && (
+        <button type="button" className="shark-chat-image" onClick={() => open({ type: 'image', url: artifactUrl, title: result.label })}>
+          <img src={artifactUrl} alt={result.label} />
+        </button>
+      )}
+      {artifactUrl && !result.artifact?.mimeType.startsWith('image/') && <a href={artifactUrl} download><FileText size={15} /> Изтегли резултата</a>}
+      {url && !projectId && !artifactUrl && <a href={url} target="_blank" rel="noreferrer">Отвори резултата <ExternalLink size={15} /></a>}
+      {!!result.sources?.length && <ol>{result.sources.map((source, index) => {
+        const href = safeLink(source.url);
+        return href ? <li key={`${source.url}-${index}`}><a href={href} target="_blank" rel="noreferrer">{source.title || href} <ExternalLink size={12} /></a></li> : null;
+      })}</ol>}
+    </div>
+  );
 }
 
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectError, setProjectError] = useState(false);
+  const [account, setAccount] = useState<Account | null>(null);
+  const [models, setModels] = useState<Model[]>([]);
+  const [capabilityReason, setCapabilityReason] = useState('');
+  const [tools, setTools] = useState<ChatTool[]>([]);
+  const [toolsPending, setToolsPending] = useState(true);
+  const [toolsError, setToolsError] = useState(false);
+  const [selectedTool, setSelectedTool] = useState<ChatTool | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [mode, setMode] = useState<Mode>('chat');
+  const [modeSaving, setModeSaving] = useState(false);
+  const [projectContext, setProjectContext] = useState<string | null>(null);
+  const [modelId, setModelId] = useState('');
+  const [reasoning, setReasoning] = useState('standard');
+  const [branchFrom, setBranchFrom] = useState<BranchFrom | null>(null);
   const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [loadingDeep, setLoadingDeep] = useState(false);
-  const [thinkingLabel, setThinkingLabel] = useState('Мисля...');
-  const [uploadId, setUploadId] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [user, setUser] = useState<{ name: string; role: string; plan: string } | null>(null);
-  const [aiMode, setAiMode] = useState<'ai' | 'local'>('local');
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const [search, setSearch] = useState('');
+  const [attachment, setAttachment] = useState<Attachment | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [mediaPending, setMediaPending] = useState(false);
+  const [optimistic, setOptimistic] = useState<Message | null>(null);
+  const [partial, setPartial] = useState('');
+  const [problem, setProblem] = useState('');
+  const [loadProblem, setLoadProblem] = useState('');
+  const [loginRequired, setLoginRequired] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [copied, setCopied] = useState('');
+  const [small, setSmall] = useState(false);
+  const [railVisible, setRailVisible] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [popup, setPopup] = useState<Popup | null>(null);
+  const [inspector, setInspector] = useState<InspectorItem | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const sendController = useRef<AbortController | null>(null);
+  const loadController = useRef<AbortController | null>(null);
+  const failedRequest = useRef<ChatRequest | null>(null);
+  const mounted = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const railRef = useRef<HTMLElement>(null);
+  const popupRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const railTrigger = useRef<HTMLButtonElement>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const cameraDialog = useRef<HTMLDialogElement>(null);
+  const cameraVideo = useRef<HTMLVideoElement>(null);
+  const cameraStream = useRef<MediaStream | null>(null);
+  const inspectorReturnFocus = useRef<HTMLElement | null>(null);
+  const inspectorRegion = useRef<HTMLDivElement>(null);
+  const media = useChatMedia(setProblem);
 
-  const scrollDown = useCallback(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const model = models.find((option) => option.id === modelId) ?? models[0];
+  const canSend = !!account && (!!model || (mode === 'work' && tools.some((tool) => tool.available)));
+  const pending = loading || sending || uploading || mediaPending || modeSaving;
+  const awaitingProjects = projects.some((project) => projectInProgress(project.status));
+  const showStart = !loading && !loadProblem && messages.length === 0 && !optimistic;
+  const appliedReasoning = model?.reasoningLevels.includes(reasoning) ? reasoning : model?.reasoningLevels[0];
+
+  const loadConversation = useCallback(async (id?: string, draftProjectId?: string) => {
+    loadController.current?.abort();
+    const controller = new AbortController();
+    loadController.current = controller;
+    setLoading(true);
+    setLoadProblem('');
+    setLoginRequired(false);
+    try {
+      const query = id ? `?conversationId=${encodeURIComponent(id)}` : '';
+      const response = await fetch(`/api/chat${query}`, { signal: controller.signal, cache: 'no-store' });
+      const data = await response.json() as ChatData;
+      if (!response.ok) {
+        if (response.status === 401 && !controller.signal.aborted) setLoginRequired(true);
+        throw new Error(data.error || 'Разговорът не може да се зареди.');
+      }
+      if (controller.signal.aborted) return;
+      const selected = data.conversations?.find((item) => item.id === data.conversationId);
+      setMessages(draftProjectId ? [] : data.messages ?? []);
+      setConversations(data.conversations ?? []);
+      setConversationId(draftProjectId ? null : data.conversationId ?? null);
+      setMode(draftProjectId ? 'work' : data.conversationMode ?? selected?.mode ?? 'chat');
+      setProjectContext(draftProjectId || data.projectId || selected?.projectId || null);
+      setModels(data.capabilities?.models ?? []);
+      setCapabilityReason(data.capabilities?.reason || '');
+      setAccount(data.user ?? null);
+    } catch (error) {
+      if (!controller.signal.aborted) setLoadProblem(error instanceof Error ? error.message : 'Разговорът не може да се зареди.');
+    } finally {
+      if (!controller.signal.aborted) setLoading(false);
+    }
+  }, []);
+
+  const loadProjects = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await fetch('/api/projects', { cache: 'no-store', signal });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      if (signal?.aborted) return;
+      setProjects(data.projects ?? []);
+      setProjectError(false);
+    } catch { if (!signal?.aborted) setProjectError(true); }
+  }, []);
+
+  const loadTools = useCallback(async () => {
+    setToolsPending(true);
+    setToolsError(false);
+    try {
+      const response = await fetch('/api/chat/tools', { cache: 'no-store' });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      setTools(data.tools ?? []);
+    } catch { setToolsError(true); }
+    finally { setToolsPending(false); }
   }, []);
 
   useEffect(() => {
-    fetch('/api/chat').then((r) => r.json()).then((d) => {
-      if (d.messages?.length) {
-        setMessages(d.messages.map((m: { id: string; role: string; content: string; imagePath?: string }) => ({
-          id: m.id,
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-          imageUrl: m.imagePath ? `/api/upload/${m.imagePath}` : undefined,
-        })));
-      } else {
-        setMessages([{
-          id: 'welcome',
-          role: 'assistant',
-          content: 'Здравей! Аз съм Supreme Brain — говорим за **всичко**: ежедневие, чувства, наука, работа, хобита, технологии, или просто „как си".\n\nНяма ограничения — питай каквото искаш. Ако поискаш код или проект, казваш и 15-те агента работят.',
-        }]);
-      }
-    });
-    fetch('/api/projects').then((r) => r.json()).then((d) => {
-      if (d.user) setUser({ ...d.user, role: d.user.role || 'USER' });
-    });
-    setAiMode('local');
+    mounted.current = true;
+    const query = new URLSearchParams(window.location.search);
+    const id = query.get('conversationId') || undefined;
+    void loadConversation(id, !id ? query.get('project') || undefined : undefined);
+    void loadProjects();
+    void loadTools();
+    return () => {
+      mounted.current = false;
+      loadController.current?.abort();
+      sendController.current?.abort();
+      cameraStream.current?.getTracks().forEach((track) => track.stop());
+    };
+  }, [loadConversation, loadProjects, loadTools]);
+
+  useEffect(() => {
+    if (!awaitingProjects) return;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      await loadProjects(controller.signal);
+      if (!controller.signal.aborted) timer = setTimeout(poll, 3000);
+    }
+    timer = setTimeout(poll, 3000);
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [awaitingProjects, loadProjects]);
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 820px)');
+    const sync = () => setSmall(query.matches);
+    sync();
+    query.addEventListener('change', sync);
+    const viewport = window.visualViewport;
+    const updateHeight = () => shellRef.current?.style.setProperty('--chat-viewport', `${viewport?.height ?? window.innerHeight}px`);
+    viewport?.addEventListener('resize', updateHeight);
+    updateHeight();
+    return () => {
+      query.removeEventListener('change', sync);
+      viewport?.removeEventListener('resize', updateHeight);
+    };
   }, []);
 
-  useEffect(() => { scrollDown(); }, [messages, scrollDown]);
+  useEffect(() => {
+    if (messages.length || optimistic) endRef.current?.scrollIntoView({ block: 'end' });
+  }, [messages, optimistic, partial]);
 
-  async function uploadImage(file: File) {
-    const form = new FormData();
-    form.append('file', file);
-    const res = await fetch('/api/upload', { method: 'POST', body: form });
-    if (!res.ok) {
-      alert('Грешка при качване на снимка');
-      return null;
+  const closePopup = useCallback((restore = false) => {
+    setPopup(null);
+    if (restore) triggerRef.current?.focus();
+  }, []);
+
+  function togglePopup(id: Popup, trigger: HTMLButtonElement) {
+    if (id === popup) { closePopup(); return; }
+    triggerRef.current = trigger;
+    setPopup(id);
+  }
+
+  function closeDrawer() {
+    setDrawerOpen(false);
+    closePopup();
+    requestAnimationFrame(() => railTrigger.current?.focus());
+  }
+
+  function closeInspector() {
+    setInspector(null);
+    requestAnimationFrame(() => inspectorReturnFocus.current?.focus());
+  }
+
+  function openInspector(item: InspectorItem) {
+    inspectorReturnFocus.current = document.activeElement as HTMLElement | null;
+    setInspector(item);
+    setDrawerOpen(false);
+    setPopup(null);
+    if (small && drawerOpen) inspectorReturnFocus.current = railTrigger.current;
+  }
+
+  useEffect(() => {
+    if (popup) popupRef.current?.querySelector<HTMLElement>('button:not(:disabled),a[href]')?.focus();
+  }, [popup]);
+
+  useEffect(() => {
+    if (small && drawerOpen) railRef.current?.querySelector<HTMLElement>('[data-close-rail]')?.focus();
+  }, [small, drawerOpen]);
+
+  useEffect(() => {
+    if (inspector) inspectorRegion.current?.querySelector<HTMLElement>('button')?.focus();
+  }, [inspector]);
+
+  useEffect(() => {
+    function clickOutside(event: PointerEvent) {
+      const target = event.target as Node;
+      if (target instanceof HTMLElement && target.classList.contains('shark-chat-popup-backdrop')) return;
+      if (popup && !popupRef.current?.contains(target) && !triggerRef.current?.contains(target)) closePopup();
     }
-    const data = await res.json();
-    setUploadId(data.uploadId);
-    setImagePreview(data.previewUrl);
-    return data.uploadId as string;
-  }
-
-  async function startBuildFromChat(text: string, imgId?: string | null, featureId?: string) {
-    const res = await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: text.slice(0, 50) || 'Chat Project',
-        description: text || 'Проект от Supreme Brain чат',
-        type: 'website',
-        inputType: imgId ? 'screenshot' : 'prompt',
-        featureId: featureId || (imgId ? 'screenshot-website' : 'prompt-software'),
-        uploadId: imgId,
-      }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const projectId = data.project.id as string;
-    setMessages((prev) => [...prev, {
-      id: `build-${Date.now()}`,
-      role: 'assistant',
-      content: `🚀 Генерирам код и ZIP 1:1… Проект \`${projectId.slice(0, 8)}\``,
-    }]);
-    return projectId;
-  }
-
-  async function pollBuildAndNotify(projectId: string) {
-    for (let i = 0; i < 90; i++) {
-      await new Promise((r) => setTimeout(r, 1000));
-      const res = await fetch(`/api/projects/${projectId}`);
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (data.project.status === 'COMPLETED') {
-        setMessages((prev) => [...prev, {
-          id: `done-${Date.now()}`,
-          role: 'assistant',
-          content: `✅ Готово! ${data.fileCount} файла.\nPreview: ${data.previewUrl}\nDownload ZIP: ${data.downloadUrl}`,
-        }]);
-        return;
+    function onKey(event: KeyboardEvent) {
+      if (cameraDialog.current?.open) return;
+      if (event.key === 'Escape') {
+        if (popup) closePopup(true);
+        else if (inspector) closeInspector();
+        else if (small && drawerOpen) closeDrawer();
       }
-      if (data.project.status === 'FAILED') {
-        setMessages((prev) => [...prev, {
-          id: `fail-${Date.now()}`,
-          role: 'assistant',
-          content: '❌ Генерацията не успя. Опитай отново в Studio.',
-        }]);
-        return;
-      }
+      const modal = small ? (popup === 'tools' ? popupRef.current : inspector ? inspectorRegion.current : drawerOpen ? railRef.current : null) : null;
+      if (event.key !== 'Tab' || !modal) return;
+      const entries = Array.from(modal.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not([type=hidden]):not(:disabled),iframe'));
+      const first = entries[0];
+      const last = entries[entries.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }
-  }
-
-  function isInstantMessage(text: string) {
-    const t = text.trim().toLowerCase();
-    if (!t) return true;
-    if (t.length < 18 && !t.includes('?')) return true;
-    return /^(здрав|привет|как си|какво става|благодар|thanks|hello|hi|hey|чао|ок|да|не|хаха|лол|lol|йо|yo)$/i.test(t);
-  }
-
-  async function sendMessage() {
-    if (!input.trim() && !uploadId) return;
-    const userMsg: Message = {
-      id: `u-${Date.now()}`,
-      role: 'user',
-      content: input.trim() || '📷 [снимка]',
-      imageUrl: imagePreview || undefined,
+    document.addEventListener('pointerdown', clickOutside);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', clickOutside);
+      document.removeEventListener('keydown', onKey);
     };
-    setMessages((prev) => [...prev, userMsg]);
-    const text = input.trim();
-    const currentUpload = uploadId;
+  }, [popup, small, drawerOpen, inspector, closePopup]);
+
+  function updateUrl(id: string | null, project: string | null = null) {
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set('conversationId', id);
+    else url.searchParams.delete('conversationId');
+    if (project) url.searchParams.set('project', project);
+    else url.searchParams.delete('project');
+    window.history.replaceState(window.history.state, '', url);
+  }
+
+  function resetDraft() {
     setInput('');
-    const instant = isInstantMessage(text) && !currentUpload;
-    setLoadingDeep(!instant);
-    setThinkingLabel(instant ? '...' : text.length > 100 ? 'Анализирам...' : 'Мисля...');
-    setLoading(true);
+    setAttachment(null);
+    setBranchFrom(null);
+    setSelectedTool(null);
+    setInspector(null);
+    setProblem('');
+    setNotice('');
+    failedRequest.current = null;
+    media.stopListening();
+    media.stopSpeaking();
+  }
 
-    const history = [...messages, userMsg]
-      .filter((m) => m.id !== 'welcome')
-      .map((m) => ({ role: m.role, content: m.content }));
+  function newConversation(project?: string) {
+    if (sending || uploading || mediaPending) return;
+    loadController.current?.abort();
+    setLoading(false);
+    setLoadProblem('');
+    setLoginRequired(false);
+    setMessages([]);
+    setConversationId(null);
+    setProjectContext(project ?? null);
+    if (project) setMode('work');
+    resetDraft();
+    setDrawerOpen(false);
+    closePopup();
+    updateUrl(null, project ?? null);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
 
+  function chooseConversation(id: string) {
+    if (sending || uploading || mediaPending) return;
+    resetDraft();
+    setMessages([]);
+    updateUrl(id);
+    closeDrawer();
+    void loadConversation(id);
+  }
+
+  async function changeMode(value: Mode) {
+    closePopup(popup === 'mode');
+    if (value === mode || pending) return;
+    media.stopListening();
+    if (!conversationId || conversationId === 'legacy') {
+      setMode(value);
+      if (value === 'chat') setSelectedTool(null);
+      return;
+    }
+    setModeSaving(true);
+    setProblem('');
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history, uploadId: currentUpload }),
-        signal: controller.signal,
+      const response = await fetch('/api/chat', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversationId, mode: value }),
       });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Режимът не можа да се запази.');
+      setMode(data.conversationMode);
+      if (data.conversationMode === 'chat') setSelectedTool(null);
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : 'Режимът не можа да се запази.');
+    } finally { setModeSaving(false); }
+  }
 
-      clearTimeout(timeoutId);
-
-      const data = await res.json();
-      setMessages((prev) => [...prev, {
-        id: `a-${Date.now()}`,
-        role: 'assistant',
-        content: data.content || 'Няма отговор.',
-      }]);
-      if (data.mode) setAiMode(data.mode);
-
-      const explicitBuild = /^давай|започни|генерирай сега|build now|start now|направи го|пусни build/i.test(text);
-      const shouldBuild = data.suggestBuild || explicitBuild;
-
-      if (shouldBuild && (currentUpload || text.length > 3)) {
-        const pid = await startBuildFromChat(
-          data.buildPrompt || text || 'Проект от чат',
-          currentUpload,
-          data.featureId
-        );
-        if (pid) pollBuildAndNotify(pid);
+  async function uploadFile(file: File) {
+    const types = mode === 'work' ? WORK_TYPES : IMAGE_TYPES;
+    const extension = file.name.split('.').pop()?.toLowerCase() || '';
+    const mime = WORK_TYPES.includes(file.type) ? file.type : MIME_BY_EXTENSION[extension];
+    const allowed = types.includes(mime);
+    if (!allowed || file.size > 25 * 1024 * 1024) {
+      setProblem(allowed ? 'Файлът трябва да бъде до 25 MB.' : 'Избери JPG, PNG или WebP. PDF, DOCX, CSV и XLSX се обработват в режим „Работа“.');
+      return;
+    }
+    setUploading(true);
+    setProblem('');
+    failedRequest.current = null;
+    try {
+      const form = new FormData();
+      form.append('file', mime === file.type ? file : new File([file], file.name, { type: mime }));
+      const response = await fetch('/api/upload', { method: 'POST', body: form });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || typeof data?.uploadId !== 'string') {
+        throw new Error(data?.error || (response.status === 413 ? 'Файлът надвишава ограничението на сървъра.' : 'Качването не успя.'));
       }
-    } catch {
-      setMessages((prev) => [...prev, {
-        id: `err-${Date.now()}`,
-        role: 'assistant',
-        content: 'Възникна грешка. Опитай отново.',
-      }]);
-    } finally {
-      setLoading(false);
-      setUploadId(null);
-      setImagePreview(null);
+      setAttachment({ id: data.uploadId, previewUrl: data.previewUrl || undefined, name: file.name, mimeType: data.mimeType || mime });
+      inputRef.current?.focus();
+    } catch (error) { setProblem(error instanceof Error ? error.message : 'Качването не успя.'); }
+    finally { setUploading(false); }
+  }
+
+  function chooseFile(kind = 'any') {
+    closePopup();
+    if (!fileRef.current) return;
+    fileRef.current.accept = INPUT_FILES[kind]?.accept ?? (mode === 'work' ? '.jpg,.jpeg,.png,.webp,.pdf,.docx,.csv,.xlsx' : INPUT_FILES.image.accept);
+    fileRef.current.click();
+  }
+
+  function closeCamera() {
+    if (cameraVideo.current) cameraVideo.current.srcObject = null;
+    cameraStream.current?.getTracks().forEach((track) => track.stop());
+    cameraStream.current = null;
+    setCameraReady(false);
+    cameraDialog.current?.close();
+  }
+
+  async function openCamera() {
+    if (!media.camera || mediaPending) return;
+    closePopup();
+    setProblem('');
+    setMediaPending(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      if (!mounted.current || !cameraVideo.current || !cameraDialog.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      cameraStream.current = stream;
+      cameraVideo.current.srcObject = stream;
+      cameraDialog.current.showModal();
+    } catch { setProblem('Камерата не може да се отвори. Провери разрешението и връзката с устройството.'); }
+    finally { setMediaPending(false); }
+  }
+
+  async function photograph() {
+    if (!cameraVideo.current) return;
+    try {
+      const file = await captureFrame(cameraVideo.current, 'камера.jpg');
+      closeCamera();
+      await uploadFile(file);
+    } catch (error) { setProblem(error instanceof Error ? error.message : 'Заснемането не успя.'); }
+  }
+
+  async function captureScreen() {
+    if (!media.screen || mediaPending) return;
+    closePopup();
+    setProblem('');
+    setMediaPending(true);
+    let stream: MediaStream | undefined;
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      if (!mounted.current) return;
+      const video = document.createElement('video');
+      video.muted = true;
+      video.srcObject = stream;
+      await video.play();
+      const file = await captureFrame(video, 'екран.jpg');
+      stream.getTracks().forEach((track) => track.stop());
+      await uploadFile(file);
+    } catch { setProblem('Екранът не беше заснет. Провери дали споделянето е разрешено.'); }
+    finally {
+      stream?.getTracks().forEach((track) => track.stop());
+      setMediaPending(false);
     }
   }
 
-  const isAdmin = user?.role === 'ADMIN';
+  function chooseTool(tool: ChatTool) {
+    if (!tool.available) return;
+    media.stopListening();
+    setSelectedTool(tool);
+    setMode('work');
+    closePopup();
+    failedRequest.current = null;
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  async function submit(request: ChatRequest, speak = false) {
+    if (sendController.current) return;
+    const controller = new AbortController();
+    sendController.current = controller;
+    setSending(true);
+    setProblem('');
+    setNotice('');
+    setPartial('');
+    setOptimistic({ id: request.requestId, role: 'user', content: request.message || 'Прикачен файл', imagePath: request.uploadId,
+      attachmentMime: request.uploadId === attachment?.id ? attachment?.mimeType : undefined });
+    closePopup();
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
+        body: JSON.stringify(request), signal: controller.signal,
+      });
+      const result = await readChatResponse(response, (delta) => setPartial((text) => text + delta));
+      if (controller.signal.aborted) return;
+      failedRequest.current = null;
+      const id = result.conversationId ?? request.conversationId;
+      if (request.branchFrom) {
+        await loadConversation(id);
+      } else {
+        const received = result.messages ?? [
+          { id: request.requestId, role: 'user', content: request.message, imagePath: request.uploadId },
+          { id: `${request.requestId}-answer`, role: 'assistant', content: result.content, toolResult: result.toolResult },
+        ];
+        setMessages((current) => [...current, ...received.filter((item) => !current.some(({ id: existing }) => item.id === existing))]);
+        setConversationId(id);
+        setConversations((current) => {
+          const existing = current.find((item) => item.id === id);
+          return [{
+            id, title: result.title || existing?.title || request.message.slice(0, 66) || 'Нов разговор',
+            mode: request.mode, projectId: request.projectId ?? existing?.projectId, updatedAt: new Date().toISOString(),
+          }, ...current.filter((item) => item.id !== id)];
+        });
+      }
+      updateUrl(id);
+      setInput('');
+      setAttachment(null);
+      setSelectedTool(null);
+      setBranchFrom(null);
+      if (result.toolResult?.projectId || result.messages?.some((message) => message.toolResult?.projectId)) void loadProjects();
+      if (speak) media.speak(result.content);
+    } catch (error) {
+      failedRequest.current = request;
+      if (controller.signal.aborted) setNotice('Получаването на отговора е прекъснато.');
+      else setProblem(error instanceof Error ? error.message : 'Връзката прекъсна.');
+    } finally {
+      if (sendController.current === controller) sendController.current = null;
+      setSending(false);
+      setOptimistic(null);
+      setPartial('');
+    }
+  }
+
+  function send(text = input, options: { speak?: boolean; origin?: BranchFrom; uploadId?: string } = {}) {
+    if (!canSend || pending || loadProblem) return;
+    const origin = options.origin ?? branchFrom;
+    const repeat = !!options.origin;
+    const uploadId = repeat ? options.uploadId : attachment?.id;
+    const tool = repeat ? null : selectedTool;
+    const message = text.trim() || (tool?.input === 'none' ? tool.label : '');
+    if (!message && !uploadId) return;
+    const requiredFile = tool && INPUT_FILES[tool.input];
+    if (requiredFile && (!attachment || !requiredFile.types.includes(attachment.mimeType || ''))) {
+      setProblem(requiredFile.required);
+      return;
+    }
+    if (uploadId && (repeat || mode === 'chat') && model?.imageInput === false) {
+      setProblem('Този модел обработва текст. В режим „Работа“ избери инструмент за прикачения файл.');
+      return;
+    }
+    if (!repeat && attachment?.mimeType && !IMAGE_TYPES.includes(attachment.mimeType) && mode === 'chat') {
+      setProblem('Избери режим „Работа“, за да обработиш този файл.');
+      return;
+    }
+    const previous = failedRequest.current;
+    const current = {
+      message, mode: repeat ? 'chat' as const : mode, model: model?.id, reasoning: appliedReasoning, uploadId,
+      toolId: tool?.id, projectId: projectContext ?? undefined, branchFrom: origin || undefined,
+    };
+    const equivalent = !!previous && previous.message === message && previous.uploadId === uploadId && previous.toolId === current.toolId
+      && previous.mode === current.mode && previous.projectId === current.projectId && previous.model === current.model && previous.reasoning === current.reasoning
+      && previous.branchFrom?.messageId === current.branchFrom?.messageId;
+    if (equivalent) { void submit(previous, options.speak); return; }
+    const id = !origin && conversationId ? conversationId : crypto.randomUUID();
+    void submit({ ...current, conversationId: id, requestId: crypto.randomUUID() }, options.speak);
+  }
+
+  function startDictation() {
+    if (pending) return;
+    media.stopSpeaking();
+    setProblem('');
+    media.listen('dictation', (text) => setInput((value) => `${value.trimEnd()}${value.trim() ? ' ' : ''}${text}`));
+  }
+
+  function startVoice() {
+    if (media.speaking) { media.stopSpeaking(); return; }
+    if (pending) return;
+    setProblem('');
+    media.listen('conversation', (text) => { setInput(text); send(text, { speak: true }); });
+  }
+
+  function editMessage(message: Message) {
+    if (!conversationId || pending) return;
+    setBranchFrom({ conversationId, messageId: message.id });
+    const image = !message.attachmentMime || message.attachmentMime.startsWith('image/');
+    setAttachment(message.imagePath ? {
+      id: message.imagePath, name: image ? 'Прикачено изображение' : 'Прикачен файл',
+      previewUrl: image ? imageUrl(message.imagePath) : undefined, mimeType: message.attachmentMime ?? undefined,
+    } : null);
+    setSelectedTool(null);
+    setInput(message.content);
+    setNotice('Редакцията ще отвори нов клон от този момент в разговора.');
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  async function copyMessage(message: Message) {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(message.id);
+    } catch { setProblem('Браузърът не разреши копиране в клипборда.'); }
+  }
+
+  const railOpen = small ? drawerOpen : railVisible;
+  const toolGroups = [...new Set(tools.map(({ group }) => group))];
+  const filteredConversations = conversations.filter(({ title }) => title.toLocaleLowerCase('bg').includes(search.trim().toLocaleLowerCase('bg')));
+  const filteredProjects = projects.filter(({ name }) => name.toLocaleLowerCase('bg').includes(search.trim().toLocaleLowerCase('bg')));
+
+  function railAction() {
+    if (small) {
+      if (drawerOpen) closeDrawer();
+      else setDrawerOpen(true);
+    } else {
+      setRailVisible((value) => !value);
+      requestAnimationFrame(() => railVisible ? railTrigger.current?.focus() : railRef.current?.querySelector<HTMLElement>('a')?.focus());
+    }
+  }
+
+  function renderMessage(message: Message, index: number, local = false) {
+    const prior = message.role === 'assistant' ? messages[index - 1] : undefined;
+    const attached = message.imagePath ? imageUrl(message.imagePath) : null;
+    const image = !message.attachmentMime || message.attachmentMime.startsWith('image/');
+    return (
+      <article className={`shark-chat-message shark-chat-message-${message.role}`} key={message.id} aria-label={message.role === 'assistant' ? 'SharkAI' : 'Ти'}>
+        {message.role === 'assistant' && <div className="shark-chat-message-author"><Logo size="sm" /> SharkAI</div>}
+        {attached && (image ? <button type="button" className="shark-chat-image" onClick={() => openInspector({ type: 'image', url: attached, title: 'Прикачено изображение' })}><img src={attached} alt="Прикачено изображение" /></button> : <a className="shark-chat-attachment-link" href={attached} download><FileText size={16} /> Прикачен файл</a>)}
+        <div className="shark-chat-message-text">{message.content}</div>
+        {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} projectStatus={projects.find((project) => project.id === message.toolResult?.projectId)?.status} />}
+        {!local && (
+          <div className="shark-chat-message-actions">
+            <button type="button" title={copied === message.id ? 'Копирано' : 'Копирай'} aria-label={copied === message.id ? 'Копирано' : 'Копирай'} onClick={() => void copyMessage(message)}>{copied === message.id ? <Check size={15} /> : <Copy size={15} />}</button>
+            {message.role === 'user' && conversationId && <button type="button" disabled={pending} title="Редактирай в нов клон" aria-label="Редактирай в нов клон" onClick={() => editMessage(message)}><Pencil size={15} /></button>}
+            {prior?.role === 'user' && conversationId && !message.toolResult && <button type="button" disabled={pending || !canSend} title="Поискай нов отговор в клон" aria-label="Поискай нов отговор в клон" onClick={() => send(prior.content, { origin: { conversationId, messageId: prior.id }, uploadId: prior.imagePath || undefined })}><RotateCcw size={15} /></button>}
+          </div>
+        )}
+      </article>
+    );
+  }
+
+  function formSubmit(event: FormEvent) {
+    event.preventDefault();
+    send();
+  }
+
+  function popupButton(type: Popup, label: string, content: ReactNode, className: string, disabled = false) {
+    return <button type="button" className={className} aria-label={label} title={label} aria-haspopup={type === 'tools' && small ? 'dialog' : undefined} aria-controls={`chat-popup-${type}`} aria-expanded={popup === type} disabled={disabled} onClick={(event) => togglePopup(type, event.currentTarget)}>{content}</button>;
+  }
+
+  function logout() {
+    void fetch('/api/auth/logout', { method: 'POST' }).then((response) => {
+      if (!response.ok) throw new Error();
+      window.location.assign('/login');
+    }).catch(() => setProblem('Изходът от акаунта не успя.'));
+  }
 
   return (
-    <div className="min-h-screen bg-shark-black flex flex-col">
-      <header className="glass border-b border-white/5 shrink-0">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Logo size="sm" />
-            <div>
-              <span className="font-display font-bold gradient-text">Supreme Brain</span>
-              <p className="text-xs text-white/40">
-                Свободен разговор за всичко
-              </p>
+    <div className="shark-chat-shell" ref={shellRef} data-rail={railVisible} data-drawer={drawerOpen}>
+      <a href="#chat-main" className="shark-chat-skip">Към разговора</a>
+      {small && drawerOpen && <button type="button" tabIndex={-1} className="shark-chat-drawer-backdrop" aria-label="Затвори историята" onClick={closeDrawer} />}
+      <aside ref={railRef} className="shark-chat-rail" id="chat-rail" aria-label="История и проекти" aria-hidden={!railOpen} inert={!railOpen}>
+        <header className="shark-chat-brand">
+          <Link href="/"><Logo size="md" /><span>Shark<span>AI</span></span></Link>
+          <button data-close-rail type="button" className="shark-chat-icon" title="Прибери историята" aria-label="Прибери историята" onClick={railAction}>{small ? <X size={20} /> : <PanelLeftClose size={19} />}</button>
+        </header>
+        <div className="shark-chat-rail-actions">
+          <button type="button" className="shark-chat-new" onClick={() => newConversation()} disabled={pending}><Plus size={18} /> Нов чат</button>
+          <label className="shark-chat-search"><Search size={17} /><span className="shark-chat-sr">Търси в заглавията на разговори и проекти</span><input type="search" value={search} placeholder="Търси в историята" onChange={(event) => setSearch(event.target.value)} /></label>
+        </div>
+        <div className="shark-chat-rail-content">
+          <section aria-label="Разговори">
+            <h2>Разговори</h2>
+            {loading && !conversations.length && <p>Зареждане…</p>}
+            {!loading && !filteredConversations.length && <p>{search ? 'Няма съвпадения.' : 'Тук се показват разговорите ти.'}</p>}
+            {filteredConversations.map(({ id, title }) => <button type="button" key={id} className="shark-chat-rail-row" disabled={sending || uploading || mediaPending || modeSaving} aria-current={conversationId === id ? 'page' : undefined} title={title} onClick={() => chooseConversation(id)}><MessageSquare size={16} /><span>{title}</span></button>)}
+          </section>
+          <section aria-label="Проекти">
+            <h2>Проекти</h2>
+            {projectError && <button type="button" className="shark-chat-rail-row" onClick={() => void loadProjects()}><RotateCcw size={16} /> <span>Повтори зареждането</span></button>}
+            {!projectError && !filteredProjects.length && <p>{search ? 'Няма съвпадения.' : 'Няма проекти за показване.'}</p>}
+            {filteredProjects.map((project) => <button type="button" key={project.id} className="shark-chat-rail-row" title={project.name} onClick={() => openInspector({ type: 'project', id: project.id, title: project.name })}><Folder size={16} /><span>{project.name}</span></button>)}
+          </section>
+        </div>
+        <nav className="shark-chat-rail-modules" aria-label="Работно пространство">
+          <Link href="/dashboard" className="shark-chat-rail-row"><LayoutDashboard size={17} /><span>Обзор</span></Link>
+          <Link href="/dashboard?view=studio" className="shark-chat-rail-row"><AppWindow size={17} /><span>Студио</span></Link>
+          <Link href="/dashboard?view=agents" className="shark-chat-rail-row"><Sparkles size={17} /><span>AI агенти</span></Link>
+        </nav>
+        <div className="shark-chat-profile">
+          {account ? popupButton('profile', 'Меню на профила', <>
+            <span className="shark-chat-profile-avatar">{account.name?.trim().charAt(0).toLocaleUpperCase('bg') || 'S'}</span>
+            <span className="shark-chat-profile-name"><strong>{account.name || 'Профил'}</strong><small>{account.plan}</small></span><ChevronDown size={15} />
+          </>, 'shark-chat-profile-button') : <Link className="shark-chat-rail-row" href="/login"><Shield size={18} /><span>Вход в SharkAI</span></Link>}
+          {popup === 'profile' && <div id="chat-popup-profile" className="shark-chat-popup shark-chat-profile-popup" ref={popupRef}>
+            <Link href="/dashboard?view=settings"><Settings size={17} /> Настройки на акаунта</Link>
+            {account?.role === 'ADMIN' && <Link href="/admin"><Shield size={17} /> Администрация</Link>}
+            <button type="button" onClick={logout}><ExternalLink size={17} /> Изход</button>
+          </div>}
+        </div>
+      </aside>
+
+      <div className="shark-chat-workspace" inert={(small && !!inspector) || (small && drawerOpen)}>
+        <header className="shark-chat-topbar">
+          <div className="shark-chat-topbar-start">
+            <button ref={railTrigger} className="shark-chat-icon shark-chat-rail-trigger" type="button" aria-label={railOpen ? 'Скрий историята' : 'Отвори историята'} title="История и проекти" aria-controls="chat-rail" aria-expanded={railOpen} onClick={railAction}>
+              {small ? <Menu size={21} /> : railOpen ? <PanelLeftClose size={19} /> : <PanelLeftOpen size={19} />}
+            </button>
+            <div className="shark-chat-mobile-mode">
+              {popupButton('mode', `Режим ${modeLabel(mode)}`, <>{modeLabel(mode)} <ChevronDown size={15} /></>, 'shark-chat-mode-trigger', pending)}
+              {popup === 'mode' && <div id="chat-popup-mode" className="shark-chat-popup shark-chat-mode-popup" ref={popupRef}>
+                {(['chat', 'work'] as const).map((item) => <button type="button" key={item} onClick={() => changeMode(item)} aria-pressed={mode === item}>{modeLabel(item)} {mode === item && <Check size={16} />}</button>)}
+              </div>}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard" className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1">
-              <LayoutDashboard className="w-3 h-3" /> Studio
-            </Link>
-            {isAdmin && (
-              <>
-                <Link href="/admin" className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1">
-                  <Shield className="w-3 h-3" /> Admin
-                </Link>
-                <Link href="/admin#settings" className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1">
-                  <Settings className="w-3 h-3" />
-                </Link>
-              </>
-            )}
+          <div className="shark-chat-mode-switch" role="group" aria-label="Режим на разговора">
+            {(['chat', 'work'] as const).map((item) => <button type="button" key={item} aria-pressed={mode === item} disabled={pending} onClick={() => changeMode(item)}>{item === 'chat' ? <MessageSquare size={15} /> : <BriefcaseBusiness size={15} />}{modeLabel(item)}</button>)}
           </div>
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-3xl mx-auto px-4 py-6 space-y-4">
-          {messages.map((msg) => (
-            <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] rounded-2xl px-4 py-3 ${
-                msg.role === 'user'
-                  ? 'bg-shark-gradient text-white'
-                  : 'glass text-white/90'
-              }`}>
-                {msg.role === 'assistant' && (
-                  <div className="flex items-center gap-1 mb-2 text-shark-cyan text-xs">
-                    <Brain className="w-3 h-3" /> Supreme Brain
-                  </div>
-                )}
-                {msg.imageUrl && (
-                  <img src={msg.imageUrl} alt="" className="max-h-40 rounded-lg mb-2 object-contain" />
-                )}
-                <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+          <Link className="shark-chat-topbar-studio" href="/dashboard?view=studio"><AppWindow size={17} /><span>Студио</span></Link>
+        </header>
+        <main id="chat-main" tabIndex={-1} className="shark-chat-main" data-start={showStart}>
+          {loading && <p className="shark-chat-center-state" role="status"><LoaderCircle size={19} className="shark-chat-spinner" /> Зареждане на разговора…</p>}
+          {loadProblem && <div className="shark-chat-center-state" role="alert">{loadProblem} {loginRequired ? <Link href={`/login?next=${encodeURIComponent(`/chat${typeof window === 'undefined' ? '' : window.location.search}`)}`}>Вход</Link> : <button type="button" onClick={() => void loadConversation(new URLSearchParams(window.location.search).get('conversationId') || undefined)}>Опитай отново</button>}</div>}
+          {showStart ? <div className="shark-chat-welcome">
+            <Logo size="lg" />
+            <h1>{mode === 'work' ? 'С какво ще работим?' : 'Как мога да помогна?'}</h1>
+          </div> : !loading && !loadProblem ? (
+            <div className="shark-chat-thread-scroll">
+              <div className="shark-chat-thread" role="log" aria-label="Разговор с SharkAI" aria-live="polite">
+                {messages.map((message, index) => renderMessage(message, index))}
+                {optimistic && renderMessage(optimistic, messages.length, true)}
+                {sending && (partial ? renderMessage({ id: 'stream', role: 'assistant', content: partial }, messages.length, true) : (
+                  <div className="shark-chat-status" role="status"><LoaderCircle size={17} className="shark-chat-spinner" /> {selectedTool ? `Изпълнявам ${selectedTool.label}…` : 'Очаквам отговор…'}</div>
+                ))}
+                <div ref={endRef} />
               </div>
             </div>
-          ))}
-          {loading && loadingDeep && (
-            <div className="flex justify-start">
-              <div className="glass rounded-2xl px-4 py-3 flex items-center gap-2 text-sm text-white/50">
-                <Loader2 className="w-4 h-4 animate-spin text-shark-cyan" /> {thinkingLabel}
+          ) : null}
+          <div className="shark-chat-compose-area">
+            {showStart && (model || (mode === 'work' && tools.some(({ available }) => available))) && <div className="shark-chat-suggestions" aria-label="Предложения">
+              {mode === 'work' ? tools.filter(({ available }) => available).slice(0, 3).map((tool) => <button type="button" disabled={pending} key={tool.id} onClick={() => chooseTool(tool)}><ToolIcon tool={tool} /> {tool.label}</button>) : suggestions.map(({ label, text, icon: Icon }) => <button type="button" key={label} disabled={pending} onClick={() => { setInput(text); send(text); }}><Icon size={16} /> {label}</button>)}
+            </div>}
+            <form className="shark-chat-composer" onSubmit={formSubmit}>
+              {(attachment || selectedTool || branchFrom || uploading || projectContext) && <div className="shark-chat-chips">
+                {attachment && <div className="shark-chat-chip">
+                  {attachment.previewUrl ? <button type="button" onClick={() => openInspector({ type: 'image', url: attachment.previewUrl!, title: attachment.name })}><img src={attachment.previewUrl} alt="" />{attachment.name}</button> : <span><FileText size={16} />{attachment.name}</span>}
+                  <button type="button" aria-label="Премахни прикачения файл" disabled={sending} onClick={() => setAttachment(null)}><X size={15} /></button>
+                </div>}
+                {selectedTool && <div className="shark-chat-chip"><span><ToolIcon tool={selectedTool} />{selectedTool.label}</span><button type="button" aria-label="Премахни избрания инструмент" disabled={sending} onClick={() => setSelectedTool(null)}><X size={15} /></button></div>}
+                {projectContext && <div className="shark-chat-chip"><span><Folder size={15} /> {projects.find((project) => project.id === projectContext)?.name ?? 'Проект'}</span></div>}
+                {branchFrom && <div className="shark-chat-chip"><span><Pencil size={15} /> Нов клон</span><button type="button" aria-label="Отмени редакцията" disabled={sending} onClick={() => { setBranchFrom(null); setInput(''); setAttachment(null); setNotice(''); }}><X size={15} /></button></div>}
+                {uploading && <div className="shark-chat-chip" role="status"><LoaderCircle size={15} className="shark-chat-spinner" /> Качване…</div>}
+              </div>}
+              <label className="shark-chat-sr" htmlFor="chat-input">Съобщение</label>
+              <textarea id="chat-input" ref={inputRef} value={input} rows={2} maxLength={12000} disabled={pending || !canSend || !!loadProblem}
+                placeholder={mode === 'work' ? 'Опиши задачата си…' : 'Напиши съобщение…'}
+                onChange={(event) => { setInput(event.target.value); setProblem(''); }}
+                onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }} />
+              <div className="shark-chat-composer-actions">
+                <div className="shark-chat-plus-anchor">
+                  {popupButton('tools', 'Още действия', <Plus size={22} />, 'shark-chat-compose-icon', loading || sending)}
+                  {popup === 'tools' && <>
+                    {small && <button type="button" tabIndex={-1} className="shark-chat-popup-backdrop" aria-label="Затвори още действия" onClick={() => closePopup(true)} />}
+                    <div id="chat-popup-tools" className="shark-chat-popup shark-chat-tools-popup" role={small ? 'dialog' : undefined} aria-modal={small ? true : undefined} aria-label="Още действия" ref={popupRef}>
+                      <header><span>Още действия</span><button className="shark-chat-icon" type="button" aria-label="Затвори още действия" onClick={() => closePopup(true)}><X size={17} /></button></header>
+                      <section>
+                        <h2>Прикачване</h2>
+                        <button type="button" disabled={!account || pending} onClick={() => chooseFile()}><Paperclip size={17} /><span><strong>Прикачи файл</strong><small>{account ? (mode === 'work' ? 'Изображение, PDF, DOCX, CSV или XLSX · до 25 MB' : 'Изображение · до 25 MB') : 'Изисква вход в акаунт'}</small></span></button>
+                        <button type="button" disabled={!account || !media.camera || pending} onClick={() => void openCamera()}><Camera size={17} /><span><strong>Камера</strong><small>{!account ? 'Изисква вход в акаунт' : !media.camera ? 'Браузърът не предоставя камера' : 'Направи снимка'}</small></span></button>
+                        <button type="button" disabled={!account || !media.screen || pending} onClick={() => void captureScreen()}><ScreenShare size={17} /><span><strong>Сподели екран</strong><small>{!account ? 'Изисква вход в акаунт' : !media.screen ? 'Браузърът не поддържа споделяне' : 'Прикачи кадър от избрания екран'}</small></span></button>
+                      </section>
+                      {(!media.dictation || !media.voice) && <section>
+                        <h2>Глас</h2>
+                        {!media.dictation && <button type="button" disabled><Mic size={17} /><span><strong>Диктовка</strong><small>Браузърът не предоставя разпознаване на реч.</small></span></button>}
+                        {!media.voice && <button type="button" disabled><AudioLines size={17} /><span><strong>Гласов разговор</strong><small>Изисква разпознаване и озвучаване на реч в браузъра.</small></span></button>}
+                      </section>}
+                      {toolsPending && <p className="shark-chat-status" role="status"><LoaderCircle size={16} className="shark-chat-spinner" /> Зареждане на инструментите…</p>}
+                      {toolsError && <button type="button" onClick={() => void loadTools()}><RotateCcw size={17} /> Зареди инструментите отново</button>}
+                      {toolGroups.map((group) => <section key={group}><h2>{group}</h2>{tools.filter((tool) => tool.group === group).map((tool) => (
+                        <button type="button" key={tool.id} disabled={!tool.available || pending} aria-pressed={selectedTool?.id === tool.id} onClick={() => chooseTool(tool)}><ToolIcon tool={tool} /><span><strong>{tool.label}</strong><small>{tool.available ? tool.description : tool.reason || 'Функцията е недостъпна.'}</small></span>{selectedTool?.id === tool.id && <Check size={16} />}</button>
+                      ))}</section>)}
+                    </div>
+                  </>}
+                </div>
+                <input ref={fileRef} type="file" hidden onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void uploadFile(file); }} />
+                {selectedTool && INPUT_FILES[selectedTool.input] && <button type="button" title="Избери входен файл" aria-label="Избери входен файл" className="shark-chat-compose-icon" disabled={pending} onClick={() => chooseFile(selectedTool.input)}><Paperclip size={17} /></button>}
+                <div className="shark-chat-compose-spacer" />
+                {models.length > 0 && <div className="shark-chat-model-anchor">
+                  {popupButton('model', `Модел ${model?.label || ''}`, <><span>{model?.label}{appliedReasoning === 'deep' && <small> · Дълбоко</small>}</span><ChevronDown size={14} /></>, 'shark-chat-model-button', pending)}
+                  {popup === 'model' && <div id="chat-popup-model" className="shark-chat-popup shark-chat-model-popup" ref={popupRef}>
+                    <section><h2>Модел</h2>{models.map((item) => <button type="button" key={item.id} aria-pressed={model?.id === item.id} onClick={() => setModelId(item.id)}>{item.label} {model?.id === item.id && <Check size={16} />}</button>)}</section>
+                    {!!model?.reasoningLevels.length && <section><h2>Разсъждение</h2>{model.reasoningLevels.map((item) => <button type="button" key={item} aria-pressed={appliedReasoning === item} onClick={() => { setReasoning(item); closePopup(true); }}>{item === 'deep' ? 'Дълбоко' : 'Стандартно'} {appliedReasoning === item && <Check size={16} />}</button>)}</section>}
+                  </div>}
+                </div>}
+                <button type="button" className="shark-chat-compose-icon" aria-label="Диктовка" aria-pressed={media.listening === 'dictation'} title={media.dictation ? 'Диктовка' : 'Диктовката не се поддържа в този браузър'} disabled={!media.dictation || !canSend || pending} onClick={startDictation}><Mic size={20} /></button>
+                <button type="button" className="shark-chat-compose-icon shark-chat-voice" aria-label={media.speaking ? 'Спри озвучаването' : 'Гласов разговор'} aria-pressed={media.listening === 'conversation' || media.speaking} title={media.voice ? 'Гласов разговор' : 'Гласовият разговор не се поддържа в този браузър'} disabled={!media.voice || !canSend || (pending && !media.speaking)} onClick={startVoice}><AudioLines size={20} /></button>
+                {sending ? <button className="shark-chat-send" type="button" aria-label="Спри отговора" title="Спри отговора" onClick={() => sendController.current?.abort()}><Square size={16} fill="currentColor" /></button> :
+                  <button className="shark-chat-send" type="submit" aria-label="Изпрати" title="Изпрати" disabled={!canSend || pending || !!loadProblem || (!input.trim() && !attachment && selectedTool?.input !== 'none')}><ArrowUp size={21} /></button>}
               </div>
+            </form>
+            <div className="shark-chat-composer-status" aria-live="polite">
+              {problem && <span className="shark-chat-notice" role="alert">{problem}</span>}
+              {notice && <span>{notice}</span>}
+              {!problem && !notice && (media.listening || media.speaking) && <span>{media.speaking ? 'SharkAI отговаря на глас.' : 'Слушам…'}</span>}
+              {!loading && !loadProblem && !account && <span><Link href="/login">Влез в акаунта си</Link>, за да използваш SharkAI и историята си.</span>}
+              {!loading && account && !model && capabilityReason && <span>{capabilityReason}</span>}
             </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-      </div>
-
-      <div className="shrink-0 border-t border-white/5 glass p-4">
-        <div className="max-w-3xl mx-auto">
-          {imagePreview && (
-            <div className="relative inline-block mb-3">
-              <img src={imagePreview} alt="" className="h-20 rounded-lg border border-shark-cyan/30" />
-              <button onClick={() => { setUploadId(null); setImagePreview(null); }} className="absolute -top-2 -right-2 bg-red-500 rounded-full p-1">
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (f) await uploadImage(f);
-            }} />
-            <button onClick={() => fileRef.current?.click()} className="btn-secondary p-3 shrink-0" title="Качи снимка">
-              <ImageIcon className="w-5 h-5" />
-            </button>
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())}
-              placeholder="Питай за всичко — как си, съвет, наука, работа, идеи…"
-              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/30 focus:outline-none focus:border-shark-cyan/50"
-              disabled={loading}
-            />
-            <button onClick={sendMessage} disabled={loading || (!input.trim() && !uploadId)} className="btn-primary p-3 shrink-0">
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-            </button>
           </div>
-          <p className="text-xs text-white/30 mt-2 text-center flex items-center justify-center gap-1">
-            <Sparkles className="w-3 h-3" />
-            Свободен чат за всичко · Build с 15 агенти когато кажеш „давай"
-            <Rocket className="w-3 h-3" />
-          </p>
-        </div>
+        </main>
       </div>
+      {inspector && <div className="shark-chat-inspector-region" ref={inspectorRegion} role={small ? 'dialog' : undefined} aria-modal={small ? true : undefined} aria-label={inspector.title}><Inspector item={inspector} close={closeInspector} talk={pending ? undefined : (project) => newConversation(project)} /></div>}
+      <dialog className="shark-chat-camera-dialog" ref={cameraDialog} onCancel={(event) => { event.preventDefault(); closeCamera(); }}>
+        <header><h2>Камера</h2><button className="shark-chat-icon" type="button" aria-label="Затвори камерата" onClick={closeCamera}><X size={18} /></button></header>
+        <video ref={cameraVideo} muted autoPlay playsInline onLoadedMetadata={() => setCameraReady(true)} />
+        <button type="button" className="shark-chat-new" disabled={!cameraReady} onClick={() => void photograph()}><Camera size={18} /> Направи снимка</button>
+      </dialog>
     </div>
   );
 }

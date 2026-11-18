@@ -20,7 +20,7 @@ export interface ImageProfile {
 }
 
 function rgbToHex(r: number, g: number, b: number) {
-  return `#${[r, g, b].map((x) => Math.round(x).toString(16).padStart(2, '0')).join('')}`;
+  return `#${[r, g, b].map((x) => Math.min(255, Math.round(x)).toString(16).padStart(2, '0')).join('')}`;
 }
 
 function sampleColors(data: Buffer, info: { width: number; height: number; channels: number }) {
@@ -34,7 +34,7 @@ function sampleColors(data: Buffer, info: { width: number; height: number; chann
     const b = data[i + 2];
     totalBrightness += (r + g + b) / 3;
     const hex = rgbToHex(Math.round(r / 24) * 24, Math.round(g / 24) * 24, Math.round(b / 24) * 24);
-    if (r + g + b > 24) colorCount[hex] = (colorCount[hex] || 0) + 1;
+    colorCount[hex] = (colorCount[hex] || 0) + 1;
   }
 
   const sorted = Object.entries(colorCount).sort((a, b) => b[1] - a[1]);
@@ -83,8 +83,11 @@ function detectLayout(data: Buffer, info: { width: number; height: number; chann
 async function analyzeBuffer(buffer: Buffer): Promise<ImageProfile> {
   const img = sharp(buffer);
   const meta = await img.metadata();
+  if (!meta.width || !meta.height) throw new Error('Missing image dimensions');
   const { data, info } = await img
     .resize(160, 160, { fit: 'inside' })
+    .toColourspace('srgb')
+    .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
@@ -97,8 +100,8 @@ async function analyzeBuffer(buffer: Buffer): Promise<ImageProfile> {
   const background = isDark ? (top[top.length - 1] || '#0a0e1a') : '#f8fafc';
 
   return {
-    width: meta.width || 1920,
-    height: meta.height || 1080,
+    width: meta.width,
+    height: meta.height,
     isDark,
     colors: top.length ? top : [primary, secondary, accent],
     primary,

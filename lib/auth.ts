@@ -3,10 +3,18 @@ import { cookies } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import { prisma } from './db';
 import type { Role, Plan } from '@prisma/client';
+import { randomBytes } from 'node:crypto';
+import { getEffectivePlan } from './billing';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'sharkai-dev-secret'
-);
+export const LEGACY_GUEST_EMAIL = 'guest@sharkai.local';
+const developmentSecret = randomBytes(32);
+
+function sessionSecret() {
+  const configured = process.env.JWT_SECRET;
+  if (configured && configured !== 'sharkai-dev-secret') return new TextEncoder().encode(configured);
+  if (process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET is not configured');
+  return developmentSecret;
+}
 
 export interface SessionUser {
   id: string;
@@ -14,6 +22,11 @@ export interface SessionUser {
   name: string | null;
   role: Role;
   plan: Plan;
+}
+
+export interface AccountSession extends SessionUser {
+  tokensUsed: number;
+  tokensLimit: number;
 }
 
 export async function hashPassword(password: string): Promise<string> {
@@ -38,12 +51,13 @@ export async function createToken(user: SessionUser): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setExpirationTime('7d')
     .setIssuedAt()
-    .sign(JWT_SECRET);
+    .sign(sessionSecret());
 }
 
 export async function verifyToken(token: string): Promise<SessionUser | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, sessionSecret(), { algorithms: ['HS256'] });
+    if (typeof payload.id !== 'string' || payload.email === LEGACY_GUEST_EMAIL) return null;
     return {
       id: payload.id as string,
       email: payload.email as string,
@@ -56,11 +70,20 @@ export async function verifyToken(token: string): Promise<SessionUser | null> {
   }
 }
 
-export async function getSession(): Promise<SessionUser | null> {
+export async function getSession(): Promise<AccountSession | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get('sharkai_token')?.value;
   if (!token) return null;
-  return verifyToken(token);
+  const claims = await verifyToken(token);
+  if (!claims) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: claims.id },
+    select: { id: true, email: true, name: true, role: true, plan: true, tokensUsed: true, tokensLimit: true },
+  });
+  if (!user || user.email === LEGACY_GUEST_EMAIL) return null;
+  const plan = await getEffectivePlan(user);
+  return { ...user, plan, tokensLimit: plan === 'PRO' && user.plan === 'FREE' ? 100_000 : user.tokensLimit };
 }
 
 export async function requireSession(): Promise<SessionUser> {

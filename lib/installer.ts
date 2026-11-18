@@ -1,8 +1,8 @@
 import { statSync } from 'node:fs';
 import path from 'node:path';
-import { version } from '../package.json';
+import packageInfo from '../package.json';
 
-export const installerFilename = `SharkAI-Setup-${version}.exe`;
+export const installerFilename = `SharkAI-Setup-${packageInfo.version}.exe`;
 
 export interface InstallerInfo {
   source: 'local' | 'external';

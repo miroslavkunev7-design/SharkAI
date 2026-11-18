@@ -1,18 +1,6 @@
 import { NextResponse } from 'next/server';
+import packageInfo from '@/package.json';
 
-export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    version: '1.0.0',
-    mode: 'local',
-    ai: false,
-    features: {
-      supremeBrain: true,
-      screenshotVision: true,
-      codeGeneration: true,
-      autonomousLoop: true,
-      zipDownload: true,
-      payments: !!process.env.STRIPE_SECRET_KEY,
-    },
-  });
+export function GET() {
+  return NextResponse.json({ ok: true, version: packageInfo.version });
 }

@@ -1,0 +1,12 @@
+[
+  { "id": "files-logo", "name": "Оригинално лого и изображения", "category": "Ресурси" },
+  { "id": "files-agents", "name": "Регистър на агентите", "category": "Ресурси" },
+  { "id": "api-status", "name": "Достъпност на уеб услугата", "category": "API" },
+  { "id": "api-chat-private", "name": "История и изпращане без сесия", "category": "Изолация" },
+  { "id": "api-projects-private", "name": "Проекти и качване без сесия", "category": "Изолация" },
+  { "id": "api-upload", "name": "Качване и четене на собствен PNG", "category": "Файлове" },
+  { "id": "build-prompt-software", "name": "Студио, HTML преглед и ZIP", "category": "Студио" },
+  { "id": "seo-sitemap", "name": "Sitemap и страница за Windows", "category": "Уеб" },
+  { "id": "installer-file", "name": "Локален PE инсталатор", "category": "Windows" },
+  { "id": "download-route", "name": "Връзка към инсталатора", "category": "Windows" }
+]

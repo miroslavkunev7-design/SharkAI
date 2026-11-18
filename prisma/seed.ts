@@ -4,37 +4,28 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  const adminEmail = process.env.ADMIN_EMAIL || 'mkunev77@abv.bg';
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Mirko0099!';
-
-  const passwordHash = await bcrypt.hash(adminPassword, 12);
-
-  const legacyAdminEmail = 'admin@sharkai.app';
-  if (adminEmail !== legacyAdminEmail) {
-    await prisma.user.deleteMany({ where: { email: legacyAdminEmail } });
+  const adminEmail = process.env.ADMIN_EMAIL?.trim();
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminEmail || !adminPassword) {
+    throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD are required to bootstrap an administrator.');
   }
 
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    create: {
+  const passwordHash = await bcrypt.hash(adminPassword, 12);
+  const created = await prisma.user.createMany({
+    data: [{
       email: adminEmail,
       passwordHash,
       name: 'SharkAI Admin',
       role: 'ADMIN',
       plan: 'ULTRA',
       tokensLimit: 999999999,
-    },
-    update: {
-      passwordHash,
-      role: 'ADMIN',
-      plan: 'ULTRA',
-      tokensLimit: 999999999,
-    },
+    }],
+    skipDuplicates: true,
   });
-
-  console.log(`Admin seeded: ${adminEmail}`);
+  console.log(created.count ? 'Bootstrap administrator created.' : 'Bootstrap account already exists.');
 }
 
-main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect());
+main().catch((error: unknown) => {
+  console.error('Administrator bootstrap failed:', error instanceof Error ? error.name : 'UnknownError');
+  process.exitCode = 1;
+}).finally(() => prisma.$disconnect());

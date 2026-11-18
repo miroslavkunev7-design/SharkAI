@@ -1,48 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { saveUpload } from '@/lib/uploads';
+import { resolveUploadMime, saveUpload, UPLOAD_MIME_TYPES, validateUpload } from '@/lib/uploads';
 import { getSession } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
-const ALLOWED = [
-  'image/png', 'image/jpeg', 'image/webp', 'image/jpg',
-  'application/pdf',
-  'video/mp4', 'video/webm', 'video/quicktime',
-  'application/json', 'text/json',
-];
+const fileKinds: Record<string, string> = { pdf: 'pdf', docx: 'document', xlsx: 'dataset', csv: 'dataset', json: 'figma' };
 
 export async function POST(req: NextRequest) {
   const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Влез, за да прикачиш файл.' }, { status: 401 });
 
   try {
     const form = await req.formData();
-    const file = form.get('file') as File | null;
-
-    if (!file) {
-      return NextResponse.json({ error: 'No file' }, { status: 400 });
+    const file = form.get('file');
+    if (!file || typeof file === 'string' || file.size === 0) {
+      return NextResponse.json({ error: 'Избери файл.' }, { status: 400 });
     }
-
-    const mime = file.type || 'application/octet-stream';
-    const ok = ALLOWED.some((a) => mime.startsWith(a.split('/')[0]) || mime === a) ||
-      mime.startsWith('image/') || mime.startsWith('video/') || mime.includes('pdf') || mime.includes('json');
-
-    if (!ok) {
-      return NextResponse.json({ error: 'Unsupported file type' }, { status: 400 });
+    const mime = resolveUploadMime(file.type, file.name);
+    if (!UPLOAD_MIME_TYPES.includes(mime)) {
+      return NextResponse.json({ error: 'Неподдържан тип файл.' }, { status: 415 });
     }
-
     if (file.size > 25 * 1024 * 1024) {
-      return NextResponse.json({ error: 'Max 25MB' }, { status: 400 });
+      return NextResponse.json({ error: 'Максималният размер е 25 MB.' }, { status: 413 });
     }
-
     const buffer = Buffer.from(await file.arrayBuffer());
-    const saved = await saveUpload(buffer, mime);
-
-    let uploadKind = 'file';
-    if (mime.startsWith('image/')) uploadKind = 'image';
-    else if (mime.startsWith('video/')) uploadKind = 'video';
-    else if (mime.includes('pdf')) uploadKind = 'pdf';
-    else if (mime.includes('json')) uploadKind = 'figma';
-
+    if (!validateUpload(buffer, mime)) {
+      return NextResponse.json({ error: 'Съдържанието не отговаря на типа на файла.' }, { status: 415 });
+    }
+    const saved = await saveUpload(buffer, mime, session.id);
+    const uploadKind = mime.startsWith('image/') ? 'image'
+      : mime.startsWith('video/') ? 'video'
+      : fileKinds[saved.ext] ?? 'file';
     return NextResponse.json({
       ok: true,
       uploadId: saved.id,
@@ -50,10 +38,10 @@ export async function POST(req: NextRequest) {
       mimeType: saved.mimeType,
       uploadKind,
       ext: saved.ext,
-      userId: session?.id ?? null,
+      userId: session.id,
     });
-  } catch (err) {
-    console.error('Upload error:', err);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+  } catch (error) {
+    console.error('Upload failed:', error instanceof Error ? error.name : 'UnknownError');
+    return NextResponse.json({ error: 'Качването не успя.' }, { status: 500 });
   }
 }

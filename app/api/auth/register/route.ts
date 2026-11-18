@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { hashPassword, createToken, setAuthCookie } from '@/lib/auth';
+import { hashPassword, createToken, setAuthCookie, LEGACY_GUEST_EMAIL } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password, name } = await req.json();
+
+    if (typeof email !== 'string' || email.trim().toLowerCase() === LEGACY_GUEST_EMAIL) {
+      return NextResponse.json({ error: 'Invalid email' }, { status: 400 });
+    }
 
     const existing = await prisma.user.findUnique({ where: { email } });
     if (existing) {

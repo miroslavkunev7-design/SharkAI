@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { readProjectManifest } from '@/lib/project-files';
 import { createProjectZip } from '@/lib/zip';
+import { getSession } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 
@@ -10,10 +11,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const project = await prisma.project.findUnique({ where: { id } });
-  const manifest = await readProjectManifest(id);
+  const session = await getSession();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const project = await prisma.project.findFirst({ where: { id, userId: session.id, status: 'COMPLETED' } });
+  const manifest = project ? await readProjectManifest(id) : null;
 
-  if (!project || !manifest || project.status !== 'COMPLETED') {
+  if (!project || !manifest?.fileCount) {
     return NextResponse.json({ error: 'Project not ready' }, { status: 404 });
   }
 
@@ -26,6 +29,7 @@ export async function GET(
         'Content-Type': 'application/zip',
         'Content-Disposition': `attachment; filename="${filename}"`,
         'Content-Length': String(zipBuffer.length),
+        'Cache-Control': 'private, no-store',
       },
     });
   } catch (err) {

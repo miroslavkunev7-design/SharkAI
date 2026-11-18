@@ -1,414 +1,601 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { Logo } from '@/components/Logo';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Upload, Mic, Video, MessageSquare, Play, Loader2,
-  FolderOpen, Sparkles, ArrowLeft, ExternalLink, Download,
-  CheckCircle2, FileCode, Brain, X, ImageIcon,
-  Monitor, Smartphone, Laptop, Cloud, Gamepad2, Figma, FileText,
-  Database, Code2, Bug, Rocket, BookOpen, Shield,
+  ArrowRight, ArrowUpRight, CarFront, CircleHelp, Code2, Download, FolderOpen, Gauge,
+  ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare, Mic, Plus,
+  Settings, Sparkles, TrendingUp, Upload, Users, X,
 } from 'lucide-react';
-import { AGENTS, AUTONOMOUS_LOOP, FEATURES, getFeature, type Feature } from '@/lib/agents';
+import { Logo } from '@/components/Logo';
+import { AGENTS, FEATURES, SUPREME_BRAIN, getFeature, getStudioFeatureAvailability } from '@/lib/agents';
+import './workspace.css';
 
-const featureIcons: Record<string, React.ElementType> = {
-  monitor: Monitor, smartphone: Smartphone, laptop: Laptop, cloud: Cloud,
-  gamepad: Gamepad2, message: MessageSquare, mic: Mic, video: Video,
-  figma: Figma, file: FileText, database: Database, api: Code2,
-  bug: Bug, code: Code2, rocket: Rocket, book: BookOpen, check: CheckCircle2, shield: Shield,
+const VIEWS = {
+  overview: { label: 'Обзор', icon: LayoutDashboard, href: '/dashboard' },
+  chat: { label: 'AI чат', icon: MessageSquare, href: '/chat' },
+  studio: { label: 'Студио', icon: Code2, href: '/dashboard?view=studio' },
+  agents: { label: 'AI агенти', icon: Users, href: '/dashboard?view=agents' },
+  automotive: { label: 'Автомобили', icon: CarFront, href: '/dashboard?view=automotive' },
+  investments: { label: 'Инвестиции', icon: TrendingUp, href: '/dashboard?view=investments' },
+  settings: { label: 'Настройки', icon: Settings, href: '/dashboard?view=settings' },
 };
 
-interface Project {
-  id: string;
-  name: string;
-  type: string;
-  status: string;
-  qualityScore: number;
-  createdAt: string;
-}
+type View = keyof typeof VIEWS;
+const PROJECT_STATUS: Record<string, string> = {
+  ANALYZING: 'Анализира се', BUILDING: 'Създават се файлове', RUNNING: 'Изпълнява се',
+  TESTING: 'Проверява се', FIXING: 'Коригира се', DEPLOYING: 'Подготвя се',
+  COMPLETED: 'Завършен', FAILED: 'Неуспешен',
+};
+const BUILD_METHODS: Record<string, string> = {
+  reference: 'Начален проект по визуална референция', provider: 'Код от AI доставчик',
+  scaffold: 'Начален проект от локален генератор', document: 'Документ от описание',
+};
+const STUDIO_LABELS: Record<string, string> = {
+  'screenshot-website': 'Сайт по скрийншот', 'screenshot-mobile': 'Flutter основа по скрийншот',
+  'screenshot-desktop': 'Electron основа по скрийншот', 'screenshot-saas': 'Уеб табло по скрийншот',
+  'screenshot-game': 'Canvas интерфейс по скрийншот', 'prompt-software': 'Уеб проект от описание',
+  'voice-software': 'Уеб проект от диктовка', 'db-gen': 'Начална схема за база данни',
+  'api-gen': 'Начален REST API проект', 'ai-docs': 'Markdown документ от описание',
+};
+const STUDIO_FEATURES = FEATURES.filter(({ id }) => !getStudioFeatureAvailability(id));
+const TERMINAL = ['COMPLETED', 'FAILED'];
 
-interface AgentRun {
-  agentId: string;
-  agentName: string;
-  output: string;
-  status: string;
-}
-
-interface ProjectAnalysis {
-  understanding: string;
-  feature?: string;
-  featureTitle?: string;
-  sections: string[];
-  colors: string[];
-}
-
-interface ProjectDetail {
-  project: Project & { analysis?: ProjectAnalysis | null };
+type User = { name: string | null; email?: string; plan: string; role: string };
+type Project = { id: string; name: string; type: string; status: string; createdAt: string };
+type ProjectDetail = {
+  project: Project & { description: string | null; analysis?: { understanding?: string; buildMethod?: string; feature?: string } | null };
   files: string[];
   fileCount: number;
-  agents: AgentRun[];
+  agents: Array<{ id: string; agentName: string; status: string; output: string | null }>;
   previewUrl: string | null;
   downloadUrl: string | null;
+};
+type Projects = { projects: Project[]; user: User | null; summary?: { total: number; completed: number; active: number } };
+type UploadResult = { uploadId: string; previewUrl: string | null; uploadKind: string; name: string };
+type BillingStatus = { period: { currentPeriodStart: string | null; currentPeriodEnd: string | null } | null };
+
+async function json<T>(url: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(url, { cache: 'no-store', ...options });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Заявката не беше успешна.');
+  return data as T;
+}
+
+function signIn(href: string) {
+  return `/login?next=${encodeURIComponent(href)}`;
+}
+
+function WorkspaceNav({ view, onNavigate }: { view: View; onNavigate?: () => void }) {
+  return (
+    <nav className="module-nav" aria-label="Работно пространство">
+      {Object.entries(VIEWS).map(([key, item]) => (
+        <Link key={key} href={item.href} aria-current={view === key ? 'page' : undefined}
+          onClick={onNavigate} title={item.label}>
+          <item.icon size={19} aria-hidden="true" /><span>{item.label}</span>
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function Banner({ view, children }: { view: View; children?: ReactNode }) {
+  const { icon: Icon, label } = VIEWS[view];
+  return (
+    <section className={`shark-glass module-banner module-banner-${view}`}>
+      <div>
+        <Icon size={24} aria-hidden="true" />
+        <h1>{label}</h1>
+        {children && <p>{children}</p>}
+      </div>
+    </section>
+  );
+}
+
+function ProjectList({ projects, error, isLoading, onRetry }: {
+  projects: Project[]; error?: string; isLoading?: boolean; onRetry: () => void;
+}) {
+  return (
+    <section className="shark-glass module-panel" aria-labelledby="module-projects-title">
+      <div className="module-heading">
+        <h2 id="module-projects-title">Последни проекти</h2>
+        <Link className="module-link" href={VIEWS.studio.href}>Студио <ArrowRight size={16} /></Link>
+      </div>
+      {isLoading ? <p role="status">Зареждане на проектите…</p>
+        : error ? <p role="alert">{error} <button type="button" className="module-link" onClick={onRetry}>Опитай отново</button></p>
+          : !projects.length ? <p>Тук ще се показват създадените проекти.</p>
+            : <ul className="module-project-list">
+              {projects.map((project) => (
+                <li key={project.id}>
+                  <Link href={`/dashboard?project=${encodeURIComponent(project.id)}`}>
+                    <FolderOpen size={19} aria-hidden="true" />
+                    <span>{project.name}</span>
+                    <small className={`module-status module-status-${project.status.toLowerCase()}`}>{PROJECT_STATUS[project.status] || project.status}</small>
+                  </Link>
+                </li>
+              ))}
+            </ul>}
+    </section>
+  );
+}
+
+function Overview({ data, loading, error, onRetry }: { data: Projects | null; loading: boolean; error: string; onRetry: () => void }) {
+  const projects = data?.projects ?? [];
+  const summary = data?.summary;
+  return (
+    <>
+      <section className="shark-glass module-banner module-overview-hero">
+        <div>
+          <h1>Команден <span>център</span></h1>
+          <p>Разговори, проекти и задачи в работното ти пространство.</p>
+          <div className="module-actions">
+            <Link href="/chat" className="shark-action">Отвори AI чата <ArrowRight size={17} /></Link>
+            <Link href={VIEWS.studio.href} className="shark-action-secondary">Към Студиото <Code2 size={17} /></Link>
+          </div>
+        </div>
+      </section>
+      {data?.user && summary && (
+        <dl className="module-metrics" aria-label="Състояние на проектите">
+          <div className="shark-glass"><dt><FolderOpen aria-hidden="true" /> Проекти</dt><dd>{summary.total}</dd></div>
+          <div className="shark-glass"><dt><Gauge aria-hidden="true" /> В работа</dt><dd>{summary.active}</dd></div>
+          <div className="shark-glass"><dt><Sparkles aria-hidden="true" /> Завършени</dt><dd>{summary.completed}</dd></div>
+        </dl>
+      )}
+      <section aria-labelledby="module-cards-title">
+        <h2 className="module-section-title" id="module-cards-title">Модули</h2>
+        <div className="module-tiles">
+          {(['chat', 'studio', 'agents'] as const).map((key) => {
+            const { href, label, icon: Icon } = VIEWS[key];
+            const captions = { chat: 'Разговори, файлове и работни задачи.', studio: 'Проекти от описание и скрийншоти.', agents: 'Роли и резултати от изпълнения.' };
+            return (
+              <Link key={key} href={href} className={`shark-glass module-tile module-banner-${key}`}>
+                <div><Icon size={20} /><ArrowUpRight size={20} /></div>
+                <span><strong>{label}</strong><p>{captions[key]}</p></span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+      <ProjectList projects={projects} error={error} isLoading={loading} onRetry={onRetry} />
+    </>
+  );
+}
+
+interface Recognition {
+  lang: string;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  start(): void;
+  stop(): void;
+}
+
+function StudioForm({ featureParam, user, loading, onCreated }: {
+  featureParam: string; user: User | null; loading: boolean; onCreated: (id: string) => void;
+}) {
+  const [featureId, setFeatureId] = useState(featureParam);
+  const [prompt, setPrompt] = useState('');
+  const [name, setName] = useState('');
+  const [upload, setUpload] = useState<UploadResult | null>(null);
+  const [busyUploading, setBusyUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [speechAvailable, setSpeechAvailable] = useState(false);
+  const [listening, setListening] = useState(false);
+  const request = useRef<{ payload: string; id: string } | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const recognition = useRef<Recognition | null>(null);
+  const feature = getFeature(featureId);
+  const needsReference = feature.uploadKinds.includes('image');
+  const unavailable = getStudioFeatureAvailability(featureId);
+
+  useEffect(() => {
+    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+    setSpeechAvailable(!!(w.SpeechRecognition || w.webkitSpeechRecognition));
+    return () => recognition.current?.stop();
+  }, []);
+
+  function dictate() {
+    if (recognition.current) { recognition.current.stop(); return; }
+    const w = window as unknown as { SpeechRecognition?: new () => Recognition; webkitSpeechRecognition?: new () => Recognition };
+    const SpeechRecognition = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+    setError('');
+    const engine = new SpeechRecognition();
+    engine.lang = 'bg-BG';
+    engine.onstart = () => setListening(true);
+    engine.onend = () => { recognition.current = null; setListening(false); };
+    engine.onerror = () => setError('Диктовката прекъсна. Провери разрешението за микрофона.');
+    engine.onresult = (event) => {
+      const text = event.results[0]?.[0]?.transcript;
+      if (text) setPrompt((previous) => [previous, text].filter(Boolean).join(' '));
+    };
+    recognition.current = engine;
+    try { engine.start(); } catch { engine.onerror(); engine.onend(); }
+  }
+
+  function removeUpload() {
+    setUpload(null);
+    if (fileInput.current) fileInput.current.value = '';
+  }
+
+  async function uploadFile(file: File) {
+    setBusyUploading(true);
+    setError('');
+    setUpload(null);
+    const form = new FormData();
+    form.append('file', file);
+
+    try {
+      const data = await json<Omit<UploadResult, 'name'>>('/api/upload', { method: 'POST', body: form });
+      setUpload({ ...data, name: file.name });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Качването прекъсна.');
+      if (fileInput.current) fileInput.current.value = '';
+    } finally {
+      setBusyUploading(false);
+    }
+  }
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving || busyUploading || unavailable || !user || (needsReference && !upload) || (!upload && !prompt.trim())) return;
+    setError('');
+    setSaving(true);
+    const body = {
+      name: name.trim() || prompt.trim().slice(0, 70) || upload?.name || 'Нов проект',
+      description: prompt.trim(),
+      type: feature.projectType,
+      inputType: feature.inputType,
+      featureId,
+      uploadId: upload?.uploadId,
+      uploadKind: upload?.uploadKind,
+    };
+    const payload = JSON.stringify(body);
+    if (request.current?.payload !== payload) request.current = { payload, id: crypto.randomUUID() };
+    try {
+      const data = await json<{ project: Project }>('/api/projects', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...body, requestId: request.current.id }),
+      });
+      onCreated(data.project.id);
+      request.current = null;
+      removeUpload();
+      setName('');
+      setPrompt('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Проектът не стартира.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="module-columns">
+      <section className="shark-glass module-panel">
+        <div className="module-heading"><h2>Нов проект</h2></div>
+        {loading ? <p role="status">Зареждане на акаунта…</p> : !user ? (
+          <>
+            <p>Влез в акаунта си, за да качиш референция и запазиш проект.</p>
+            <Link className="shark-action" href={signIn(`/dashboard?feature=${encodeURIComponent(featureParam)}`)}>Вход <ArrowRight size={16} /></Link>
+          </>
+        ) : (
+          <form className="module-form" onSubmit={submit}>
+            <div className="module-fields">
+              <label>Име на проекта <input value={name} onChange={(event) => setName(event.target.value)} maxLength={70} placeholder="Моят проект" /></label>
+              <label>Тип на проекта
+                <select onChange={(event) => { setFeatureId(event.target.value); removeUpload(); setError(''); }} value={featureId} disabled={busyUploading || saving}>
+                  {unavailable && <option value={featureId}>{feature.title}</option>}
+                  {STUDIO_FEATURES.map(({ id, title }) => <option key={id} value={id}>{STUDIO_LABELS[id] ?? title}</option>)}
+                </select>
+              </label>
+            </div>
+            {unavailable && <p role="status">{unavailable}</p>}
+            {needsReference && !unavailable && (
+              <div className="module-upload">
+                <input ref={fileInput} type="file" className="sr-only" id="studio-reference" accept="image/png,image/jpeg,image/webp"
+                  disabled={busyUploading || saving}
+                  onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); }} />
+                <label htmlFor="studio-reference">
+                  {busyUploading ? <LoaderCircle size={22} className="animate-spin" /> : <Upload size={22} />}
+                  {busyUploading ? 'Качване…' : upload?.name || 'Избери референтно изображение'}
+                  <small>PNG, JPG или WebP</small>
+                </label>
+                {upload && <button type="button" onClick={removeUpload} className="module-link"><X size={17} /> Премахни файла</button>}
+              </div>
+            )}
+            <label>Описание
+              <textarea required={!needsReference} value={prompt} onChange={(event) => setPrompt(event.target.value)}
+                maxLength={4000} rows={4} placeholder="Какво трябва да съдържа проектът?" />
+            </label>
+            {featureId === 'voice-software' && (speechAvailable
+              ? <button type="button" className="shark-action-secondary" onClick={dictate}><Mic size={17} />{listening ? 'Спри диктовката' : 'Диктувай описание'}</button>
+              : <p>Диктовката изисква браузър с поддръжка на разпознаване на реч.</p>)}
+            {error && <p className="module-error" role="alert">{error}</p>}
+            <button type="submit" className="shark-action"
+              disabled={!!unavailable || saving || busyUploading || (needsReference ? !upload : !prompt.trim())}>
+              {saving ? <LoaderCircle size={17} className="animate-spin" /> : <Plus size={17} />}
+              {saving ? 'Проектът стартира…' : 'Създай проект'}
+            </button>
+            <details className="module-disclosure">
+              <summary>Липсващи инструменти в Студиото</summary>
+              <ul>{FEATURES.filter(({ id }) => getStudioFeatureAvailability(id)).map(({ id, title }) => <li key={id}><strong>{title}</strong><p>{getStudioFeatureAvailability(id)}</p></li>)}</ul>
+            </details>
+          </form>
+        )}
+      </section>
+      <section className="shark-glass module-panel">
+        <div className="module-heading"><h2>Визуална референция</h2></div>
+        <div className="module-upload-preview">
+          {upload?.previewUrl
+            ? <Image src={upload.previewUrl} alt="Качена визуална референция" width={800} height={450} unoptimized />
+            : <div><ImageIcon size={27} /><p>{needsReference ? 'Каченото изображение ще се покаже тук.' : 'Този тип проект използва описание.'}</p></div>}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function Result({ detail, error, onRetry }: { detail: ProjectDetail | null; error: string; onRetry: () => void }) {
+  return (
+    <section className="shark-glass module-panel" aria-labelledby="studio-result">
+      <div className="module-heading">
+        <h2 id="studio-result">{detail?.project.name || 'Резултат от Студиото'}</h2>
+        {detail && <span className={`module-status module-status-${detail.project.status.toLowerCase()}`} role="status">{PROJECT_STATUS[detail.project.status] || detail.project.status}</span>}
+      </div>
+      {error && <p className="module-error" role="alert">{error} <button type="button" className="module-link" onClick={onRetry}>Провери отново</button></p>}
+      {!detail && !error && <p role="status"><LoaderCircle size={17} className="inline animate-spin" /> Зареждане на проекта…</p>}
+      {detail?.project.status === 'FAILED' && <p role="alert">Студиото не завърши проекта. Прегледай входа и създай нов проект при нужда.</p>}
+      {detail?.project.analysis?.understanding && <p className="module-copy">{detail.project.analysis.understanding}</p>}
+      {detail?.project.status === 'COMPLETED' && (
+        <>
+          <p className="module-copy">{detail.fileCount ? `Запазени файлове: ${detail.fileCount}.` : 'Архивът на този проект е недостъпен.'} {BUILD_METHODS[detail.project.analysis?.buildMethod || '']}</p>
+          <div className="module-actions">
+            {detail.previewUrl && <a href={detail.previewUrl} target="_blank" rel="noopener noreferrer" className="shark-action-secondary">Преглед <ArrowUpRight size={17} /></a>}
+            {detail.downloadUrl && <a href={detail.downloadUrl} download className="shark-action">Изтегли ZIP <Download size={17} /></a>}
+          </div>
+          {detail.files.length > 0 && (
+            <details className="module-disclosure">
+              <summary>Файлове</summary>
+              <ul className="module-file-list">{detail.files.map((file) => <li key={file}><code>{file}</code></li>)}</ul>
+            </details>
+          )}
+        </>
+      )}
+      {detail && detail.agents.length > 0 && BUILD_METHODS[detail.project.analysis?.buildMethod || ''] && (
+        <details className="module-disclosure">
+          <summary>Резултати от изпълнението</summary>
+          <ul>{detail.agents.map(({ id, agentName, output }) => <li key={id}><strong>{agentName}</strong>{output && <p>{output}</p>}</li>)}</ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function Agents() {
+  return (
+    <>
+      <Banner view="agents">Ролите, регистрирани в SharkAI.</Banner>
+      <section className="shark-glass module-panel">
+        <div className="module-heading">
+          <div className="module-brain"><Logo size="md" /><div><h2>{SUPREME_BRAIN.name}</h2><p>{SUPREME_BRAIN.description}</p></div></div>
+          <Link className="module-link" href={VIEWS.studio.href}>Студио <ArrowRight size={16} /></Link>
+        </div>
+        <p>Изпълнените роли и резултатите се показват в конкретния проект.</p>
+      </section>
+      <section aria-labelledby="module-agents-title">
+        <h2 className="module-section-title" id="module-agents-title">Специализирани роли</h2>
+        <ul className="module-agents">
+          {AGENTS.map((agent) => (
+            <li key={agent.id} className="shark-glass module-panel">
+              <span className="module-agent-icon"><Users size={18} /></span>
+              <div><strong>{agent.name}</strong><p>{agent.description}</p></div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
+
+function Account({ user, loading, error }: { user: User | null; loading: boolean; error: string }) {
+  const router = useRouter();
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
+  const [billingError, setBillingError] = useState('');
+  const [logoutError, setLogoutError] = useState('');
+  const [signingOut, setSigningOut] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    const request = new AbortController();
+    void json<BillingStatus>('/api/payments/status', { signal: request.signal })
+      .then(setBilling).catch(() => { if (!request.signal.aborted) setBillingError('Периодът на абонамента не можа да се зареди.'); });
+    return () => request.abort();
+  }, [user]);
+
+  async function logout() {
+    setSigningOut(true);
+    setLogoutError('');
+    try {
+      await json('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+      router.refresh();
+    } catch {
+      setLogoutError('Изходът не беше успешен. Опитай отново.');
+      setSigningOut(false);
+    }
+  }
+
+  const formatter = new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeStyle: 'short' });
+  return (
+    <>
+      <Banner view="settings">Акаунт, права и абонамент.</Banner>
+      <section className="shark-glass module-panel">
+        <div className="module-heading"><h2>Профил</h2></div>
+        {loading ? <p role="status">Зареждане на профила…</p> : error ? <p role="alert">{error}</p> : !user
+          ? <Link className="shark-action" href={signIn(VIEWS.settings.href)}>Вход <ArrowRight size={17} /></Link>
+          : (
+            <>
+              <dl className="module-account">
+                {user.name && <div><dt>Име</dt><dd>{user.name}</dd></div>}
+                {user.email && <div><dt>Имейл</dt><dd>{user.email}</dd></div>}
+                <div><dt>План</dt><dd>{user.plan}</dd></div>
+                <div><dt>Роля</dt><dd>{user.role === 'ADMIN' ? 'Администратор' : 'Потребител'}</dd></div>
+                {billing?.period?.currentPeriodStart && <div><dt>Начало на периода</dt><dd><time dateTime={billing.period.currentPeriodStart}>{formatter.format(new Date(billing.period.currentPeriodStart))}</time></dd></div>}
+                {billing?.period?.currentPeriodEnd && <div><dt>Край на периода</dt><dd><time dateTime={billing.period.currentPeriodEnd}>{formatter.format(new Date(billing.period.currentPeriodEnd))}</time></dd></div>}
+              </dl>
+              {billingError && <p role="alert" className="module-error">{billingError}</p>}
+              <div className="module-actions">
+                {user.role === 'ADMIN' ? <Link className="shark-action-secondary" href="/admin#settings">Административни настройки</Link>
+                  : <Link className="shark-action-secondary" href="/pricing">Планове</Link>}
+                <button className="shark-action-secondary" type="button" onClick={logout} disabled={signingOut}>{signingOut ? 'Излизане…' : 'Изход'}</button>
+              </div>
+              {logoutError && <p role="alert" className="module-error">{logoutError}</p>}
+            </>
+          )}
+      </section>
+    </>
+  );
+}
+
+function Automotive() {
+  return (
+    <>
+      <section className="shark-glass module-banner module-banner-automotive">
+        <div><CarFront size={26} /><h1>Автомобили</h1><p>Автомобилни изображения от проектните материали на SharkAI.</p></div>
+        <Image src="/assets/image-1.png" className="module-car" alt="Сребрист автомобил от проектните материали на SharkAI" width={420} height={420} />
+      </section>
+      <div className="module-columns">
+        <section className="shark-glass module-panel">
+          <div className="module-heading"><h2>Диагностика</h2></div>
+          <p>Няма свързан източник за VIN, OBD диагностичен адаптер или интерактивен 3D модел.</p>
+        </section>
+        <figure className="shark-glass module-panel module-engine">
+          <Image src="/assets/image-2.png" alt="Изображение на червен и сребрист двигател" width={320} height={320} />
+          <figcaption>Двигател от проектните материали</figcaption>
+        </figure>
+      </div>
+    </>
+  );
 }
 
 function DashboardContent() {
-  const searchParams = useSearchParams();
-  const initialFeature = searchParams.get('feature') || 'screenshot-website';
+  const router = useRouter();
+  const params = useSearchParams();
+  const projectId = params.get('project');
+  const featureParam = params.get('feature');
+  const viewParam = params.get('view');
+  const view: View = projectId || featureParam ? 'studio'
+    : viewParam && Object.hasOwn(VIEWS, viewParam) && viewParam !== 'chat' ? viewParam as View : 'overview';
+  const dialog = useRef<HTMLDialogElement>(null);
+  const [data, setData] = useState<Projects | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [details, setDetails] = useState<ProjectDetail | null>(null);
+  const [projectError, setProjectError] = useState('');
+  const [reload, setReload] = useState(0);
 
-  const [selectedFeature, setSelectedFeature] = useState<Feature>(getFeature(initialFeature));
-  const [prompt, setPrompt] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [activeDetail, setActiveDetail] = useState<ProjectDetail | null>(null);
-  const [activeLoop, setActiveLoop] = useState(-1);
-  const [completedAgents, setCompletedAgents] = useState<string[]>([]);
-  const [user, setUser] = useState<{ name: string; plan: string; role?: string } | null>(null);
-  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
-  const [uploadId, setUploadId] = useState<string | null>(null);
-  const [uploadKind, setUploadKind] = useState<string | null>(null);
-  const [listening, setListening] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const f = searchParams.get('feature');
-    if (f) setSelectedFeature(getFeature(f));
-  }, [searchParams]);
-
-  function startVoiceInput() {
-    const w = window as unknown as Record<string, unknown>;
-    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!SR || typeof SR !== 'function') {
-      alert('Гласов вход — използвай Chrome или Edge.');
-      return;
-    }
-    const rec = new (SR as new () => {
-      lang: string; interimResults: boolean;
-      onstart: (() => void) | null; onend: (() => void) | null;
-      onresult: ((e: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => void) | null;
-      start: () => void;
-    })();
-    rec.lang = 'bg-BG';
-    rec.interimResults = false;
-    rec.onstart = () => setListening(true);
-    rec.onend = () => setListening(false);
-    rec.onresult = (e) => {
-      const text = e.results[0]?.[0]?.transcript;
-      if (text) setPrompt((p) => (p ? `${p} ${text}` : text));
-    };
-    rec.start();
-  }
-
-  const acceptUpload = selectedFeature.uploadKinds.includes('image')
-    ? 'image/png,image/jpeg,image/webp'
-    : selectedFeature.uploadKinds.includes('video')
-      ? 'video/mp4,video/webm'
-      : selectedFeature.uploadKinds.includes('pdf')
-        ? 'application/pdf'
-        : selectedFeature.uploadKinds.includes('figma')
-          ? 'application/json,image/png,image/jpeg'
-          : 'image/*,video/*,application/pdf,application/json';
-
-  async function handleFileUpload(file: File): Promise<string | null> {
-    const form = new FormData();
-    form.append('file', file);
+  const fetchProjects = useCallback(async (signal?: AbortSignal) => {
+    setError('');
     try {
-      const res = await fetch('/api/upload', { method: 'POST', body: form });
-      if (!res.ok) throw new Error('Upload failed');
-      const data = await res.json();
-      setUploadId(data.uploadId);
-      setUploadKind(data.uploadKind);
-      setUploadPreview(data.previewUrl || `📎 ${file.name}`);
-      return data.uploadId as string;
+      setData(await json<Projects>('/api/projects', { signal }));
     } catch {
-      alert('Грешка при качване (макс 25MB).');
-      return null;
+      if (!signal?.aborted) setError('Проектите и профилът не можаха да се заредят.');
+    } finally {
+      if (!signal?.aborted) setLoading(false);
     }
-  }
-
-  const fetchProjects = useCallback(async () => {
-    try {
-      const res = await fetch('/api/projects');
-      if (res.ok) {
-        const data = await res.json();
-        setProjects(data.projects || []);
-        if (data.user) setUser(data.user);
-      }
-    } catch { /* */ }
   }, []);
 
-  const pollProject = useCallback(async (projectId: string) => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}`);
-      if (!res.ok) return;
-      const data = await res.json();
-      setActiveDetail(data);
-
-      const statusToStep: Record<string, number> = {
-        ANALYZING: 0, BUILDING: 1, RUNNING: 2, TESTING: 3,
-        FIXING: 5, DEPLOYING: 7, COMPLETED: 7, FAILED: -1,
-      };
-      setActiveLoop(statusToStep[data.project.status] ?? 0);
-
-      if (data.agents?.length) {
-        setCompletedAgents(data.agents.map((a: AgentRun) => a.agentName));
-      }
-
-      if (data.project.status === 'COMPLETED' || data.project.status === 'FAILED') {
-        if (pollRef.current) clearInterval(pollRef.current);
-        setLoading(false);
-        setActiveLoop(AUTONOMOUS_LOOP.length - 1);
-        fetchProjects();
-      }
-    } catch { /* */ }
+  useEffect(() => {
+    const request = new AbortController();
+    void fetchProjects(request.signal);
+    return () => request.abort();
   }, [fetchProjects]);
 
   useEffect(() => {
-    fetchProjects();
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
-  }, [fetchProjects]);
+    setDetails(null);
+    setProjectError('');
+    if (!projectId || !data?.user) return;
 
-  async function startGenerate(forcedUploadId?: string) {
-    const id = forcedUploadId || uploadId;
-    const needsUpload = !selectedFeature.uploadKinds.includes('none');
-    if (!prompt.trim() && !id && needsUpload) return;
-    if (!prompt.trim() && selectedFeature.uploadKinds.includes('none') && !id) return;
-
-    setLoading(true);
-    setActiveLoop(0);
-    setCompletedAgents([]);
-    setActiveDetail(null);
-
-    try {
-      const res = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: prompt.slice(0, 50) || selectedFeature.title,
-          description: prompt || selectedFeature.subtitle,
-          type: selectedFeature.projectType,
-          inputType: selectedFeature.inputType,
-          featureId: selectedFeature.id,
-          uploadId: id,
-          uploadKind,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
-      setActiveProjectId(data.project.id);
-      if (pollRef.current) clearInterval(pollRef.current);
-      pollRef.current = setInterval(() => pollProject(data.project.id), 800);
-      await pollProject(data.project.id);
-    } catch {
-      setLoading(false);
-      alert('Генерацията не стартира.');
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const result = await json<ProjectDetail>(`/api/projects/${encodeURIComponent(projectId!)}`, { signal: controller.signal });
+        if (controller.signal.aborted) return;
+        setDetails(result);
+        if (TERMINAL.includes(result.project.status)) {
+          void fetchProjects(controller.signal);
+        } else {
+          timer = setTimeout(poll, 1600);
+        }
+      } catch (err) {
+        if (!controller.signal.aborted) setProjectError(err instanceof Error ? err.message : 'Статусът е недостъпен.');
+      }
     }
+    void poll();
+    return () => { controller.abort(); clearTimeout(timer); };
+  }, [projectId, data?.user?.email, !!data?.user, reload, fetchProjects]);
+
+  function created(id: string) {
+    router.push(`/dashboard?project=${encodeURIComponent(id)}`);
+    void fetchProjects();
   }
 
-  const isComplete = activeDetail?.project.status === 'COMPLETED';
-  const needsFile = !selectedFeature.uploadKinds.includes('none');
-
   return (
-    <div className="min-h-screen bg-shark-black">
-      <header className="glass border-b border-white/5 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-white/50 hover:text-white"><ArrowLeft className="w-5 h-5" /></Link>
-            <Logo size="sm" />
-            <span className="font-display font-bold gradient-text">SharkAI Studio</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {user && <span className="text-sm text-white/50 hidden sm:block">{user.name} · <span className="text-shark-cyan">{user.plan}</span></span>}
-            <Link href="/chat" className="btn-secondary text-sm py-2 px-4">Chat</Link>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="mb-6">
-          <h2 className="font-display text-lg font-bold mb-3 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-shark-cyan" /> 18 Features — Multi-Agent
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 max-h-48 overflow-y-auto pr-1">
-            {FEATURES.map((f) => {
-              const Icon = featureIcons[f.icon] || Code2;
-              const active = selectedFeature.id === f.id;
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => { setSelectedFeature(f); setUploadId(null); setUploadPreview(null); }}
-                  className={`text-left p-3 rounded-xl text-xs transition-all ${active ? 'bg-shark-gradient text-white ring-2 ring-shark-cyan/50' : 'glass hover:bg-white/10'}`}
-                >
-                  <Icon className="w-4 h-4 mb-1 opacity-80" />
-                  <p className="font-medium leading-tight">{f.title}</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <div className="glass rounded-2xl p-6">
-              <h3 className="font-semibold text-shark-cyan mb-1">{selectedFeature.title}</h3>
-              <p className="text-sm text-white/50 mb-4">{selectedFeature.subtitle}</p>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={acceptUpload}
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const id = await handleFileUpload(file);
-                    if (id && needsFile) await startGenerate(id);
-                  }
-                }}
-              />
-
-              {uploadPreview ? (
-                <div className="relative mb-4 rounded-xl overflow-hidden border border-shark-cyan/30 p-3 bg-black/30">
-                  {uploadPreview.startsWith('/') ? (
-                    <img src={uploadPreview} alt="" className="w-full max-h-40 object-contain" />
-                  ) : (
-                    <p className="text-sm text-shark-cyan">{uploadPreview}</p>
-                  )}
-                  <button onClick={() => { setUploadPreview(null); setUploadId(null); }} className="absolute top-2 right-2 p-1 bg-black/70 rounded-full">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : needsFile ? (
-                <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-white/20 rounded-xl p-5 text-center hover:border-shark-cyan/50 cursor-pointer mb-4">
-                  <Upload className="w-7 h-7 mx-auto mb-2 text-shark-cyan" />
-                  <p className="text-sm text-white/60">Качи файл за {selectedFeature.title}</p>
-                </div>
-              ) : null}
-
-              <div className="relative mb-4">
-                <textarea
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  placeholder="Опиши проекта на български или английски…"
-                  className="w-full h-28 bg-white/5 border border-white/10 rounded-xl p-4 pr-14 text-white placeholder:text-white/30 focus:outline-none focus:border-shark-cyan/50 resize-none"
-                />
-                {(selectedFeature.inputType === 'voice' || selectedFeature.inputType === 'prompt') && (
-                  <button type="button" onClick={startVoiceInput} className={`absolute right-3 bottom-3 p-2 rounded-xl ${listening ? 'bg-red-500/80 animate-pulse' : 'bg-shark-gradient'}`}>
-                    <Mic className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-
-              <button onClick={() => startGenerate()} disabled={loading || (!prompt.trim() && !uploadId)} className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50">
-                {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> Multi-Agent Build…</> : <><Play className="w-5 h-5" /> Generate with 15 Agents</>}
-              </button>
-            </div>
-
-            {(loading || activeDetail) && (
-              <div className="glass rounded-2xl p-6">
-                <h3 className="font-semibold mb-4 text-shark-cyan flex items-center gap-2">
-                  {isComplete ? <><CheckCircle2 className="w-5 h-5 text-green-400" /> Ready</> : <>Autonomous Loop</>}
-                </h3>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {AUTONOMOUS_LOOP.map((step, i) => (
-                    <div key={step.step} className={`px-3 py-1.5 rounded-lg text-xs ${i <= activeLoop ? 'bg-shark-gradient text-white' : 'bg-white/5 text-white/30'}`}>
-                      {step.label}
-                    </div>
-                  ))}
-                </div>
-
-                {activeDetail?.project.analysis?.understanding && (
-                  <div className="bg-shark-blue/10 border border-shark-cyan/20 rounded-xl p-4 mb-4">
-                    <p className="text-xs text-shark-cyan font-semibold mb-2 flex items-center gap-1"><Brain className="w-4 h-4" /> Supreme Brain</p>
-                    <p className="text-sm text-white/80">{activeDetail.project.analysis.understanding}</p>
-                    {activeDetail.project.analysis.featureTitle && (
-                      <p className="text-xs text-white/40 mt-2">Feature: {activeDetail.project.analysis.featureTitle}</p>
-                    )}
-                  </div>
-                )}
-
-                {completedAgents.length > 0 && (
-                  <div className="mb-4 max-h-40 overflow-y-auto space-y-1">
-                    {completedAgents.map((name, i) => (
-                      <p key={i} className="text-xs text-green-400/80 font-mono">✓ {name}</p>
-                    ))}
-                  </div>
-                )}
-
-                {isComplete && activeDetail && (
-                  <div className="space-y-4">
-                    <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
-                      <p className="text-green-400 font-medium">✓ {activeDetail.fileCount} files · {activeDetail.project.qualityScore.toFixed(0)}%</p>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      {activeDetail.previewUrl && (
-                        <a href={activeDetail.previewUrl} target="_blank" rel="noopener noreferrer" className="btn-primary text-sm py-2 px-4 flex items-center gap-2">
-                          <ExternalLink className="w-4 h-4" /> Preview
-                        </a>
-                      )}
-                      {activeDetail.downloadUrl && (
-                        <a href={activeDetail.downloadUrl} download className="btn-primary text-sm py-2 px-4 flex items-center gap-2">
-                          <Download className="w-4 h-4" /> Download ZIP
-                        </a>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {activeDetail.files.slice(0, 20).map((f) => (
-                        <span key={f} className="text-xs bg-white/5 px-2 py-0.5 rounded font-mono text-shark-cyan">{f}</span>
-                      ))}
-                      {activeDetail.files.length > 20 && <span className="text-xs text-white/40">+{activeDetail.files.length - 20} more</span>}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-6">
-            <div className="glass rounded-2xl p-5">
-              <h3 className="font-semibold mb-3 text-sm">15 Agents</h3>
-              <div className="space-y-2 max-h-80 overflow-y-auto">
-                {AGENTS.map((a) => {
-                  const done = completedAgents.includes(a.name);
-                  return (
-                    <div key={a.id} className={`p-2 rounded-lg text-xs ${done ? 'bg-green-500/10 border border-green-500/20' : 'bg-white/5'}`}>
-                      <p className="font-medium text-shark-cyan">{a.id} · {a.name}</p>
-                      <p className="text-white/40">{a.description}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="glass rounded-2xl p-5">
-              <h3 className="font-semibold mb-3 flex items-center gap-2"><FolderOpen className="w-4 h-4" /> Projects</h3>
-              {projects.length === 0 ? (
-                <p className="text-sm text-white/40">No projects yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {projects.slice(0, 6).map((p) => (
-                    <button key={p.id} onClick={() => { setActiveProjectId(p.id); pollProject(p.id); }} className="w-full text-left bg-white/5 rounded-lg p-2 hover:bg-white/10 text-sm">
-                      <span className="truncate block">{p.name}</span>
-                      <span className="text-xs text-white/40">{p.status} · {p.qualityScore.toFixed(0)}%</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+    <div className="module-workspace">
+      <a className="module-skip" href="#workspace-content">Към съдържанието</a>
+      <aside className="module-sidebar shark-glass">
+        <Link href="/" className="module-brand"><Logo size="md" /><span>SharkAI</span></Link>
+        <WorkspaceNav view={view} />
+        <Link className="module-sidebar-account" href={data?.user ? VIEWS.settings.href : signIn('/dashboard')}>
+          <Settings size={18} /><span>{data?.user?.name || data?.user?.email || 'Вход'}</span>
+        </Link>
+      </aside>
+      <div className="module-main">
+        <header className="module-topbar">
+          <button type="button" className="module-menu shark-action-secondary" onClick={() => dialog.current?.showModal()} aria-label="Отвори менюто"><Menu size={22} /></button>
+          <Link href="/" className="module-mobile-brand"><Logo size="sm" /></Link>
+          <span className="module-breadcrumb"><Link href="/dashboard">Работно пространство</Link><span aria-hidden="true">/</span><strong>{VIEWS[view].label}</strong></span>
+          <Link className="module-top-chat shark-action-secondary" href="/chat"><MessageSquare size={17} /> <span>AI чат</span></Link>
+        </header>
+        <main id="workspace-content" className="module-content" tabIndex={-1}>
+          {view === 'overview' && <Overview data={data} loading={loading} error={error} onRetry={() => void fetchProjects()} />}
+          {view === 'studio' && <>
+            <Banner view="studio">Създай проект от описание или визуална референция.</Banner>
+            {error && <p className="module-error" role="alert">{error} <button type="button" className="module-link" onClick={() => void fetchProjects()}>Опитай отново</button></p>}
+            {projectId && data?.user && <Result detail={details} error={projectError} onRetry={() => setReload((value) => value + 1)} />}
+            {projectId && !loading && !data?.user && <section className="shark-glass module-panel"><p>Влез в акаунта си, за да отвориш проекта.</p><Link className="shark-action" href={signIn(`/dashboard?project=${encodeURIComponent(projectId)}`)}>Вход <ArrowRight size={17} /></Link></section>}
+            <StudioForm key={featureParam ?? 'screenshot-website'} featureParam={featureParam ?? 'screenshot-website'} user={data?.user ?? null} loading={loading} onCreated={created} />
+            {data?.user && <ProjectList projects={data.projects} onRetry={() => void fetchProjects()} />}
+          </>}
+          {view === 'agents' && <Agents />}
+          {view === 'automotive' && <Automotive />}
+          {view === 'investments' && <>
+            <Banner view="investments">Състояние на свързания портфейл.</Banner>
+            <section className="shark-glass module-panel">
+              <div className="module-heading"><h2><CircleHelp size={19} /> Няма свързан източник</h2></div>
+              <p>За портфейл, наличности и движения е нужен конфигуриран доставчик с достъп за четене.</p>
+            </section>
+          </>}
+          {view === 'settings' && <Account user={data?.user ?? null} loading={loading} error={error} />}
+        </main>
       </div>
+      <dialog ref={dialog} className="module-drawer shark-glass" aria-label="Навигация" onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
+        <div className="module-drawer-content">
+          <div className="module-drawer-head">
+            <Link href="/" className="module-brand"><Logo size="md" /><span>SharkAI</span></Link>
+            <button type="button" className="shark-action-secondary" aria-label="Затвори менюто" onClick={() => dialog.current?.close()}><X size={22} /></button>
+          </div>
+          <WorkspaceNav view={view} onNavigate={() => dialog.current?.close()} />
+        </div>
+      </dialog>
     </div>
   );
 }
 
 export default function DashboardPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-shark-black flex items-center justify-center text-white/50">Loading Studio…</div>}>
-      <DashboardContent />
-    </Suspense>
-  );
+  return <Suspense fallback={<main className="module-content" role="status">Зареждане на работното пространство…</main>}><DashboardContent /></Suspense>;
 }

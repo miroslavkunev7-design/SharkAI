@@ -27,7 +27,7 @@ async function resolveAnthropicKey() {
   return cachedAnthropicKey;
 }
 
-async function getOpenAI() {
+export async function getOpenAI() {
   if (!(await isPaidAIEnabled())) return null;
   const key = await resolveOpenAIKey();
   if (!key) return null;

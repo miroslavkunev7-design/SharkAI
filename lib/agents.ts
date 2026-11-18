@@ -77,6 +77,22 @@ export function getFeature(id?: string): Feature {
   return FEATURES.find((f) => f.id === id) || FEATURES[0];
 }
 
+const STUDIO_UNAVAILABLE: Record<string, string> = {
+  'video-software': 'Няма анализатор за видео и записи на екрана.',
+  'figma-code': 'Няма интеграция с Figma. За експортирана снимка използвай проект от скрийншот.',
+  'pdf-app': 'Няма услуга за извличане на съдържание от PDF в Студиото.',
+  'ai-debug': 'Не е свързана среда за проверка на съществуващ код.',
+  'ai-refactor': 'Не е свързан източник за съществуващия код и проверка на промените.',
+  'ai-deploy': 'Няма свързана среда за публикуване.',
+  'ai-test': 'Няма изолирана среда за изпълнение на тестове.',
+  'ai-security': 'Няма конфигуриран анализатор за сигурност на проекти.',
+};
+
+export function getStudioFeatureAvailability(id: string): string | null {
+  if (!FEATURES.some((feature) => feature.id === id)) return 'Непознат тип проект.';
+  return STUDIO_UNAVAILABLE[id] ?? null;
+}
+
 export const PLANS = {
   PRO: {
     name: 'PRO',

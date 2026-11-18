@@ -15,16 +15,16 @@ export default function DownloadPage() {
   const installer = getInstallerInfo();
 
   return (
-    <main className="min-h-screen bg-shark-black circuit-bg px-4 py-20">
-      <div className="glass mx-auto max-w-2xl rounded-[30px] px-6 py-10 text-center sm:p-12">
-        <Logo size="lg" variant="full" className="mx-auto mb-8 max-w-xs" />
+    <main className="min-h-svh px-4 py-16 sm:py-24">
+      <div className="shark-glass mx-auto max-w-2xl rounded-[30px] px-6 py-10 text-center sm:p-12">
+        <Logo size="lg" className="mx-auto mb-8 max-w-xs" />
         <h1 className="font-display text-3xl font-bold sm:text-5xl">SharkAI за Windows</h1>
         <p className="mx-auto mb-8 mt-4 max-w-lg leading-relaxed text-white/70">
           Влез със съществуващия си SharkAI акаунт. Чатът и проектите използват интернет връзка.
         </p>
         {installer ? (
           <>
-            <a href={installer.url} className="btn-primary inline-flex items-center gap-2">
+            <a href={installer.url} className="shark-action">
               <Download aria-hidden="true" className="h-5 w-5" /> Изтегли за Windows
             </a>
             <p className="mt-3 text-sm text-white/70">
@@ -36,7 +36,7 @@ export default function DownloadPage() {
             Инсталаторът за тази версия още не е достъпен.
           </p>
         )}
-        <Link href="/chat" className="btn-secondary mt-8 inline-flex items-center gap-2">
+        <Link href="/chat" className="shark-action-secondary mt-8">
           Отвори SharkAI в браузъра <ArrowRight aria-hidden="true" className="h-4 w-4" />
         </Link>
       </div>

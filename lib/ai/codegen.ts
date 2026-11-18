@@ -14,11 +14,11 @@ const FilesSchema = z.object({
 export async function generateWithAI(
   brain: BrainResult,
   projectType: string
-): Promise<Array<{ path: string; content: string }>> {
+): Promise<{ files: Array<{ path: string; content: string }>; method: 'provider' | 'scaffold' }> {
   const model = await getTextModel();
 
   if (!model || !(await hasAIProvider()) || isQuotaExceeded()) {
-    return generateFromIntent(brain.intent, projectType, brain.screenshotAnalysis);
+    return { files: generateFromIntent(brain.intent, projectType, brain.screenshotAnalysis), method: 'scaffold' };
   }
 
   const layoutDetail = brain.aiIntent?.layout || brain.screenshotAnalysis || '';
@@ -50,13 +50,13 @@ User: "${brain.intent.rawPrompt}"`,
           content: `# ${brain.intent.title}\n\n${brain.intent.understanding}`,
         });
       }
-      return output.files;
+      return { files: output.files, method: 'provider' };
     }
   } catch (err) {
     console.error('AI codegen failed:', err);
   }
 
-  return generateFromIntent(brain.intent, projectType, brain.screenshotAnalysis);
+  return { files: generateFromIntent(brain.intent, projectType, brain.screenshotAnalysis), method: 'scaffold' };
 }
 
 function generateFromIntent(

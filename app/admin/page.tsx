@@ -1,274 +1,181 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { ArrowLeft, BarChart3, KeyRound, RefreshCw, Shield, TestTube, Users } from 'lucide-react';
 import { Logo } from '@/components/Logo';
-import {
-  Users, DollarSign, Cpu, Server, AlertTriangle,
-  BarChart3, Settings, Shield, ArrowLeft, RefreshCw,
-  MessageSquare, Key, Check, Zap, TestTube,
-} from 'lucide-react';
-
-interface AdminStats {
-  totalUsers: number;
-  proUsers: number;
-  ultraUsers: number;
-  totalProjects: number;
-  revenue: number;
-  activeAgents: number;
-  serverUptime: number;
-  errorRate: number;
-}
 
 interface AISettings {
   paidAIEnabled: boolean;
   aiConfigured: boolean;
-  localMode: boolean;
-  openai: { hasKey: boolean; preview: string | null };
-  anthropic: { hasKey: boolean; preview: string | null };
+  openai: { hasKey: boolean };
+  anthropic: { hasKey: boolean };
+}
+
+interface AdminData {
+  stats: { totalUsers: number; proUsers: number; ultraUsers: number; totalProjects: number };
+  users: Array<{ id: string; email: string; plan: string }>;
+  account: { plan: string };
+  ai: AISettings;
 }
 
 export default function AdminPage() {
   const router = useRouter();
-  const [stats, setStats] = useState<AdminStats | null>(null);
-  const [users, setUsers] = useState<Array<{ id: string; email: string; plan: string; role: string; tokensUsed: number }>>([]);
+  const [data, setData] = useState<AdminData | null>(null);
   const [loading, setLoading] = useState(true);
   const [openaiKey, setOpenaiKey] = useState('');
   const [anthropicKey, setAnthropicKey] = useState('');
   const [paidAI, setPaidAI] = useState(false);
-  const [ai, setAi] = useState<AISettings | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<string | null>(null);
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    const [adminRes, settingsRes] = await Promise.all([
-      fetch('/api/admin'),
-      fetch('/api/settings'),
-    ]);
-
-    if (adminRes.status === 403) {
-      router.push('/login');
-      return;
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin', { cache: 'no-store' });
+      if (response.status === 403) {
+        router.replace('/login');
+        return;
+      }
+      if (!response.ok) throw new Error('Административните данни са недостъпни.');
+      const admin: AdminData = await response.json();
+      setData(admin);
+      setPaidAI(admin.ai.paidAIEnabled);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Зареждането прекъсна.');
+    } finally {
+      setLoading(false);
     }
-
-    const admin = await adminRes.json();
-    const settings = await settingsRes.json();
-
-    setStats(admin.stats);
-    setUsers(admin.users || []);
-    setAi(settings);
-    setPaidAI(settings.paidAIEnabled);
-    setLoading(false);
   }, [router]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
-  async function saveSettings() {
-    const res = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        paidAIEnabled: paidAI,
-        openaiKey: openaiKey || undefined,
-        anthropicKey: anthropicKey || undefined,
-      }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setAi(data);
+  async function saveSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setStatus('');
+    setSaving(true);
+    try {
+      const response = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paidAIEnabled: paidAI,
+          openaiKey: openaiKey.trim() || undefined,
+          anthropicKey: anthropicKey.trim() || undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Настройките не бяха запазени.');
+      setData((previous) => previous ? { ...previous, ai: result } : previous);
+      setPaidAI(result.paidAIEnabled);
       setOpenaiKey('');
       setAnthropicKey('');
-      setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      setStatus('Настройките са запазени.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Настройките не бяха запазени.');
+    } finally {
+      setSaving(false);
     }
   }
 
-  async function testApi() {
+  async function testProvider() {
     setTesting(true);
-    setTestResult(null);
+    setError('');
+    setStatus('');
     try {
-      const res = await fetch('/api/admin/ai-test', { method: 'POST' });
-      const data = await res.json();
-      setTestResult(data.ok ? `✅ ${data.reply}` : `❌ ${data.error}`);
-    } catch {
-      setTestResult('❌ Тестът не успя');
+      const response = await fetch('/api/admin/ai-test', { method: 'POST' });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || 'AI проверката не беше успешна.');
+      setStatus(result.reply);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'AI проверката не беше успешна.');
     } finally {
       setTesting(false);
     }
   }
 
-  const cards = stats ? [
-    { icon: Users, label: 'Total Users', value: stats.totalUsers, color: 'text-shark-cyan' },
-    { icon: DollarSign, label: 'Monthly Revenue', value: `€${stats.revenue}`, color: 'text-green-400' },
-    { icon: Cpu, label: 'Active Agents', value: stats.activeAgents, color: 'text-shark-purple' },
-    { icon: Server, label: 'Server Uptime', value: `${stats.serverUptime}%`, color: 'text-shark-blue' },
-    { icon: BarChart3, label: 'Total Projects', value: stats.totalProjects, color: 'text-shark-cyan' },
-    { icon: AlertTriangle, label: 'Error Rate', value: `${stats.errorRate}%`, color: 'text-yellow-400' },
+  const cards = data ? [
+    { label: 'Потребители', value: data.stats.totalUsers, icon: Users },
+    { label: 'План PRO в профила', value: data.stats.proUsers, icon: Users },
+    { label: 'План ULTRA в профила', value: data.stats.ultraUsers, icon: Users },
+    { label: 'Проекти', value: data.stats.totalProjects, icon: BarChart3 },
   ] : [];
 
   return (
-    <div className="min-h-screen bg-shark-black">
-      <header className="glass border-b border-white/5">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-white/50 hover:text-white"><ArrowLeft className="w-5 h-5" /></Link>
-            <Logo size="sm" />
-            <span className="font-display font-bold gradient-text">Admin Panel</span>
-            <span className="text-xs bg-shark-purple/30 text-shark-purple px-2 py-1 rounded-full flex items-center gap-1">
-              <Shield className="w-3 h-3" /> ULTRA
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/chat" className="btn-primary text-sm py-2 px-4 flex items-center gap-2">
-              <MessageSquare className="w-4 h-4" /> Supreme Brain Chat
-            </Link>
-            <button onClick={() => load()} className="btn-secondary text-sm py-2 px-3">
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
+    <main className="min-h-screen max-w-6xl mx-auto px-4 py-5">
+      <header className="shark-glass rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href="/dashboard?view=settings" className="shark-action-secondary" aria-label="Към настройките на акаунта"><ArrowLeft size={18} /></Link>
+          <Logo size="md" />
+          <h1 className="text-xl font-bold">Администрация</h1>
+          {data && <span className="inline-flex items-center gap-2 text-sm text-white/75"><Shield size={16} /> {data.account.plan}</span>}
         </div>
+        <button className="shark-action-secondary" type="button" onClick={() => void load()} disabled={loading || saving} aria-label="Обнови">
+          <RefreshCw size={17} className={loading ? 'animate-spin' : undefined} />
+        </button>
       </header>
-
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {loading ? (
-          <div className="text-center py-20 text-white/50">Loading...</div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
-              {cards.map(({ icon: Icon, label, value, color }) => (
-                <div key={label} className="glass rounded-xl p-4">
-                  <Icon className={`w-5 h-5 ${color} mb-2`} />
-                  <p className="text-2xl font-bold">{value}</p>
-                  <p className="text-xs text-white/40">{label}</p>
-                </div>
-              ))}
-            </div>
-
-            <div className="grid lg:grid-cols-2 gap-8">
-              <div id="settings" className="glass rounded-2xl p-6 border-shark-cyan/20">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
-                  <Key className="w-5 h-5 text-shark-cyan" /> AI API Settings
-                </h3>
-
-                <label className="flex items-center gap-3 mb-4 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={paidAI}
-                    onChange={(e) => setPaidAI(e.target.checked)}
-                    className="w-4 h-4 rounded accent-shark-cyan"
-                  />
-                  <span className="text-sm">
-                    {paidAI
-                      ? '✅ Платен AI включен (OpenAI / Anthropic)'
-                      : '⚡ Локален режим — безплатно, без API ключ'}
-                  </span>
-                </label>
-
-                {ai?.localMode && !paidAI && (
-                  <p className="text-xs text-white/40 mb-4 flex items-center gap-1">
-                    <Zap className="w-3 h-3" /> Чат, screenshot и ZIP работят локално
-                  </p>
-                )}
-
-                <div className="space-y-3 mb-4">
-                  <div>
-                    <label className="text-xs text-white/50 mb-1 block">OpenAI API Key</label>
-                    {ai?.openai.hasKey && (
-                      <p className="text-xs text-green-400/80 mb-1">Запазен: {ai.openai.preview}</p>
-                    )}
-                    <input
-                      type="password"
-                      value={openaiKey}
-                      onChange={(e) => setOpenaiKey(e.target.value)}
-                      placeholder="sk-..."
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-shark-cyan/50"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-white/50 mb-1 block">Anthropic API Key (опционално)</label>
-                    {ai?.anthropic.hasKey && (
-                      <p className="text-xs text-green-400/80 mb-1">Запазен: {ai.anthropic.preview}</p>
-                    )}
-                    <input
-                      type="password"
-                      value={anthropicKey}
-                      onChange={(e) => setAnthropicKey(e.target.value)}
-                      placeholder="sk-ant-..."
-                      className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-shark-cyan/50"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    onClick={saveSettings}
-                    className="btn-primary flex-1 flex items-center justify-center gap-2"
-                  >
-                    {saved ? <><Check className="w-4 h-4" /> Запазено!</> : 'Запази настройки'}
-                  </button>
-                  {paidAI && (
-                    <button
-                      onClick={testApi}
-                      disabled={testing}
-                      className="btn-secondary flex items-center gap-2 px-4"
-                    >
-                      <TestTube className="w-4 h-4" />
-                      {testing ? '...' : 'Test'}
-                    </button>
-                  )}
-                </div>
-                {testResult && <p className="text-xs mt-2 text-white/60">{testResult}</p>}
+      {loading && <p role="status" className="my-4 text-white/70">Зареждане на административните данни…</p>}
+      {error && <p role="alert" className="my-4 text-rose-200">{error}</p>}
+      {status && <p role="status" className="my-4 text-cyan-200">{status}</p>}
+      {data && (
+        <>
+          <dl className="grid grid-cols-2 md:grid-cols-4 gap-3 my-5">
+            {cards.map(({ icon: Icon, label, value }) => (
+              <div key={label} className="shark-glass rounded-xl p-4">
+                <Icon className="mb-2 text-cyan-200" size={19} aria-hidden="true" />
+                <dt className="text-sm text-white/75">{label}</dt><dd className="text-2xl font-bold">{value}</dd>
               </div>
-
-              <div className="glass rounded-2xl p-6">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
-                  <Users className="w-5 h-5 text-shark-cyan" /> Users
-                </h3>
-                <div className="overflow-x-auto max-h-64">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-white/40 border-b border-white/10">
-                        <th className="text-left py-2">Email</th>
-                        <th className="text-left py-2">Plan</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map((user) => (
-                        <tr key={user.id} className="border-b border-white/5">
-                          <td className="py-2 truncate max-w-[200px]">{user.email}</td>
-                          <td className="py-2"><span className="text-xs text-shark-cyan">{user.plan}</span></td>
-                        </tr>
-                      ))}
-                    </tbody>
+            ))}
+          </dl>
+          <div className="grid lg:grid-cols-2 gap-4">
+            <section id="settings" className="shark-glass rounded-2xl p-5">
+              <h2 className="mb-4 flex items-center gap-2 font-bold"><KeyRound size={19} /> AI доставчици</h2>
+              <form className="grid gap-4" onSubmit={saveSettings}>
+                <label className="flex gap-3 items-center min-h-11">
+                  <input type="checkbox" className="w-5 h-5 accent-cyan-400" checked={paidAI} onChange={(event) => setPaidAI(event.target.checked)} />
+                  Разреши конфигурираните AI услуги
+                </label>
+                <p className="text-sm text-white/75">{data.ai.aiConfigured ? 'Има конфигуриран доставчик.' : 'Няма разрешен и конфигуриран доставчик.'}</p>
+                <label className="grid gap-2 text-sm">OpenAI API ключ
+                  {data.ai.openai.hasKey && <small className="text-cyan-200">Запазен ключ</small>}
+                  <input type="password" value={openaiKey} onChange={(event) => setOpenaiKey(event.target.value)} className="rounded-xl border border-white/20 bg-black/35 p-3" autoComplete="off" />
+                </label>
+                <label className="grid gap-2 text-sm">Anthropic API ключ
+                  {data.ai.anthropic.hasKey && <small className="text-cyan-200">Запазен ключ</small>}
+                  <input type="password" value={anthropicKey} onChange={(event) => setAnthropicKey(event.target.value)} className="rounded-xl border border-white/20 bg-black/35 p-3" autoComplete="off" />
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <button className="shark-action" type="submit" disabled={saving}>{saving ? 'Запазване…' : 'Запази настройките'}</button>
+                  {data.ai.aiConfigured && <button className="shark-action-secondary" type="button" onClick={testProvider} disabled={testing || saving}>
+                    <TestTube size={17} /> {testing ? 'Проверка…' : 'Провери връзката'}
+                  </button>}
+                </div>
+              </form>
+            </section>
+            <section className="shark-glass rounded-2xl p-5 min-w-0">
+              <h2 className="mb-4 flex items-center gap-2 font-bold"><Users size={19} /> Потребители</h2>
+              {!data.users.length ? <p className="text-sm text-white/75">Няма потребителски записи.</p> : (
+                <div className="overflow-x-auto max-h-96">
+                  <table className="w-full text-left text-sm"><thead><tr><th className="p-2">Имейл</th><th className="p-2">План в профила</th></tr></thead>
+                    <tbody>{data.users.map((user) => <tr key={user.id} className="border-t border-white/10"><td className="p-2 break-all">{user.email}</td><td className="p-2 text-cyan-200">{user.plan}</td></tr>)}</tbody>
                   </table>
                 </div>
-              </div>
-
-              <div className="glass rounded-2xl p-6 lg:col-span-2">
-                <h3 className="font-semibold mb-4 flex items-center gap-2">
-                  <Settings className="w-5 h-5 text-shark-purple" /> Quick Links
-                </h3>
-                <div className="grid sm:grid-cols-3 gap-3">
-                  <Link href="/chat" className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors text-center">
-                    <MessageSquare className="w-6 h-6 mx-auto mb-2 text-shark-cyan" />
-                    <span className="text-sm">AI Chat</span>
-                  </Link>
-                  <Link href="/dashboard" className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors text-center">
-                    <Cpu className="w-6 h-6 mx-auto mb-2 text-shark-purple" />
-                    <span className="text-sm">Studio</span>
-                  </Link>
-                  <Link href="/pricing" className="bg-white/5 rounded-xl p-4 hover:bg-white/10 transition-colors text-center">
-                    <DollarSign className="w-6 h-6 mx-auto mb-2 text-green-400" />
-                    <span className="text-sm">Pricing</span>
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+              )}
+            </section>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-4">
+            <Link href="/chat" className="shark-action-secondary">AI чат</Link>
+            <Link href="/dashboard?view=studio" className="shark-action-secondary">Студио</Link>
+            <Link href="/pricing" className="shark-action-secondary">Планове</Link>
+            <Link href="/tests" className="shark-action-secondary">Проверки</Link>
+          </div>
+        </>
+      )}
+    </main>
   );
 }
