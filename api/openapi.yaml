@@ -7,6 +7,57 @@ info:
     Minor-unit strings represent exact integers in the named currency. Provider availability and
     authorization are checked at runtime. A read grant confers no permission to submit a broker order.
 paths:
+  /api/markets/crypto:
+    get:
+      operationId: browseKrakenCryptoMarkets
+      summary: Search and paginate listed Kraken spot crypto pairs with their quote and market status.
+      description: Catalog pages contain 20 pairs sorted by rolling 24-hour trade count. Volume is in units of the base asset. Percentage change is from the first trade of the UTC day. checked_at is the time of the ticker response, and a missing fresh ticker is represented by null.
+      security: []
+      parameters:
+        - {name: q, in: query, required: false, schema: {type: string, maxLength: 60}}
+        - {name: page, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 99999}}
+      responses:
+        '200': {description: Market page retrieved., content: {application/json: {schema: {$ref: '#/components/schemas/CryptoCatalog'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/markets/crypto/chart:
+    get:
+      operationId: getKrakenCryptoChart
+      summary: Return completed Kraken spot intervals with trades and the current ticker.
+      description: Times are Unix seconds at interval start. The unfinished trailing candle is excluded. Missing trading intervals are not interpolated.
+      security: []
+      parameters:
+        - {name: pair, in: query, required: true, schema: {type: string, pattern: '^[A-Za-z0-9_.-]{2,40}$'}}
+        - {name: range, in: query, required: false, schema: {enum: [1d, 7d, 30d, 90d, 1y], default: 1d}}
+      responses:
+        '200': {description: Kraken market history., content: {application/json: {schema: {$ref: '#/components/schemas/CryptoChart'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '404': {$ref: '#/components/responses/HTTP404'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments/progress:
+    get:
+      operationId: readMandateProgress
+      summary: Read authenticated investment mandate results and available reporting windows.
+      security: [{Session: []}]
+      parameters:
+        - {name: start, in: query, required: false, schema: {type: string, format: date}}
+      responses:
+        '200': {description: Mandate observations or a structured unavailable result., content: {application/json: {schema: {$ref: '#/components/schemas/InvestmentProgress'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+  /api/wallet-investments/progress/opportunities:
+    get:
+      operationId: readInvestmentOpportunities
+      summary: Read owner strategy evidence, euro cash and Bulgarian housing reference indicators.
+      security: [{Session: []}]
+      parameters:
+        - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}}
+        - {name: days, in: query, required: false, schema: {enum: [1, 7, 14, 21, 28], default: 7}}
+      responses:
+        '200': {description: Observed indicators, strategy comparisons and unavailable sources., content: {application/json: {schema: {$ref: '#/components/schemas/InvestmentOpportunities'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '503': {$ref: '#/components/responses/HTTP503'}
   /api/wallet-investments/forecast:
     post:
       operationId: calculateOwnerForecast
@@ -1263,6 +1314,74 @@ components:
               customer_count: {type: "integer", minimum: 0, maximum: 10000000}
               largest_customer_revenue_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
           maxItems: 200
+    InvestmentProgress:
+      type: "object"
+      additionalProperties: false
+      required: ["status","stage","currency","provider","start","end","windows","goal_minor","points","reports","as_of","fresh","target_reached","realized_account_minor","basis"]
+      properties:
+        status: {"enum":["verified","no_mandate","no_observations","unavailable"]}
+        stage: {"enum":["active","stopped","revoked","expired","scheduled",null]}
+        currency: {"type":["string","null"]}
+        provider: {"type":["string","null"]}
+        start: {"type":["string","null"],"format":"date"}
+        end: {"type":["string","null"],"format":"date"}
+        windows: {"type":"array","items":{"type":"string","format":"date"}}
+        goal_minor: {"type":["string","null"],"pattern":"^(0|-?[1-9][0-9]*)$"}
+        points: {"type":"array","items":{"type":"object","additionalProperties":false,"required":["observed_at","net_minor","percent"],"properties":{"observed_at":{"type":"string","format":"date-time"},"net_minor":{"type":"string","pattern":"^(0|-?[1-9][0-9]*)$"},"percent":{"type":["string","null"]}}}}
+        reports: {"type":"integer","minimum":0}
+        as_of: {"type":["string","null"],"format":"date-time"}
+        fresh: {"type":"boolean"}
+        target_reached: {"type":["boolean","null"]}
+        realized_account_minor: {"type":["string","null"],"pattern":"^(0|-?[1-9][0-9]*)$"}
+        basis: {"const":"verified_period_closeout_after_reported_costs"}
+    InvestmentOpportunities:
+      type: "object"
+      additionalProperties: false
+      required: ["currency","days","as_of","ranked","strategies","briefs","unavailable_sources"]
+      properties:
+        currency: {"type":["string","null"]}
+        days: {"enum":[1,7,14,21,28]}
+        as_of: {"type":"string","format":"date-time"}
+        ranked: {"type":"boolean"}
+        strategies: {"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","label","instrument","category","rank","leader","source","source_url","observed_at","start","end","samples","median_bps","drawdown_bps","worst_bps","holdout_bps","assessment","risk","qualifications"],"properties":{"id":{"type":"string"},"label":{"type":"string"},"instrument":{"type":"string"},"category":{"enum":["STOCK","ETF","strategy"]},"rank":{"type":["integer","null"],"minimum":1},"leader":{"type":"boolean"},"source":{"type":"string"},"source_url":{"type":"string","format":"uri"},"observed_at":{"type":"string","format":"date-time"},"start":{"type":"string","format":"date"},"end":{"type":"string","format":"date"},"samples":{"type":"integer","minimum":0},"median_bps":{"type":"number"},"drawdown_bps":{"type":"number"},"worst_bps":{"type":"number"},"holdout_bps":{"type":"number"},"assessment":{"type":"string"},"risk":{"type":"string"},"qualifications":{"type":"array","items":{"type":"string"}}}}}
+        briefs: {"type":"array","items":{"type":"object","additionalProperties":false,"required":["category","title","metric","value","period","source","url","evidence_url","as_of","assessment","risk"],"properties":{"category":{"enum":["housing","euro_cash"]},"title":{"type":"string"},"metric":{"type":"string"},"value":{"type":"string"},"period":{"type":"string"},"source":{"type":"string"},"url":{"type":"string","format":"uri"},"evidence_url":{"type":"string","format":"uri"},"as_of":{"type":"string"},"assessment":{"type":"string"},"risk":{"type":"string"}}}}
+        unavailable_sources: {"type":"array","items":{"type":"string"}}
+    KrakenQuote:
+      type: "object"
+      additionalProperties: false
+      required: ["price","volume_24h","trades_24h","day_change_pct"]
+      properties:
+        price: {"type":"string","pattern":"^(0|[1-9][0-9]{0,20})(\\.[0-9]{1,18})?$"}
+        volume_24h: {"type":"string","pattern":"^(0|[1-9][0-9]{0,20})(\\.[0-9]{1,18})?$"}
+        trades_24h: {"type":"integer","minimum":0}
+        day_change_pct: {"type":["number","null"]}
+    CryptoCatalog:
+      type: "object"
+      additionalProperties: false
+      required: ["source","status","checked_at","total","matched","page","pages","rows"]
+      properties:
+        source: {"const":"Kraken Spot"}
+        status: {"const":"available"}
+        checked_at: {"type":["string","null"],"format":"date-time"}
+        total: {"type":"integer","minimum":0}
+        matched: {"type":"integer","minimum":0}
+        page: {"type":"integer","minimum":1}
+        pages: {"type":"integer","minimum":0}
+        rows: {"type":"array","maxItems":20,"items":{"type":"object","additionalProperties":false,"required":["id","base","quote","name","ticker","market_status"],"properties":{"id":{"type":"string"},"base":{"type":"string"},"quote":{"type":"string"},"name":{"type":"string"},"ticker":{"oneOf":[{"$ref":"#/components/schemas/KrakenQuote"},{"type":"null"}]},"market_status":{"type":"string"}}}}
+    CryptoChart:
+      type: "object"
+      additionalProperties: false
+      required: ["source","status","pair","range","checked_at","ticker_at","ticker","interval_minutes","candles"]
+      properties:
+        source: {"const":"Kraken Spot"}
+        status: {"const":"available"}
+        pair: {"type":"object","additionalProperties":false,"required":["id","base","quote","name","market_status"],"properties":{"id":{"type":"string"},"base":{"type":"string"},"quote":{"type":"string"},"name":{"type":"string"},"market_status":{"type":"string"}}}
+        range: {"enum":["1d","7d","30d","90d","1y"]}
+        checked_at: {"type":"string","format":"date-time"}
+        ticker_at: {"type":["string","null"],"format":"date-time"}
+        ticker: {"oneOf":[{"$ref":"#/components/schemas/KrakenQuote"},{"type":"null"}]}
+        interval_minutes: {"type":"integer","minimum":1}
+        candles: {"type":"array","maxItems":720,"items":{"type":"object","additionalProperties":false,"required":["start","close","high","low","volume","trades"],"properties":{"start":{"type":"integer","minimum":0},"close":{"type":"number"},"high":{"type":"number"},"low":{"type":"number"},"volume":{"type":"number"},"trades":{"type":"integer","minimum":1}}}}
     OwnerWalletTransactions:
       type: object
       additionalProperties: false
