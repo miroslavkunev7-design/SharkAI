@@ -5,6 +5,7 @@ import { prisma } from '@/lib/db';
 import { estimateInvestmentForecast } from '@/lib/investments/forecast';
 import { resolveWalletStatus, walletOwnerCapabilities } from '@/lib/investments/wallet-status.server';
 import { readBrokerForecastInput } from '@/lib/investments/forecast-source.server';
+import { readPortfolioValuations } from '@/lib/investments/portfolio-valuations.server';
 import { readOwnerPerformanceFee } from '@/lib/investments/performance-fee.server';
 import { readBrokerOwnerState, revokeBrokerOwnerTrading } from '@/lib/investments/broker-owner-state.server';
 import { targetCalendar, type WalletSettingsInput, type WalletTargetInput } from './wallet-investments-contract';
@@ -82,8 +83,13 @@ export async function walletDashboard(profile: WalletInvestmentSettings | null, 
 export type WalletInvestmentsDashboard = Awaited<ReturnType<typeof walletDashboard>>;
 
 export async function withBrokerOwnerActivity(dashboard: WalletInvestmentsDashboard, userId: string) {
-  const [broker_activity,performance_fee]=await Promise.all([readBrokerOwnerState(userId),readOwnerPerformanceFee(userId)]);
-  return { ...dashboard, broker_activity, performance_fee,
+  const { investments, settings } = dashboard;
+  const [broker_activity, performance_fee, portfolio_valuations] = await Promise.all([
+    readBrokerOwnerState(userId), readOwnerPerformanceFee(userId),
+    investments.provider && (investments.status === 'verified' || investments.status === 'stale')
+      ? readPortfolioValuations(userId, settings, investments.provider) : Promise.resolve([]),
+  ]);
+  return { ...dashboard, broker_activity, performance_fee, portfolio_valuations,
     wallet_capabilities: walletOwnerCapabilities({userId,currency:dashboard.settings.currency}) };
 }
 

@@ -71,6 +71,15 @@
   display: block;
 }
 
+.module-wallet-provider-actions {
+  display: grid;
+  gap: .75rem;
+  scroll-margin-block: 5rem;
+}
+.module-wallet-provider-actions h3 {
+  margin: 0;
+}
+
 .module-wallet-form {
   display: grid;
   gap: 1rem;

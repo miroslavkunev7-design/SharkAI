@@ -17,8 +17,7 @@ import {
 import { isTerminalStudioStatus, TRACKED_STUDIO_RUNS, type AgentRunActivity } from '@/lib/studio-activity';
 import { accountPlanLabel, hasLifetimeUltra, type AccountPlan } from '../account-plan';
 import { MemorySettings } from './memory-settings';
-import { WalletInvestments } from './wallet-investments';
-import { InvestmentLab, investmentAccountHref } from './investment-lab';
+import { InvestmentLab } from './investment-lab';
 import { Commerce } from './commerce';
 import './workspace.css';
 
@@ -780,10 +779,7 @@ function DashboardContent() {
           {view === 'agents' && <Agents user={data?.user ?? null} loading={loading} />}
           {view === 'automotive' && <Automotive />}
           {view === 'commerce' && <><Banner view="commerce" /><Commerce signInHref={signIn(VIEWS.commerce.href)} /></>}
-          {view === 'investments' && <InvestmentLab account={params.get('panel') === 'account'}>
-            <Banner view="investments" />
-            <WalletInvestments signInHref={signIn(investmentAccountHref)} />
-          </InvestmentLab>}
+          {view === 'investments' && <InvestmentLab ownerKey={data?.user?.email} />}
           {view === 'settings' && <Account user={data?.user ?? null} loading={loading} error={error} />}
         </main>
       </div>

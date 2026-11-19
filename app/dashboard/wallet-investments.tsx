@@ -1,6 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+import { portfolioOrderLabels } from './portfolio-account';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { displayMinor, minorToInput, type WalletSettingsInput } from '@/lib/wallet-investments-contract';
 import type { WalletInvestmentsDashboard, WalletInvestmentsOwnerDashboard } from '@/lib/wallet-investments-server';
@@ -66,13 +68,6 @@ const brokerProviderCopy = {
 } as const;
 
 type BrokerActivity = WalletInvestmentsOwnerDashboard['broker_activity'];
-type BrokerOrder = BrokerActivity['accounts'][number]['recent_orders'][number];
-const orderStatus: Record<BrokerOrder['status'], string> = {
-  RESERVED: 'Резервирана', SUBMITTING: 'Очаква потвърждение за изпращане', ACKNOWLEDGED: 'Приета от брокера',
-  PENDING: 'Изчакваща', WORKING: 'Активна', PARTIALLY_FILLED: 'Частично изпълнена',
-  CANCEL_PENDING: 'Изчаква отмяна', REVIEW_REQUIRED: 'Изисква преглед', FILLED: 'Изпълнена',
-  CANCELED: 'Отменена', REJECTED: 'Отхвърлена', UNKNOWN: 'Неустановена', VOIDED: 'Прекратена преди изпращане',
-};
 const reconciliationStatus = {
   verified: 'Сверени позиции', pending: 'Предстои сверяване на позициите',
   stale: 'Данните за позициите са остарели', unavailable: 'Данните за позициите са недостъпни',
@@ -98,7 +93,7 @@ function BrokerActivityPanel({ activity }: { activity: BrokerActivity }) {
         <ul>{account.recent_orders.map((order, row) => (
           <li key={row}>
             <strong>{order.side === 'BUY' ? 'Покупка' : 'Продажба'} · {order.instrument}</strong>
-            <span>{orderStatus[order.status]} · {order.units} бр.</span>
+            <span>{portfolioOrderLabels[order.status]} · {order.units} бр.</span>
             {order.provider_observed_at && ['FILLED', 'PARTIALLY_FILLED', 'CANCELED'].includes(order.status) && <span>Изпълнени {order.filled_units} бр.</span>}
             <span>{order.provider_observed_at ? 'Данни от брокера към ' + dateLabel(order.provider_observed_at, true) : 'Записано на ' + dateLabel(order.recorded_at, true)}</span>
             {order.reconciliation_required && <span>Изисква сверяване с брокера</span>}
@@ -197,6 +192,8 @@ function AskSharkAi({ access }: { access: WalletInvestmentsDashboard['settings']
 }
 
 export function WalletInvestments({ signInHref }: { signInHref: string }) {
+  const queryAction = useSearchParams().get('action');
+  const walletAction = queryAction === 'funding' || queryAction === 'withdrawal' ? queryAction : null;
   const [data, setData] = useState<WalletInvestmentsOwnerDashboard | null>(null);
   const [state, setState] = useState<'loading' | 'signed_out' | 'ready' | 'unavailable'>('loading');
   const [saving, setSaving] = useState(false);
@@ -290,7 +287,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
             {wallet.source && <div><dt>Източник</dt><dd>{sourceName(wallet.source)}</dd></div>}
             {wallet.observed_at && <div><dt>Проверено към</dt><dd>{dateLabel(wallet.observed_at, true)}</dd></div>}
           </dl>
-          <WalletProviderActions data={data} key={settings.currency ?? ''} />
+          <WalletProviderActions data={data} action={walletAction} key={settings.currency ?? ''} />
         </section>
         <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="broker-account-title">
           <h2 id="broker-account-title">Инвестиции</h2>

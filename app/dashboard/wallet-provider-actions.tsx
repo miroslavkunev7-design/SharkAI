@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { displayMinor } from '@/lib/wallet-investments-contract';
 import type { WalletDepositSummary } from '@/lib/investments/wallet-operations.server';
 import type { WalletInvestmentsOwnerDashboard } from '@/lib/wallet-investments-server';
@@ -11,7 +11,17 @@ const reviews: Record<string,string> = {
 };
 const api = '/api/wallet-investments/provider/';
 
-export function WalletProviderActions({ data }: { data: WalletInvestmentsOwnerDashboard }) {
+export function WalletProviderActions({ data, action }: {
+  data: WalletInvestmentsOwnerDashboard; action: 'funding' | 'withdrawal' | null;
+}) {
+  const actionSection = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!action) return;
+    const section = actionSection.current;
+    const target = section?.querySelector<HTMLElement>('[data-provider-action]') ?? section;
+    target?.focus({ preventScroll: true });
+    section?.scrollIntoView({ block: 'center' });
+  }, [action]);
   const [deposits,setDeposits] = useState<WalletDepositSummary|null>(null);
   const [busy,setBusy] = useState(false);
   const [notice,setNotice] = useState('');
@@ -39,13 +49,20 @@ export function WalletProviderActions({ data }: { data: WalletInvestmentsOwnerDa
     } catch { setNotice('Извлечението е недостъпно. Провери в Wise дали се изисква потвърждение.'); }
     finally { setBusy(false); }
   }
-  return <>
+  const actionLabel = action === 'funding' ? 'Зареждане' : 'Теглене';
+  return <div ref={actionSection} tabIndex={-1} className="module-wallet-provider-actions" aria-label={action ? actionLabel : 'Действия в Wise'}>
+    {action && <h3>{actionLabel} чрез Wise</h3>}
+    {action && data.wallet.status !== 'verified' && <p role="status">
+      За {action === 'funding' ? 'зареждане' : 'теглене'} е необходим потвърден портфейл в Wise.
+    </p>}
     {capable.hosted_kyc && <p role="status">Проверка на самоличността · {review === null ? 'Зареждане…' : reviews[review] ?? 'Временно недостъпна'}</p>}
     {review === 'WAITING_CUSTOMER_INPUT' && <form method="POST" action={api+'onboarding'}>
       <button className="shark-action-secondary" type="submit">{data.wallet.status === 'verified' ? 'Продължи проверката в Wise' : 'Създай портфейл в Wise'}</button>
     </form>}
     {!capable.hosted_kyc && data.wallet.status !== 'verified' && <button className="shark-action-secondary" type="button" disabled>Създай портфейл</button>}
-    {data.wallet.status === 'verified' && <a href="https://wise.com/home/" className="shark-action-secondary" target="_blank" rel="noopener noreferrer">Зареждане или теглене в Wise</a>}
+    {data.wallet.status === 'verified' && <a href="https://wise.com/home/" data-provider-action className="shark-action-secondary" target="_blank" rel="noopener noreferrer">
+      {action ? actionLabel + ' в Wise' : 'Зареждане или теглене в Wise'}
+    </a>}
     {capable.deposit_statements && <button className="shark-action-secondary" type="button" onClick={()=>void checkDeposits()} disabled={busy}>
       {busy ? 'Проверка…' : 'Постъпления за последните 7 дни'}
     </button>}
@@ -53,5 +70,5 @@ export function WalletProviderActions({ data }: { data: WalletInvestmentsOwnerDa
       Осчетоводени постъпления · {deposits.count}{deposits.latest && <> · Последно {displayMinor(deposits.latest.amount_minor,deposits.currency)} на {new Date(deposits.latest.occurred_at).toLocaleDateString('bg-BG',{timeZone:'Europe/Sofia'})}</>}
     </p>}
     {notice && <p role="status">{notice}</p>}
-  </>;
+  </div>;
 }

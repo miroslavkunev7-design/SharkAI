@@ -9,7 +9,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { operation } = await params;
   if (!['deposits','review','onboarding'].includes(operation)) return walletJson({status:'unsupported'},404);
   const reviewRedirect = () => new Response(null,{ status:303, headers:{
-    Location:'/dashboard?view=investments&wallet_review=unavailable', 'Cache-Control':'private, no-store', 'Referrer-Policy':'no-referrer',
+    Location:'/dashboard?view=investments&panel=account&section=manage&wallet_review=unavailable', 'Cache-Control':'private, no-store', 'Referrer-Policy':'no-referrer',
   } });
   try {
     const account=await getSession();

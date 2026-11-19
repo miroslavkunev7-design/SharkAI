@@ -1,48 +1,61 @@
 'use client';
 
 import Link from 'next/link';
-import { ChartCandlestick, WalletCards } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ChevronLeft } from 'lucide-react';
+import { PortfolioHome } from './portfolio-home';
+import { PortfolioMarkets } from './portfolio-markets';
+import { usePortfolioAccount } from './portfolio-account';
+import { WalletInvestments } from './wallet-investments';
 import './investment-lab.css';
 
-const marketHref = '/dashboard?view=investments';
-export const investmentAccountHref = `${marketHref}&panel=account`;
+const portfolioHref = '/dashboard?view=investments';
+const marketsHref = portfolioHref + '&panel=markets';
+const accountHref = portfolioHref + '&panel=account';
+const managementHref = accountHref + '&section=manage';
+const signIn = (destination: string) => '/login?next=' + encodeURIComponent(destination);
 
-/** The market lab is also published as a standalone SharkAI Site. */
-function MarketFrame() {
-  const frame = useRef<HTMLIFrameElement>(null);
-  const [height, setHeight] = useState(880);
-
-  useEffect(() => {
-    function fit(event: MessageEvent) {
-      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow) return;
-      const message = event.data;
-      if (message?.type === 'sharkai-investments-resize' && Number.isSafeInteger(message.height) && message.height > 0) {
-        setHeight(Math.min(message.height, 60_000));
-      }
-    }
-    window.addEventListener('message', fit);
-    return () => window.removeEventListener('message', fit);
-  }, []);
-
-  return (
-    <iframe ref={frame} className="module-investment-frame" title="Инвестиционна лаборатория на SharkAI"
-      src="/investment-lab/index.html?embed=1" style={{ height }} />
-  );
+function ReturnToPortfolio() {
+  return <Link className="portfolio-return" href={portfolioHref}>
+    <ChevronLeft size={17} aria-hidden="true" /> Моят портфейл
+  </Link>;
 }
 
-export function InvestmentLab({ account, children }: { account: boolean; children: ReactNode }) {
-  return (
-    <>
-      <nav className="module-investment-switch" aria-label="Инвестиционно пространство">
-        <Link href={marketHref} aria-current={account ? undefined : 'page'} scroll={false}>
-          <ChartCandlestick size={18} aria-hidden="true" /> Пазари
-        </Link>
-        <Link href={investmentAccountHref} aria-current={account ? 'page' : undefined} scroll={false}>
-          <WalletCards size={18} aria-hidden="true" /> Моят портфейл
-        </Link>
-      </nav>
-      {account ? children : <MarketFrame />}
-    </>
-  );
+function AccountOverview({ ownerKey }: { ownerKey?: string }) {
+  const router = useRouter();
+  const account = usePortfolioAccount(true, ownerKey);
+  return <PortfolioHome
+    account={account}
+    market={<PortfolioMarkets initialView="watchlist" syncPreferences />}
+    signInHref={signIn(portfolioHref)}
+    onOpenMarkets={() => router.push(marketsHref)}
+    onOpenAccount={() => router.push(managementHref)}
+    onOpenSimulator={() => { window.location.assign('/investment-lab/simulator.html'); }}
+    onAction={(action) => {
+      const destination = accountHref + '&action=' + action;
+      router.push(account.status === 'guest' ? signIn(destination) : destination);
+    }}
+  />;
+}
+
+export function InvestmentLab({ ownerKey }: { ownerKey?: string }) {
+  const params = useSearchParams();
+  const panel = params.get('panel');
+  if (panel === 'markets') {
+    return <div className="portfolio-subpage">
+      <ReturnToPortfolio />
+      <h1 className="portfolio-section-heading">Пазари</h1>
+      <PortfolioMarkets initialView="markets" syncPreferences />
+    </div>;
+  }
+  const action = params.get('action');
+  if (panel === 'account' && (params.get('section') === 'manage' || action === 'funding' || action === 'withdrawal')) {
+    const destination = action === 'funding' || action === 'withdrawal' ? accountHref + '&action=' + action : managementHref;
+    return <div className="portfolio-subpage">
+      <ReturnToPortfolio />
+      <h1 className="portfolio-section-heading">Управление на сметката</h1>
+      <WalletInvestments signInHref={signIn(destination)} />
+    </div>;
+  }
+  return <AccountOverview ownerKey={ownerKey} />;
 }
