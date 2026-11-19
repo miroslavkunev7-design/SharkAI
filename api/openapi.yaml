@@ -84,12 +84,11 @@ paths:
     get:
       operationId: getShopifyConnection
       summary: Verify the signed-in owner's bound Shopify store and read access.
-      description: Checks the store identity and distinguishes a confirmed empty order history in Shopify's normal 60-day window from an unverified order query.
+      description: Checks the bound domain and installed scopes. A connected identity may still lack read access. An empty 60-day history is reported only after a successful order query.
       security: [{Session: []}]
       responses:
         '200': {description: Connection checked., content: {application/json: {schema: {$ref: '#/components/schemas/ShopifyConnection'}}}}
         '401': {$ref: '#/components/responses/HTTP401'}
-        '503': {$ref: '#/components/responses/HTTP503'}
   /api/commerce/procurement:
     get:
       operationId: getOwnerProcurement
@@ -1225,10 +1224,11 @@ components:
     ShopifyConnection:
       type: object
       additionalProperties: false
-      required: [status, shop, orders_last_60_days, checked_at]
+      required: [status, shop, order_access, orders_last_60_days, checked_at]
       properties:
         status: {enum: [connected, not_configured, unauthorized, identity_mismatch, unavailable]}
         shop: {type: [string, 'null'], pattern: '^[a-z0-9][a-z0-9-]{0,61}\.myshopify\.com$'}
+        order_access: {enum: [ready, missing_scope, unverified]}
         orders_last_60_days: {enum: [none, present, unverified]}
         checked_at: {type: string, format: date-time}
     PrintfulNotification:

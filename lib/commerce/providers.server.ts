@@ -7,15 +7,26 @@ export const currencies=z.enum(['USD','EUR','GBP','BGN']);
 export const storeContract=z.object({id:z.string().uuid(),shop:domain,printful_store:numericRef.nullable(),external_ref_prefix:z.enum(['','shopify-']),currency:currencies,hard_cap:numericRef,contract:z.string().regex(/^[a-f0-9]{64}$/)});
 export type Store=z.infer<typeof storeContract>;
 const secret=z.string().min(16).max(4096);
-const keys=z.object({shop:domain,store:numericRef.nullable().optional(),shopify_secret:secret,shopify_access_token:secret,printful_access_token:secret.optional()}).strict();
-export function commerceCredentials(store:Store,env:NodeJS.ProcessEnv=process.env) {
+const keys=z.object({shop:domain,owner_id:z.string().min(1).max(256).optional(),store:numericRef.nullable().optional(),
+  shopify_secret:secret,shopify_access_token:secret.optional(),shopify_client_id:z.string().regex(/^[A-Za-z0-9_-]{12,128}$/).optional(),
+  printful_access_token:secret.optional()}).strict().refine(k=>!!k.shopify_client_id!==!!k.shopify_access_token);
+export type ShopifyCredentials=z.infer<typeof keys>;
+export function configuredShops(env:NodeJS.ProcessEnv=process.env) {
   const config=env.SHARKAI_COMMERCE_STORES;
-  if (!config || config.length>65536) throw Error('Store unavailable');
+  if (!config) return [];
+  if (config.length>65536) throw Error('Store unavailable');
   const list=z.array(keys).max(32).parse(JSON.parse(config));
-  const own=list.filter(s=>s.shop===store.shop && (s.store??null)===store.printful_store);
-  const access=list.flatMap(s=>s.printful_access_token?[s.shopify_access_token,s.printful_access_token]:[s.shopify_access_token]);
-  if(own.length!==1 || new Set(access).size!==access.length || list.some(s=>access.includes(s.shopify_secret))) throw Error('Store unavailable');
-  return own[0];
+  const access=list.flatMap(s=>[s.shopify_access_token,s.printful_access_token]).filter((v):v is string=>!!v);
+  const owners=list.flatMap(s=>s.owner_id?[s.owner_id]:[]);
+  if(new Set(list.map(s=>s.shop)).size!==list.length || new Set(owners).size!==owners.length ||
+    new Set(access).size!==access.length || list.some(s=>access.includes(s.shopify_secret)))throw Error('Store unavailable');
+  return list;
+}
+export function commerceCredentials(store:Store,env:NodeJS.ProcessEnv=process.env) {
+  const own=configuredShops(env).find(s=>s.shop===store.shop);
+  if(!own)throw Error('Store unavailable');
+  // Shopify authentication is independent of whether a Printful supplier is bound.
+  return (own.store??null)===store.printful_store?own:{...own,printful_access_token:undefined};
 }
 type Credentials=z.infer<typeof keys>;
 export const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -30,6 +41,47 @@ export async function boundedBytes(message:Request|Response,max:number,timeout=4
   try{for(;;){const next=await reader.read();if(expired)throw Error('Timeout');if(next.done)break;count+=next.value.length;
     if(count>max){await reader.cancel();throw Error('Too large');}parts.push(next.value);}return Buffer.concat(parts);}
   finally{clearTimeout(timer);reader.releaseLock();}
+}
+export class ShopifyUnauthorized extends Error {}
+const tokenCache=new Map<string,Promise<{token:string;expires:number}>>();
+async function grantedToken(k:ShopifyCredentials,send:typeof fetch,cacheKey:string):Promise<string> {
+  const cached=tokenCache.get(cacheKey);
+  if(cached){
+    const current=await cached;
+    if(current.expires>Date.now())return current.token;
+    if(tokenCache.get(cacheKey)!==cached)return grantedToken(k,send,cacheKey);
+    tokenCache.delete(cacheKey);
+  }
+  for(const [id,promise] of tokenCache)void promise.then(v=>{if(v.expires<=Date.now()&&promise===tokenCache.get(id))tokenCache.delete(id);},()=>{});
+  const pending=(async()=>{
+    const response=await send('https://'+domain.parse(k.shop)+'/admin/oauth/access_token',{method:'POST',cache:'no-store',redirect:'error',
+      signal:AbortSignal.timeout(5000),headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({grant_type:'client_credentials',client_id:k.shopify_client_id!,client_secret:k.shopify_secret})});
+    if(response.status===400||response.status===401||response.status===403)throw new ShopifyUnauthorized();
+    if(!response.ok)throw Error('Shopify unavailable');
+    const grant=z.object({access_token:secret,expires_in:z.number().int().positive()}).parse(JSON.parse((await boundedBytes(response,16384)).toString('utf8')));
+    return {token:grant.access_token,expires:Date.now()+Math.max(0,Math.min(86400,grant.expires_in)-60)*1000};
+  })();
+  tokenCache.set(cacheKey,pending);
+  try{return (await pending).token;}catch(e){if(tokenCache.get(cacheKey)===pending)tokenCache.delete(cacheKey);throw e;}
+}
+export async function shopifyQuery(k:ShopifyCredentials,query:string,variables:Record<string,string>,send:typeof fetch=fetch) {
+  if(!query.startsWith('query '))throw Error('Read query required');
+  const key=digest([k.shop,k.shopify_client_id,k.shopify_secret]);
+  const url='https://'+domain.parse(k.shop)+'/admin/api/2026-04/graphql.json';
+  const execute=(token:string)=>send(url,{method:'POST',redirect:'error',cache:'no-store',signal:AbortSignal.timeout(6000),
+    headers:{'Content-Type':'application/json','X-Shopify-Access-Token':token},body:JSON.stringify({query,variables})});
+  const token=k.shopify_access_token??await grantedToken(k,send,key);
+  let response=await execute(token);
+  if(response.status===401&&k.shopify_client_id){
+    const previous=tokenCache.get(key);
+    if(previous&&(await previous).token===token&&tokenCache.get(key)===previous)tokenCache.delete(key);
+    await response.body?.cancel();
+    response=await execute(await grantedToken(k,send,key));
+  }
+  if(response.status===401||response.status===403)throw new ShopifyUnauthorized();
+  if(!response.ok)throw Error('Shopify unavailable');
+  return JSON.parse((await boundedBytes(response,524288)).toString('utf8'));
 }
 async function readProvider(send:typeof fetch,url:string,opts:RequestInit) {
   const resp=await send(url,{...opts,redirect:'error',cache:'no-store',signal:AbortSignal.timeout(6000)});
@@ -55,8 +107,8 @@ const gql=`query SharkOrder($id: ID!) {order(id:$id){id test createdAt updatedAt
   shippingAddress{name company address1 address2 city provinceCode countryCodeV2 zip} lineItems(first:100){pageInfo{hasNextPage} nodes{currentQuantity requiresShipping variant{id}}}}}`;
 export async function readShopifyOrder(store:Store,ref:string,credentials:Credentials,send:typeof fetch=fetch) {
   numericRef.parse(ref);const id='gid://shopify/Order/'+ref;
-  const raw=await readProvider(send,'https://'+domain.parse(store.shop)+'/admin/api/2026-04/graphql.json',{method:'POST',
-    headers:{'Content-Type':'application/json','X-Shopify-Access-Token':credentials.shopify_access_token},body:JSON.stringify({query:gql,variables:{id}})});
+  if(credentials.shop!==store.shop) throw Error('Store unavailable');
+  const raw=await shopifyQuery(credentials,gql,{id},send);
   if(raw.errors?.length) throw Error('Unverified Shopify response');
   const o=order.parse(raw.data?.order);
   if(o.id!==id || o.test || [o.totalPriceSet,o.totalRefundedSet].some(v=>v.shopMoney.currencyCode!==store.currency))throw Error('Unverified Shopify order');

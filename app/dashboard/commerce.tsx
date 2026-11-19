@@ -34,7 +34,7 @@ function margin(row:Daily) {
 }
 const amount=(value:bigint|null,currency:string)=>displayMinor(value?.toString()??null,currency);
 type ShopifyStatus={status:'connected'|'not_configured'|'unauthorized'|'identity_mismatch'|'unavailable';shop:string|null;
-  orders_last_60_days:'none'|'present'|'unverified';checked_at:string};
+  order_access:'ready'|'missing_scope'|'unverified';orders_last_60_days:'none'|'present'|'unverified';checked_at:string};
 const shopErrors={not_configured:'Липсва връзка за Shopify магазина на този профил.',unauthorized:'Shopify не потвърди нужните права за четене.',
   identity_mismatch:'Shopify върна различен магазин от одобрения за този профил.',unavailable:'Проверката на Shopify е временно недостъпна.'};
 function ShopifyConnection() {
@@ -46,15 +46,18 @@ function ShopifyConnection() {
       const response=await fetch('/api/commerce/shopify-connection',{cache:'no-store'});
       const result=await response.json() as ShopifyStatus;
       if(!['connected','not_configured','unauthorized','identity_mismatch','unavailable'].includes(result.status))throw Error();
-      if(result.status==='connected' && (!response.ok || !result.shop || !['none','present','unverified'].includes(result.orders_last_60_days)))throw Error();
+      if(result.status==='connected' && (!response.ok || !result.shop || !['none','present','unverified'].includes(result.orders_last_60_days)
+        || !['ready','missing_scope','unverified'].includes(result.order_access)))throw Error();
       setReport(result);
-    }catch{setReport({status:'unavailable',shop:null,orders_last_60_days:'unverified',checked_at:new Date().toISOString()});}
+    }catch{setReport({status:'unavailable',shop:null,order_access:'unverified',orders_last_60_days:'unverified',checked_at:new Date().toISOString()});}
     finally{setBusy(false);}
   }
   return <div className="commerce-form">
     <button type="button" disabled={busy} className="shark-action-secondary" onClick={()=>void inspect()}>{busy?'Проверка в Shopify…':'Провери връзката с Shopify'}</button>
     {report&&<div role="status">
-      {report.status==='connected'?<><strong>Потвърден Shopify магазин · {report.shop}</strong><p>{report.orders_last_60_days==='none'?
+      {report.status==='connected'?<><strong>Потвърден Shopify магазин · {report.shop}</strong>
+        <p>{report.order_access==='ready'?'Потвърдени права за четене на продуктите и поръчките.':report.order_access==='missing_scope'?
+          'Липсват част от правата за четене на продуктите и поръчките.':'Правата за четене предстои да се проверят.'}</p><p>{report.orders_last_60_days==='none'?
         'Shopify потвърди 0 видими поръчки за последните 60 дни.':report.orders_last_60_days==='present'?'Има видими поръчки през последните 60 дни.':
         'Броят на поръчките за последните 60 дни е непотвърден.'}</p></>:<p>{shopErrors[report.status]}</p>}
       <small>Проверено към {seen(report.checked_at)} (София).</small>
