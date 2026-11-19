@@ -76,6 +76,16 @@ paths:
         '401': {$ref: '#/components/responses/HTTP401'}
         '403': {$ref: '#/components/responses/HTTP403'}
         '503': {$ref: '#/components/responses/HTTP503'}
+  /api/market/opportunities:
+    get:
+      operationId: readPublicMarketOpportunities
+      summary: Read published ECB euro cash and Eurostat Bulgarian housing indicators.
+      security: []
+      parameters:
+        - {name: days, in: query, required: false, schema: {type: integer, enum: [1, 7, 14, 21, 28], default: 7}}
+      responses:
+        '200': {description: Source-linked public indicators and sources currently unavailable., content: {application/json: {schema: {$ref: '#/components/schemas/PublicMarketOpportunities'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
   /api/market/euro-reference:
     get:
       operationId: readEuroMoneyMarketReference
@@ -1334,6 +1344,15 @@ components:
         target_reached: {"type":["boolean","null"]}
         realized_account_minor: {"type":["string","null"],"pattern":"^(0|-?[1-9][0-9]*)$"}
         basis: {"const":"verified_period_closeout_after_reported_costs"}
+    PublicMarketOpportunities:
+      type: object
+      additionalProperties: false
+      required: [days, as_of, briefs, unavailable_sources]
+      properties:
+        days: {$ref: '#/components/schemas/InvestmentOpportunities/properties/days'}
+        as_of: {$ref: '#/components/schemas/InvestmentOpportunities/properties/as_of'}
+        briefs: {$ref: '#/components/schemas/InvestmentOpportunities/properties/briefs'}
+        unavailable_sources: {$ref: '#/components/schemas/InvestmentOpportunities/properties/unavailable_sources'}
     InvestmentOpportunities:
       type: "object"
       additionalProperties: false
@@ -1344,7 +1363,7 @@ components:
         as_of: {"type":"string","format":"date-time"}
         ranked: {"type":"boolean"}
         strategies: {"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","label","instrument","category","rank","leader","source","source_url","observed_at","start","end","samples","median_bps","drawdown_bps","worst_bps","holdout_bps","assessment","risk","qualifications"],"properties":{"id":{"type":"string"},"label":{"type":"string"},"instrument":{"type":"string"},"category":{"enum":["STOCK","ETF","strategy"]},"rank":{"type":["integer","null"],"minimum":1},"leader":{"type":"boolean"},"source":{"type":"string"},"source_url":{"type":"string","format":"uri"},"observed_at":{"type":"string","format":"date-time"},"start":{"type":"string","format":"date"},"end":{"type":"string","format":"date"},"samples":{"type":"integer","minimum":0},"median_bps":{"type":"number"},"drawdown_bps":{"type":"number"},"worst_bps":{"type":"number"},"holdout_bps":{"type":"number"},"assessment":{"type":"string"},"risk":{"type":"string"},"qualifications":{"type":"array","items":{"type":"string"}}}}}
-        briefs: {"type":"array","items":{"type":"object","additionalProperties":false,"required":["category","title","metric","value","period","source","url","evidence_url","as_of","assessment","risk"],"properties":{"category":{"enum":["housing","euro_cash"]},"title":{"type":"string"},"metric":{"type":"string"},"value":{"type":"string"},"period":{"type":"string"},"source":{"type":"string"},"url":{"type":"string","format":"uri"},"evidence_url":{"type":"string","format":"uri"},"as_of":{"type":"string"},"assessment":{"type":"string"},"risk":{"type":"string"}}}}
+        briefs: {"type":"array","items":{"type":"object","additionalProperties":false,"required":["category","title","metric","value","period","source","url","evidence_url","as_of","assessment","risk"],"properties":{"category":{"enum":["housing","euro_cash"]},"title":{"type":"string"},"metric":{"type":"string"},"value":{"type":"string"},"period":{"type":"string"},"source":{"type":"string"},"url":{"type":"string","format":"uri"},"evidence_url":{"type":"string","format":"uri-reference"},"as_of":{"type":"string"},"assessment":{"type":"string"},"risk":{"type":"string"}}}}
         unavailable_sources: {"type":"array","items":{"type":"string"}}
     KrakenQuote:
       type: "object"
