@@ -3,6 +3,7 @@ import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { PrismaClient, Prisma } from '@prisma/client';
 import { handleBrokerWorker } from '../../lib/investments/order-worker.server';
+import { readForecastMandateCap } from '../../lib/investments/forecast-quote.server';
 import { makeProfitPacket, provisionProfitPolicy } from './profit-only-check.mts';
 
 type Query=(sql:string,values?:readonly unknown[])=>Promise<{rows:Record<string,any>[]}>;
@@ -85,6 +86,10 @@ export async function checkBrokerWorker(q:Query,db:PrismaClient) {
     assert.equal((await (await post('profit-evidence',auditor,profitKey,firstPacket)).json()).status,'recorded');
     assert.equal((await (await post('profit-evidence',auditor,profitKey,firstPacket)).json()).status,'replayed');
     const ready=await readOffers();
+    const forecastBinding='quote-fixture-'+broker;
+    await q(`INSERT INTO sharkai_forecast.binding VALUES($1,'forecast', $2,$3,$4,'USD','asset',$5,
+      now(),now(),now(),current_date-3650,now()+interval '2 days',NULL)`,[forecastBinding,owner,broker.toLowerCase(),brokerKey,label]);
+    assert.equal(await readForecastMandateCap(owner,forecastBinding,db,env),BigInt(0));
     assert.equal(ready.offers.length,1);
     assert.equal((await q(`SELECT sharkai_broker.accept_owner_mandate($1,$2,$3,'public."WalletInvestmentSettings"'::regclass,$4) AS ok`,
       [owner,policy,ready.offers[0].digest,version])).rows[0].ok,true);
@@ -95,6 +100,9 @@ export async function checkBrokerWorker(q:Query,db:PrismaClient) {
     const initial={...start,snapshot_id:'s1',observed_at:await brokerTime(),report_ref:'fixture-net',performance};
     assert.equal((await (await post('account-snapshot','broker-feed',quoteKey,initial)).json()).status,'recorded');
     assert.equal((await (await post('profit-evidence',auditor,profitKey,packet(initial,1000,0))).json()).status,'recorded');
+    assert.equal(await readForecastMandateCap(owner,forecastBinding,db,env),BigInt(550));
+    assert.equal(await readForecastMandateCap(owner,forecastBinding,db,{}),BigInt(0));
+    assert.equal(await readForecastMandateCap('foreign-owner',forecastBinding,db,env),BigInt(0));
     assert.equal((await q('SELECT sharkai_broker.owner_worker_status($1) AS enabled',[owner])).rows[0].enabled,true);
     const diagnosticKeys={signals:['strategy'],quotes:['broker-feed'],profits:[auditor],workers:[worker],tokens:{
       tokenref:{digest:credentialHash,account:createHash('sha256').update(broker+'/'+brokerKey).digest('hex')},

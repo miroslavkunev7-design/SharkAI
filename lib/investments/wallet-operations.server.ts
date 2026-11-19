@@ -26,19 +26,28 @@ export type WalletDepositSummary = {
   observed_at: string; count: number; latest: Deposit | null;
 };
 
-export function projectWiseDeposits(raw: unknown, accountId: string, code: string, decimals: number, from: Date, to: Date): WalletDepositSummary | null {
+function verifiedStatement(raw: unknown, accountId: string, code: string, from: Date, to: Date) {
   const parsed = statement.safeParse(raw);
   if (!parsed.success) return null;
   const {query, transactions, endOfStatementBalance} = parsed.data;
   if (String(query.accountId) !== accountId || query.currency !== code || endOfStatementBalance.currency !== code
       || Date.parse(query.intervalStart) !== from.valueOf() || Date.parse(query.intervalEnd) !== to.valueOf()) return null;
-  let latest: Deposit | null = null;
-  let count = 0;
   const references = new Set<string>();
   for (const row of transactions) {
     const at = Date.parse(row.date);
     if (at < from.valueOf() || at > to.valueOf() || row.amount.currency !== code || references.has(row.referenceNumber)) return null;
     references.add(row.referenceNumber);
+  }
+  return transactions;
+}
+
+export function projectWiseDeposits(raw: unknown, accountId: string, code: string, decimals: number, from: Date, to: Date): WalletDepositSummary | null {
+  const transactions=verifiedStatement(raw,accountId,code,from,to);
+  if(!transactions) return null;
+  let latest: Deposit | null = null;
+  let count = 0;
+  for(const row of transactions) {
+    const at=Date.parse(row.date);
     if (row.type !== 'CREDIT' || !['DEPOSIT','MONEY_ADDED'].includes(row.details.type)) continue;
     const minor = amountMinor(row.amount.value, decimals);
     if (!minor || minor === '0') return null;
@@ -49,7 +58,28 @@ export function projectWiseDeposits(raw: unknown, accountId: string, code: strin
     observed_at:to.toISOString(),count,latest };
 }
 
-export async function readWalletDeposits(owner: WalletOwnerRequest, now?: Date, env = process.env, transport?: WiseTransport) {
+const categories:Record<string,string>={
+  MONEY_ADDED:'Захранване',DEPOSIT:'Постъпление',CARD:'Плащане с карта',TRANSFER:'Превод',
+  DIRECT_DEBIT:'Директен дебит',CONVERSION:'Обмяна на валута',FEE:'Такса',REFUND:'Възстановяване',
+};
+
+export function projectWiseTransactions(raw:unknown,accountId:string,code:string,decimals:number,from:Date,to:Date) {
+  const rows=verifiedStatement(raw,accountId,code,from,to);
+  if(!rows) return null;
+  const transactions=[];
+  for(const row of rows) {
+    if(row.type==='CREDIT' && row.amount.value<0) return null;
+    const minor=amountMinor(Math.abs(row.amount.value),decimals);
+    if(minor===null) return null;
+    transactions.push({direction:row.type==='CREDIT'?'credit' as const:'debit' as const,amount_minor:minor,
+      occurred_at:new Date(row.date).toISOString(),category:Object.hasOwn(categories,row.details.type)?categories[row.details.type]:'Движение'});
+  }
+  transactions.sort((a,b)=>b.occurred_at.localeCompare(a.occurred_at));
+  return {status:'available' as const,currency:code,from:from.toISOString(),to:to.toISOString(),
+    transactions:transactions.slice(0,100),has_more:transactions.length>100};
+}
+
+async function readStatement(owner:WalletOwnerRequest,intervalMs:number,now:Date|undefined,env:NodeJS.ProcessEnv,transport?:WiseTransport) {
   const connection = wiseWalletConnection(owner,now,env,transport);
   if (connection.status !== 'connected' || !connection.binding.statement_approval_ref) return null;
   const { binding } = connection;
@@ -59,13 +89,30 @@ export async function readWalletDeposits(owner: WalletOwnerRequest, now?: Date, 
     if (!await verifiedProfile(binding,read)) return null;
     const to = new Date((now ?? new Date()).valueOf());
     to.setUTCMilliseconds(0);
-    const from = new Date(to.valueOf()-week);
+    const from = new Date(to.valueOf()-intervalMs);
     const query = new URLSearchParams({currency:binding.currency,intervalStart:from.toISOString(),intervalEnd:to.toISOString(),type:'COMPACT',statementLocale:'en'});
     const raw = await read(`/profiles/${binding.profile_id}/balance-statements/${binding.balance_id}/statement.json?${query}`);
     const finished = now ?? new Date();
-    const result = projectWiseDeposits(raw,binding.balance_id,binding.currency,connection.decimals,from,to);
-    return finished.valueOf()<connection.expiresAt && result ? { ...result, observed_at:finished.toISOString() } : null;
+    return finished.valueOf()<connection.expiresAt ? {raw,accountId:binding.balance_id,code:binding.currency,decimals:connection.decimals,from,to,finished} : null;
   } catch { return null; }
+}
+
+export async function readWalletDeposits(owner:WalletOwnerRequest,now?:Date,env=process.env,transport?:WiseTransport) {
+  const statement=await readStatement(owner,week,now,env,transport);
+  if(!statement) return null;
+  const {raw,accountId,code,decimals,from,to,finished}=statement;
+  const result=projectWiseDeposits(raw,accountId,code,decimals,from,to);
+  return result?{...result,observed_at:finished.toISOString()}:null;
+}
+
+export async function readWalletTransactions(owner:WalletOwnerRequest,now?:Date,env=process.env,transport?:WiseTransport) {
+  const statement=await readStatement(owner,30*86400000,now,env,transport);
+  if(statement) {
+    const {raw,accountId,code,decimals,from,to,finished}=statement;
+    const result=projectWiseTransactions(raw,accountId,code,decimals,from,to);
+    if(result) return {...result,as_of:finished.toISOString()};
+  }
+  return {status:'unavailable' as const,currency:owner.currency,from:null,to:null,as_of:null,transactions:[],has_more:false};
 }
 
 export async function walletKyc(owner: WalletOwnerRequest, start: boolean, now?: Date, env = process.env, transport?: WiseTransport) {
@@ -82,7 +129,7 @@ export async function walletKyc(owner: WalletOwnerRequest, start: boolean, now?:
     if (!start || current.data.status !== 'WAITING_CUSTOMER_INPUT') return { status:current.data.status, url:null };
     const callback = new URL(env.NEXT_PUBLIC_APP_URL ?? '');
     if (callback.protocol !== 'https:' || callback.username || callback.password) return null;
-    const result = kyc.safeParse(await read(path,{redirectUrl:callback.origin+'/dashboard?view=investments'}));
+    const result = kyc.safeParse(await read(path,{redirectUrl:callback.origin+'/wallet'}));
     const link = result.success ? result.data.link : null;
     if (!result.success || result.data.id !== reviewId || result.data.status !== 'WAITING_CUSTOMER_INPUT' || !link) return null;
     const url = new URL(link.value);

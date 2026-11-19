@@ -124,6 +124,74 @@ function medianReturn(sorted: HistoricalReturn[]) {
   };
 }
 
+type HistorySelection=Pick<ForecastInput,'ownerId'|'currency'|'instrumentCode'|'strategyLabel'|'horizonDays'|'history'>;
+
+function calendarBoundary(closeTime:number,anchor:number){
+  // A period starts immediately after the prior day's final UTC valuation.
+  const opening=new Date(closeTime+dayMs);
+  const lastDay=new Date(Date.UTC(opening.getUTCFullYear(),opening.getUTCMonth()+1,0)).getUTCDate();
+  return opening.getUTCDate()===Math.min(anchor,lastDay);
+}
+
+/** Independently recorded daily strategy NAV. No deposit, market quote or cash balance is converted into NAV evidence here. */
+export function verifiedHistoricalReturns(input:HistorySelection,now:Date,calendarMonth=false) {
+  const {history,ownerId,currency,instrumentCode,strategyLabel,horizonDays}=input;
+  if(!history||!evidenceLabel(ownerId)||!evidenceLabel(history.accountRef)||history.ownerId!==ownerId||
+    !currency||!/^[A-Z]{3}$/.test(currency)||history.currency!==currency||!evidenceLabel(instrumentCode)||!evidenceLabel(strategyLabel)||
+    history.instrumentCode!==instrumentCode||history.strategyLabel!==strategyLabel||!evidenceLabel(history.source)||
+    history.basis!=='cash_flow_adjusted_after_fees'||history.valuationBasis!=='unitized_strategy_nav'||
+    !horizonDays||!Number.isInteger(horizonDays)||horizonDays<1||horizonDays>366)return null;
+  const feeCoverage=verifiedFeeCoverage(history.feeCoverage);
+  const minCapital=unsignedInteger(history.applicableCapitalMinor?.min),maxCapital=unsignedInteger(history.applicableCapitalMinor?.max);
+  if(!feeCoverage||minCapital===null||maxCapital===null||maxCapital<minCapital)return null;
+  const closes=history.closes,time=now.valueOf(),today=Math.floor(time/dayMs)*dayMs;
+  const observed=instant(history.observedAt),last=Array.isArray(closes)?closes.length-1:-1;
+  if(!Number.isFinite(time)||!Number.isFinite(observed)||observed<today||observed>time||last<1||last>=maxDailyCloses)return null;
+  const firstFixed=last%horizonDays;
+  const monthAnchor=now.getUTCDate();
+  const boundaries:{units:bigint;date:string}[]=[];
+  let previous:bigint|null=null,valuedCloses=0;
+  for(let i=0;i<=last;i++){
+    const close=closes[i],date=today-(last-i+1)*dayMs;
+    if(!close||utcDay(close.date)!==date)return null;
+    const units=unsignedInteger(close.units);
+    if(units===null||(units===zero&&i!==last))return null;
+    if(close.kind==='valued')valuedCloses++;
+    else if(close.kind!=='confirmed_market_closed'||units!==previous)return null;
+    previous=units;
+    if(calendarMonth?calendarBoundary(date,monthAnchor):i>=firstFixed&&(i-firstFixed)%horizonDays===0){
+      boundaries.push({units,date:close.date});
+    }
+  }
+  if(valuedCloses<2||boundaries.length<=minWindows)return null;
+  const outcomes=boundaries.slice(1).map((end,i)=>({change:end.units-boundaries[i].units,initial:boundaries[i].units}));
+  outcomes.sort((a,b)=>{
+    const comparison=a.change*b.initial-b.change*a.initial;
+    return comparison<zero?-1:comparison>zero?1:0;
+  });
+  return {outcomes,minCapital,maxCapital,feeCoverage,windowStart:boundaries[0].date,windowEnd:boundaries[boundaries.length-1].date,
+    source:history.source,asOf:history.observedAt};
+}
+type Evidence=NonNullable<ReturnType<typeof verifiedHistoricalReturns>>;
+function capitalInRange(capital:bigint,evidence:Evidence){
+  return capital>zero&&capital>=evidence.minCapital&&capital<=evidence.maxCapital;
+}
+function moneyAt(capital:bigint,{change,initial}:HistoricalReturn){
+  return floorRatio(capital*change,initial).toString();
+}
+function percentage({change,initial}:HistoricalReturn,upper=false){
+  const numerator=change*BigInt(100000000);
+  const scaled=upper?-floorRatio(-numerator,initial):floorRatio(numerator,initial);
+  const digits=(scaled<zero?-scaled:scaled).toString().padStart(7,'0');
+  return (scaled<zero?'-':'')+digits.slice(0,-6)+'.'+digits.slice(-6);
+}
+export function observedRange(capital:bigint,evidence:Evidence|null){
+  if(!evidence||!capitalInRange(capital,evidence))return null;
+  const low=evidence.outcomes[0],high=evidence.outcomes[evidence.outcomes.length-1];
+  return {lower_minor:moneyAt(capital,low),upper_minor:(-floorRatio(-capital*high.change,high.initial)).toString(),
+    lower_pct:percentage(low),upper_pct:percentage(high,true)};
+}
+
 /** Historical scenarios use contiguous, non-overlapping periods without assuming independent returns. */
 export function estimateInvestmentForecast(input: ForecastInput, now = new Date()): ForecastResult {
   const { ownerId, currency, instrumentCode, strategyLabel, horizonDays, funding, history } = input;
@@ -151,52 +219,16 @@ export function estimateInvestmentForecast(input: ForecastInput, now = new Date(
   if (available === zero) return { ...empty, reason: 'no_authorized_capital' };
   const capital = available < cap ? available : cap;
   const funded = { ...empty, reason:'insufficient_verified_data' as const, authorized_funded_minor: capital.toString(), funding_source: funding.source };
-  if (!evidenceLabel(instrumentCode) || !evidenceLabel(strategyLabel) ||
-      !horizonDays || !Number.isInteger(horizonDays) || horizonDays < 1 || horizonDays > 366) return funded;
-  if (!history || history.ownerId !== ownerId || history.accountRef !== funding.accountRef ||
-      !evidenceLabel(history.source) || history.currency !== currency ||
-      history.instrumentCode !== instrumentCode || history.strategyLabel !== strategyLabel ||
-      history.basis !== 'cash_flow_adjusted_after_fees' || history.valuationBasis !== 'unitized_strategy_nav') return funded;
-  const feeCoverage = verifiedFeeCoverage(history.feeCoverage);
-  const minCapital = unsignedInteger(history.applicableCapitalMinor?.min);
-  const maxCapital = unsignedInteger(history.applicableCapitalMinor?.max);
-  if (!feeCoverage || minCapital === null || maxCapital === null || capital < minCapital || capital > maxCapital) return funded;
-
-  const closes = history.closes;
-  if (!Array.isArray(closes) || closes.length > maxDailyCloses) return funded;
-  const last = closes.length - 1;
-  const windows = Math.floor(last / horizonDays);
-  if (windows < minWindows) return funded;
-  const today = Math.floor(time / dayMs) * dayMs;
-  const end = today - dayMs;
-  const observedAt = instant(history.observedAt);
-  if (!Number.isFinite(observedAt) || observedAt < today || observedAt > time) return funded;
-  const start = last - windows * horizonDays;
-  const values: bigint[] = [];
-  let previous: bigint | null = null;
-  let valuedCloses = 0;
-  for (let i = 0; i <= last; i++) {
-    const close = closes[i];
-    if (!close || utcDay(close.date) !== end - (last - i) * dayMs) return funded;
-    const units = unsignedInteger(close.units);
-    if (units === null || (units === zero && i !== last)) return funded;
-    if (close.kind === 'valued') valuedCloses++;
-    else if (close.kind !== 'confirmed_market_closed' || units !== previous) return funded;
-    previous = units;
-    if (i >= start && (i - start) % horizonDays === 0) values.push(units);
-  }
-  if (valuedCloses < 2) return funded;
-  const outcomes = values.slice(1).map((close, i) => ({ change: close - values[i], initial: values[i] }));
-  outcomes.sort((a, b) => {
-    const comparison = a.change * b.initial - b.change * a.initial;
-    return comparison < zero ? -1 : comparison > zero ? 1 : 0;
-  });
-  const amount = ({ change, initial }: HistoricalReturn) => floorRatio(capital * change, initial).toString();
+  if(!history||history.accountRef!==funding.accountRef)return funded;
+  const evidence=verifiedHistoricalReturns(input,now);
+  if(!evidence||!capitalInRange(capital,evidence))return funded;
+  const {outcomes,feeCoverage}=evidence,windows=outcomes.length;
+  const amount=(value:HistoricalReturn)=>moneyAt(capital,value);
   const percentile = (percent: number) => outcomes[Math.ceil(windows * percent / 100) - 1];
   return {
     ...funded, status: 'available', reason: null, lower_minor: amount(percentile(5)), median_minor: amount(medianReturn(outcomes)),
     upper_minor: amount(percentile(95)), worst_observed_minor: amount(outcomes[0]),
-    best_observed_minor: amount(outcomes[windows - 1]), as_of: history.observedAt, window_start: closes[start].date,
-    window_end: closes[last].date, sample_count: windows, source: history.source, fee_coverage: feeCoverage,
+    best_observed_minor: amount(outcomes[windows - 1]), as_of: history.observedAt, window_start: evidence.windowStart,
+    window_end: evidence.windowEnd, sample_count: windows, source: history.source, fee_coverage: feeCoverage,
   };
 }

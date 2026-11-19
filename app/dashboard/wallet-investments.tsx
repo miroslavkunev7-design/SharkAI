@@ -10,6 +10,7 @@ import { WalletInvestmentsForm } from './wallet-investments-form';
 import { WalletProviderActions } from './wallet-provider-actions';
 import { TradingConsent } from './trading-consent';
 import { ResearchPanel } from './research';
+import {isWalletOwnerDashboard} from './wallet-dashboard-shape';
 import './wallet-investments.css';
 
 const API = '/api/wallet-investments';
@@ -32,13 +33,6 @@ async function request(path: string, options?: RequestInit) {
   const response = await fetch(API + path, { cache: 'no-store', ...options });
   const body = await response.json().catch(() => null);
   return { response, body };
-}
-
-function isDashboard(value: unknown): value is WalletInvestmentsOwnerDashboard {
-  return typeof value === 'object' && value !== null && 'settings' in value
-    && 'wallet' in value && 'wallet_capabilities' in value && 'investments' in value && typeof value.investments==='object'
-    && value.investments!==null && 'profit_budget' in value.investments && 'forecast' in value
-    && 'broker_activity' in value && 'weekly_report' in value && 'performance_fee' in value;
 }
 
 function dateLabel(value: string | null, includeTime = false) {
@@ -207,7 +201,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
       if (signal?.aborted) return;
       if (response.status === 401) {
         setState('signed_out');
-      } else if (response.ok && isDashboard(body)) {
+      } else if (response.ok && isWalletOwnerDashboard(body)) {
         setData(body);
         setState('ready');
       } else {
@@ -238,7 +232,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
         setState('signed_out');
         return;
       }
-      if (!response.ok || !isDashboard(body)) {
+      if (!response.ok || !isWalletOwnerDashboard(body)) {
         setError(response.status === 400 ? 'Провери въведените стойности.' : 'Промяната временно е недостъпна.');
         return;
       }
@@ -251,16 +245,19 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
     }
   }
 
-  if (state === 'loading') return <p role="status">Зареждане на портфейла и инвестициите…</p>;
+  if (state === 'loading') return <><Link className="shark-action" href="/wallet">Отвори портфейла</Link>
+    <p role="status">Зареждане на портфейла и инвестициите…</p></>;
   if (state === 'signed_out') return (
     <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
       <h2>Достъп до профила</h2>
+      <Link className="shark-action" href="/wallet">Създай портфейл</Link>
       <Link className="shark-action" href={signInHref}>Вход</Link>
     </section>
   );
   if (state === 'unavailable' || !data) return (
     <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
       <p role="alert">Данните временно са недостъпни.</p>
+      <Link className="shark-action" href="/wallet">Отвори портфейла</Link>
       <button className="shark-action-secondary" type="button" onClick={() => void load()}>Опитай отново</button>
     </section>
   );
@@ -281,6 +278,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
       <div className="module-wallet-split">
         <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-account-title">
           <h2 id="wallet-account-title">Портфейл</h2>
+          <Link className="shark-action" href="/wallet">{wallet.status==='verified'?'Отвори портфейла':'Създай портфейл'}</Link>
           <p>{walletProviderCopy[wallet.status]}</p>
           <dl className="module-wallet-metrics">
             <div><dt>Баланс</dt><dd>{displayMinor(wallet.balance_minor, wallet.currency)}</dd></div>

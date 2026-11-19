@@ -1,0 +1,97 @@
+.wallet-projection {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+  padding: clamp(1rem, 2.4vw, 1.65rem);
+  border: 1px solid var(--workspace-line, #a2bac9);
+  border-radius: 1rem;
+  background: linear-gradient(145deg, #f9fdff, #edf7fc);
+  color: var(--workspace-ink, #102e43);
+  text-align: left;
+}
+
+.wallet-projection h2, .wallet-projection p, .wallet-projection dl { margin: 0; }
+.wallet-projection h2 { font-size: clamp(1.15rem, 2vw, 1.5rem); line-height: 1.25; }
+.wallet-projection p { color: #294859; overflow-wrap: anywhere; line-height: 1.5; }
+.wallet-projection-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 17rem) minmax(5.5rem, 7rem);
+  gap: .75rem;
+}
+.wallet-projection-fields label, .wallet-projection-periods legend {
+  font-size: .88rem;
+  font-weight: 650;
+}
+.wallet-projection-fields label { display: grid; gap: .35rem; min-width: 0; }
+.wallet-projection-fields input, .wallet-projection-fields select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 2.8rem;
+  padding: .55rem .7rem;
+  border: 1px solid #809cad;
+  border-radius: .55rem;
+  background: white;
+  color: #143954;
+  font: inherit;
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+.wallet-projection-fields input[aria-invalid=true] { border-color: #9c3032; }
+.wallet-projection-periods { padding: 0; margin: 0; min-width: 0; border: 0; }
+.wallet-projection-periods legend { margin-bottom: .4rem; }
+.wallet-projection-periods > div { display: flex; flex-wrap: wrap; gap: .35rem; }
+.wallet-projection-periods label { position: relative; cursor: pointer; }
+.wallet-projection-periods input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+.wallet-projection-periods span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.65rem;
+  padding: 0 .7rem;
+  border: 1px solid #93acba;
+  border-radius: .5rem;
+  background: #fff;
+  color: #284d61;
+  font-size: .9rem;
+}
+.wallet-projection-periods input:checked + span { border-color: #184c68; background: #184c68; color: #fff; }
+.wallet-projection-periods input:focus-visible + span, .wallet-projection :is(input, select, button):focus-visible {
+  outline: 2px solid #0877b6;
+  outline-offset: 2px;
+}
+.wallet-projection-answer { display: grid; gap: .8rem; }
+.wallet-projection-answer:empty { display: none; }
+.wallet-projection-period { font-size: .9rem; font-weight: 650; }
+.wallet-projection-range { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem),1fr)); gap: .65rem; }
+.wallet-projection-range > div {
+  min-width: 0;
+  padding: .85rem 1rem;
+  border: 1px solid #b9ceda;
+  border-radius: .65rem;
+  background: #fff;
+}
+.wallet-projection-range dt { color: #3b5566; font-size: .85rem; }
+.wallet-projection-range dd { display: grid; gap: .12rem; margin: .4rem 0 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.wallet-projection-range strong { font-size: clamp(1.25rem, 3vw, 1.7rem); line-height: 1.2; }
+.wallet-projection-range [data-sign=negative] strong { color: #993a3d; }
+.wallet-projection-range [data-sign=positive] strong { color: #176745; }
+.wallet-projection-budget { padding-top: .7rem; border-top: 1px solid #bed1db; }
+.wallet-projection-source, .wallet-projection-note, .wallet-projection small { font-size: .85rem; }
+.wallet-projection small { color: #465e6d; line-height: 1.5; }
+.wallet-projection .wallet-projection-error { color: #91313b; }
+.wallet-projection-error button { padding: .3rem .45rem; border: 0; background: transparent; color: #145c8a; font: inherit; text-decoration: underline; cursor: pointer; }
+.wallet-euro-reference { padding: .85rem 1rem; border: 1px solid #b5cdd8; border-radius: .7rem; background: #eef6f8; }
+.wallet-euro-reference h3, .wallet-euro-reference summary { margin: 0; font-size: 1rem; font-weight: 700; color: #23485a; }
+.wallet-euro-reference summary { cursor: pointer; }
+.wallet-euro-reference > :is(p, dl) { margin-top: .6rem; }
+.wallet-euro-reference .wallet-euro-range { grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem),1fr)); }
+.wallet-euro-reference a { color: #155674; text-decoration: underline; }
+@media (max-width: 350px) {
+  .wallet-projection-fields { grid-template-columns: minmax(0, 1fr); }
+}

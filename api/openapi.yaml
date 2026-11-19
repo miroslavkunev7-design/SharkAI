@@ -7,6 +7,35 @@ info:
     Minor-unit strings represent exact integers in the named currency. Provider availability and
     authorization are checked at runtime. A read grant confers no permission to submit a broker order.
 paths:
+  /api/wallet-investments/forecast:
+    post:
+      operationId: calculateOwnerForecast
+      summary: Estimate the observed range for a hypothetical amount and calendar period.
+      description: Returns the owner's authenticated strategy history after verified broker costs and before platform performance fees. Changing the hypothetical amount does not change authorizations. The separately reported funded amount is limited to verified eligible profit, consent and the entered amount. Month uses the same day of the following month, clamped to month end.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/OwnerForecastInput'}}
+      responses:
+        '200': {description: Historical estimate or structured insufficient-evidence result., content: {application/json: {schema: {$ref: '#/components/schemas/OwnerForecast'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/market/euro-reference:
+    get:
+      operationId: readEuroMoneyMarketReference
+      summary: Read historical euro short-term rate compounded-index changes from the ECB.
+      description: Public comparison based on observed periods with matching published endpoints. Rates are percentage points in millionths. Amounts and account data are not accepted by this endpoint.
+      security: []
+      parameters:
+        - {name: period, in: query, required: true, schema: {$ref: '#/components/schemas/ForecastPeriod'}}
+      responses:
+        '200': {description: Verified ECB reference range or structured unavailable result., content: {application/json: {schema: {$ref: '#/components/schemas/EcbReference'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
   /api/research/{domain}:
     get:
       operationId: getOwnerResearch
@@ -497,6 +526,19 @@ paths:
         '401': {$ref: '#/components/responses/HTTP401'}
         '403': {$ref: '#/components/responses/HTTP403'}
         '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments/provider/transactions:
+    post:
+      operationId: readOwnerWalletTransactions
+      summary: Read posted Wise balance movements for the last 30 days.
+      description: The authenticated owner receives up to 100 verified movements in descending date order. Amounts are absolute minor units. Direction distinguishes credits and debits. has_more indicates additional statement rows in this window.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      responses:
+        '200': {description: Statement projection or structured unavailable result., content: {application/json: {schema: {$ref: '#/components/schemas/OwnerWalletTransactions'}}}}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
   /api/wallet-investments/provider/deposits:
     post:
       operationId: getOwnerDeposits
@@ -532,7 +574,7 @@ paths:
       operationId: openOwnerOnboarding
       summary: "Open the owner’s Wise hosted verification session."
       description: >-
-        Onboarding redirects to the validated provider URL, or to the dashboard with wallet_review=unavailable when no link is available.
+        Onboarding redirects to the validated provider URL, or to /wallet with wallet_review=unavailable when no link is available.
       security: [{Session: []}]
       parameters:
         - {$ref: '#/components/parameters/Origin'}
@@ -1221,6 +1263,89 @@ components:
               customer_count: {type: "integer", minimum: 0, maximum: 10000000}
               largest_customer_revenue_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
           maxItems: 200
+    OwnerWalletTransactions:
+      type: object
+      additionalProperties: false
+      required: [status, currency, from, to, as_of, transactions, has_more]
+      properties:
+        status: {enum: [available, unavailable]}
+        currency: {type: [string, 'null'], pattern: '^[A-Z]{3}$'}
+        from: {type: [string, 'null'], format: date-time}
+        to: {type: [string, 'null'], format: date-time}
+        as_of: {type: [string, 'null'], format: date-time}
+        has_more: {type: boolean}
+        transactions:
+          type: array
+          maxItems: 100
+          items:
+            type: object
+            additionalProperties: false
+            required: [direction, amount_minor, occurred_at, category]
+            properties:
+              direction: {enum: [credit, debit]}
+              amount_minor: {type: string, pattern: '^(0|[1-9][0-9]*)$'}
+              occurred_at: {type: string, format: date-time}
+              category: {enum: [Захранване, Постъпление, Плащане с карта, Превод, Директен дебит, Обмяна на валута, Такса, Възстановяване, Движение]}
+    ForecastPeriod:
+      type: "string"
+      enum: ["day","week_1","week_2","week_3","week_4","month"]
+    OwnerForecastInput:
+      type: "object"
+      additionalProperties: false
+      required: ["currency","amount_minor","period"]
+      properties:
+        currency: {"type":"string","pattern":"^[A-Z]{3}$"}
+        amount_minor: {"type":"string","pattern":"^[1-9][0-9]{0,18}$","description":"Positive minor-unit amount up to 9223372036854775807."}
+        period: {"$ref":"#/components/schemas/ForecastPeriod"}
+    ObservedCashRange:
+      type: "object"
+      additionalProperties: false
+      required: ["lower_minor","upper_minor","lower_pct","upper_pct"]
+      properties:
+        lower_minor: {"type":"string","pattern":"^-?\\d+$"}
+        upper_minor: {"type":"string","pattern":"^-?\\d+$"}
+        lower_pct: {"type":"string","pattern":"^-?\\d+(\\.\\d+)?$"}
+        upper_pct: {"type":"string","pattern":"^-?\\d+(\\.\\d+)?$"}
+    OwnerForecast:
+      type: "object"
+      additionalProperties: false
+      required: ["status","reason","currency","amount_minor","period","start_date","end_date_exclusive","horizon_days","range","sample_count","source","instrument_code","strategy_label","as_of","window_start","window_end","authorized_funded_minor","authorized_range","basis","performance_fee_basis"]
+      properties:
+        status: {"enum":["available","unavailable"]}
+        reason: {"enum":["insufficient_verified_history",null]}
+        currency: {"type":"string","pattern":"^[A-Z]{3}$"}
+        amount_minor: {"type":"string","pattern":"^-?\\d+$"}
+        period: {"$ref":"#/components/schemas/ForecastPeriod"}
+        start_date: {"type":"string","format":"date"}
+        end_date_exclusive: {"type":"string","format":"date"}
+        horizon_days: {"type":"integer","minimum":1,"maximum":31}
+        range: {"oneOf":[{"$ref":"#/components/schemas/ObservedCashRange"},{"type":"null"}]}
+        sample_count: {"type":["integer","null"],"minimum":0}
+        source: {"type":["string","null"]}
+        instrument_code: {"type":["string","null"]}
+        strategy_label: {"type":["string","null"]}
+        as_of: {"type":["string","null"],"format":"date-time"}
+        window_start: {"type":["string","null"],"format":"date"}
+        window_end: {"type":["string","null"],"format":"date"}
+        authorized_funded_minor: {"type":"string","pattern":"^\\d+$"}
+        authorized_range: {"oneOf":[{"$ref":"#/components/schemas/ObservedCashRange"},{"type":"null"}]}
+        basis: {"const":"historical_observed_extrema"}
+        performance_fee_basis: {"const":"before_platform_performance_fee"}
+    EcbReference:
+      type: "object"
+      additionalProperties: false
+      required: ["status","source","source_url","period","from","as_of","samples","lower_pct_micros","median_pct_micros","upper_pct_micros"]
+      properties:
+        status: {"enum":["available","unavailable"]}
+        source: {"const":"ECB_ESTR_COMPOUNDED_INDEX"}
+        source_url: {"type":"string","format":"uri"}
+        period: {"$ref":"#/components/schemas/ForecastPeriod"}
+        from: {"type":["string","null"],"format":"date"}
+        as_of: {"type":["string","null"],"format":"date"}
+        samples: {"type":"integer","minimum":0}
+        lower_pct_micros: {"type":["string","null"],"pattern":"^-?\\d+$"}
+        median_pct_micros: {"type":["string","null"],"pattern":"^-?\\d+$"}
+        upper_pct_micros: {"type":["string","null"],"pattern":"^-?\\d+$"}
     ShopifyConnection:
       type: object
       additionalProperties: false

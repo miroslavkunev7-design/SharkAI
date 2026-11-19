@@ -39,7 +39,7 @@ export default function LoginPage() {
         return;
       }
       const next = new URLSearchParams(window.location.search).get('next');
-      const allowedReturn = next && /^\/(chat|dashboard|pricing)(\?|$)/.test(next);
+      const allowedReturn = next && /^\/(chat|dashboard|pricing|wallet)(\?|$)/.test(next);
       window.location.replace(allowedReturn ? next : '/chat');
     } catch {
       setError('Връзката със SharkAI прекъсна. Опитай отново.');

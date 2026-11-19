@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
 import { resolveWalletStatus } from '../lib/investments/wallet-status.server';
-import { projectWiseDeposits, readWalletDeposits, walletKyc } from '../lib/investments/wallet-operations.server';
+import { projectWiseDeposits, projectWiseTransactions, readWalletDeposits, walletKyc } from '../lib/investments/wallet-operations.server';
 import type { WiseTransport } from '../lib/investments/wise-wallet.server';
 
 const now = new Date('2026-11-19T11:00:00.000Z');
@@ -41,6 +41,11 @@ test('statement credits are bound to the selected balance, currency and exact se
   assert.equal(projectWiseDeposits(raw,'303','EUR',2,new Date(from.valueOf()-1),now),null);
   assert.equal(projectWiseDeposits({...raw,transactions:[row,row]},'303','EUR',2,from,now),null);
   assert.equal(projectWiseDeposits({...raw,transactions:[]},'303','EUR',2,from,now)?.count,0);
+  const debit={...row,type:'DEBIT',amount:{value:-2.56,currency:'EUR'},details:{type:'CARD',merchant:'private'},referenceNumber:'ref-card'};
+  const history=projectWiseTransactions({...raw,transactions:[row,debit]},'303','EUR',2,from,now);
+  assert.deepEqual(history?.transactions.map(x=>[x.direction,x.amount_minor,x.category]),[['credit','1245','Захранване'],['debit','256','Плащане с карта']]);
+  assert(!JSON.stringify(history).includes('private'));
+  assert.equal(projectWiseTransactions({...raw,transactions:[debit,debit]},'303','EUR',2,from,now),null);
   const env={...makeEnv(),WISE_WALLET_OWNER_BINDING:JSON.stringify({...binding,statement_approval_ref:'fixture'})};
   const fixture=fixtureTransport({'/2026Q4/profiles/202/balance-statements/303/statement.json':raw});
   assert.equal((await readWalletDeposits(owner,now,env,fixture.transport))?.count,1);
@@ -58,7 +63,7 @@ test('KYC starts only for the owner with an active Wise review; only owner POST 
   const base=fixtureTransport({[route]:{id,status:'WAITING_CUSTOMER_INPUT'}});
   const make=(link:string,expires:string): WiseTransport => async (actual,options)=>{
     if (options.method==='PATCH') {
-      assert.equal(actual.pathname,route); assert.equal(JSON.parse(options.body!).redirectUrl,'https://example.invalid/dashboard?view=investments');
+      assert.equal(actual.pathname,route); assert.equal(JSON.parse(options.body!).redirectUrl,'https://example.invalid/wallet');
       return {id,status:'WAITING_CUSTOMER_INPUT',link:{value:link,expiresAt:expires}};
     }
     return base.transport(actual,options);
