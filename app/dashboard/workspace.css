@@ -87,7 +87,7 @@
   padding: 9px clamp(16px, 2.4vw, 34px);
   min-height: 60px;
 }
-.module-topbar .module-menu, .module-topbar .module-mobile-brand { display: none; }
+.module-topbar .module-menu, .module-topbar .module-mobile-brand, .module-topbar .module-agent-shortcut { display: none; }
 .module-breadcrumb { display: flex; align-items: center; gap: 9px; color: #a5bad8; font-size: .86rem; }
 .module-breadcrumb a:hover { color: #fff; }
 .module-breadcrumb strong { color: #e9f5ff; }
@@ -475,7 +475,7 @@
 @media (max-width: 750px) {
   .module-workspace { display: block; }
   .module-sidebar { display: none; }
-  .module-topbar .module-menu { display: inline-grid; }
+  .module-topbar .module-menu, .module-topbar .module-agent-shortcut { display: inline-grid; }
   .module-topbar .module-mobile-brand { display: inline-flex; }
   .module-topbar { justify-content: flex-start; }
   .module-breadcrumb { display: none; }

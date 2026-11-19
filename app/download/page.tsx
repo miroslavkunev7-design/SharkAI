@@ -36,7 +36,7 @@ export default function DownloadPage() {
             </div>
           ) : <p className="shark-entry-status">Инсталаторът за тази версия още не е достъпен.</p>}
           <Link href="/chat" className="shark-entry-inline-link">
-            Отвори SharkAI в браузъра <ArrowRight aria-hidden="true" className="h-4 w-4" />
+            Чат с Шарк агент в браузъра <ArrowRight aria-hidden="true" className="h-4 w-4" />
           </Link>
         </div>
       </section>

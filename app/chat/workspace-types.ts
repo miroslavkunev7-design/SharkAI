@@ -10,6 +10,7 @@ export interface Message {
   imagePath?: string | null;
   attachmentMime?: string | null;
   toolResult?: ChatToolResult | null;
+  replySource?: 'shark' | 'fallback';
 }
 
 export interface Conversation {

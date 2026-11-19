@@ -8,6 +8,8 @@ export interface ChatResult {
   conversationMode?: Mode;
   messages?: Message[];
   toolResult?: ChatToolResult | null;
+  assistant?: 'shark' | 'workspace';
+  assistantFallback?: boolean;
 }
 
 function isChatResult(value: unknown): value is ChatResult {

@@ -6,7 +6,7 @@ import { Menu, X } from 'lucide-react';
 import { Logo } from './Logo';
 
 const links = [
-  { href: '/chat', label: 'Чат' },
+  { href: '/chat', label: 'Шарк агент' },
   { href: '/dashboard?view=studio', label: 'Студио' },
   { href: '#features', label: 'Модули' },
   { href: '/download', label: 'За Windows' },

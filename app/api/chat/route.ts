@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSession, type AccountSession } from '@/lib/auth';
+import { isPaidAIEnabled } from '@/lib/ai/config';
 import { fallbackWorkspaceModel, remainingChatTokens, workspaceModels } from '@/lib/ai/workspace-chat';
 import { createNativeToolRouter, NativeToolSelectionError, streamWorkspaceReply } from '@/lib/ai/workspace-tool-routing';
 import { chatFileReference, isFileFollowUp, rememberedChatFiles, specifiesParticularChatFile, type ChatFile } from '@/lib/chat-file-context';
@@ -23,6 +24,8 @@ import { kickImageJob } from '@/lib/image-jobs';
 import { kickResearchJob } from '@/lib/research';
 import { MemoryError, readChatMemory } from '@/lib/personal-memory.server';
 import { reminderInputSchema } from '@/lib/reminder-input';
+import { requestHasSameOrigin } from '@/lib/request-origin';
+import { sendSharkChatMessage, sharkAssistantConfigured, SHARK_ASSISTANT_TEXT_LIMIT } from '@/lib/shark-assistant.server';
 import { readOwnedUpload } from '@/lib/uploads';
 
 export const runtime = 'nodejs';
@@ -35,7 +38,7 @@ const inputSchema = z.object({
   conversationId: conversationKey.default(LEGACY_CHAT),
   requestId: z.string().uuid().optional(),
   projectId: z.string().min(1).max(80).nullish(),
-  model: z.enum(['standard', 'advanced']).default('standard'),
+  model: z.enum(['auto', 'standard', 'advanced']).default('auto'),
   reasoning: z.enum(['standard', 'deep']).default('standard'),
   mode: z.enum(['chat', 'work']).default('chat'),
   toolId: z.string().min(1).max(100).nullish(),
@@ -77,14 +80,20 @@ function chatError(error: unknown, signal?: AbortSignal): ErrorResponse {
   return { error: 'Заявката не можа да завърши.', status: 500 };
 }
 
+async function canUseSharkAssistant(account: AccountSession | null) {
+  // The n8n webhook returns no token usage for metered plans.
+  return !!account && remainingChatTokens(account) === Infinity && sharkAssistantConfigured() && await isPaidAIEnabled();
+}
+
 export async function GET(req: NextRequest) {
   try {
     const account = await getSession();
     const selected = req.nextUrl.searchParams.get('conversationId') ?? undefined;
     if (selected && !conversationKey.safeParse(selected).success) throw new ChatError('Разговорът не е намерен.', 404);
     if (!account && selected) throw new ChatError('Влез, за да отвориш разговора.', 401);
-    const [access, history] = await Promise.all([
+    const [access, sharkAssistant, history] = await Promise.all([
       workspaceModels(account),
+      canUseSharkAssistant(account),
       account ? loadChat(account.id, selected) : {
         conversations: [], conversationId: null, conversationMode: 'chat', projectId: null, messages: [],
       },
@@ -92,7 +101,7 @@ export async function GET(req: NextRequest) {
     const models = access.models.map(({ id, label, reasoningLevels, imageInput }) => ({ id, label, reasoningLevels, imageInput }));
     const user = account ? { name: account.name, email: account.email, role: account.role, plan: account.plan,
       ...(account.lifetime && { lifetime: true }) } : null;
-    return NextResponse.json({ ...history, user, capabilities: { models, reason: access.reason } }, {
+    return NextResponse.json({ ...history, user, capabilities: { models, reason: access.reason, sharkAssistant } }, {
       headers: { 'Cache-Control': 'private, no-store' },
     });
   } catch (error) {
@@ -132,7 +141,7 @@ async function personalPreferences(userId: string) {
   }
 }
 
-async function completeTurn(account: AccountSession, input: Turn, signal: AbortSignal, onDelta?: (text: string) => void) {
+async function completeTurn(account: AccountSession, input: Turn, signal: AbortSignal, sameOrigin: boolean, onDelta?: (text: string) => void) {
   const userId = account.id;
   const { conversationId, mode, toolId, message } = input;
   const requestId = input.requestId ?? randomUUID();
@@ -191,6 +200,7 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
     let toolResult: Omit<ChatToolResult, 'usageTokens'> | null = null;
     let tokens = 0;
     let content = '';
+    let assistant: 'shark' | 'workspace' | undefined;
 
     async function executeTool(id: string, prompt: string) {
       const dispatched = await dispatchChatTool({
@@ -209,7 +219,16 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
     if (toolIntent?.metered && remainingChatTokens(account) === 0) {
       throw new ChatError('Достигнат е лимитът на текущия план.', 429);
     }
-    if (researchAction?.kind === 'citation' && report) {
+    const tryShark = sameOrigin && input.model === 'auto' && input.reasoning === 'standard' && mode === 'chat' &&
+      !!message && message.length <= SHARK_ASSISTANT_TEXT_LIMIT && !uploadId && !referencesFile && !toolId && !toolIntent &&
+      !researchAction && !report && !context.project && !input.branchFrom && await canUseSharkAssistant(account);
+    const shark = tryShark ? await sendSharkChatMessage({
+      userId, conversationId, requestId, message, history: context.recent, signal,
+    }) : null;
+    if (shark) {
+      assistant = 'shark';
+      content = shark.reply;
+    } else if (researchAction?.kind === 'citation' && report) {
       const { title, url, number } = selectResearchCitation(report, researchAction.number);
       content = `[${number}] ${title}`;
       toolResult = { id: randomUUID(), toolId: 'research-source', label: 'Източник от доклада', status: 'completed',
@@ -220,8 +239,9 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
       await executeTool(toolIntent.id, message);
     } else {
       const { models, reason } = await workspaceModels(account);
-      const selected = models.find(({ id }) => id === input.model);
+      const selected = models.find(({ id }) => id === (input.model === 'auto' ? 'standard' : input.model));
       const remaining = remainingChatTokens(account);
+      if (!selected && tryShark) throw new ChatError('Шарк агентът е временно недостъпен. Опитай отново.', 503);
       if (!selected) throw new ChatError(reason || 'Моделът е недостъпен за текущия план.', remaining === 0 ? 429 : models.length ? 403 : 503);
       if (!selected.reasoningLevels.includes(input.reasoning)) throw new ChatError('Моделът не поддържа избраното ниво на разсъждение.');
       const unsupportedAttachment = Boolean(upload && (!upload.mimeType.startsWith('image/') || !selected.imageInput));
@@ -309,6 +329,7 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
       } else {
         if (unsupportedAttachment) throw new ChatError(unsupported, 415);
         content = reply.text;
+        assistant = 'workspace';
       }
     }
     signal.throwIfAborted();
@@ -319,7 +340,7 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
     const savedTool = saved.toolResult as ChatToolResult | null;
     if (savedTool?.imageJobId) kickImageJob(savedTool.imageJobId, userId);
     if (savedTool?.researchId) kickResearchJob(savedTool.researchId, userId);
-    return saved;
+    return { ...saved, ...(assistant && { assistant }), ...(tryShark && assistant === 'workspace' && { assistantFallback: true }) };
   } finally {
     await releaseChatLease(userId, requestId, lease).catch(() => console.error('Chat lease cleanup failed'));
   }
@@ -339,8 +360,9 @@ export async function POST(req: NextRequest) {
 
   const stop = new AbortController();
   const signal = AbortSignal.any([req.signal, stop.signal, AbortSignal.timeout(165_000)]);
+  const sameOrigin = !req.headers.has('origin') || requestHasSameOrigin(req);
   if (!req.headers.get('accept')?.includes('application/x-ndjson')) {
-    try { return NextResponse.json(await completeTurn(account, input.data, signal)); }
+    try { return NextResponse.json(await completeTurn(account, input.data, signal, sameOrigin)); }
     catch (error) {
       const failure = chatError(error, signal);
       return NextResponse.json({ error: failure.error }, { status: failure.status });
@@ -354,7 +376,7 @@ export async function POST(req: NextRequest) {
       const send = (event: object) => { if (!cancelled) controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`)); };
       void (async () => {
         try {
-          const result = await completeTurn(account, input.data, signal, (text) => send({ type: 'delta', text }));
+          const result = await completeTurn(account, input.data, signal, sameOrigin, (text) => send({ type: 'delta', text }));
           send({ type: 'done', ...result });
         } catch (error) {
           send({ type: 'error', ...chatError(error, signal) });

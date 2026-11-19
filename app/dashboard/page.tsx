@@ -23,7 +23,7 @@ import './workspace.css';
 
 const VIEWS = {
   overview: { label: 'Обзор', icon: LayoutDashboard, href: '/dashboard' },
-  chat: { label: 'AI чат', icon: MessageSquare, href: '/chat' },
+  chat: { label: 'Шарк агент', icon: MessageSquare, href: '/chat' },
   studio: { label: 'Студио', icon: Code2, href: '/dashboard?view=studio' },
   agents: { label: 'AI агенти', icon: Users, href: '/dashboard?view=agents' },
   automotive: { label: 'Автомобили', icon: CarFront, href: '/dashboard?view=automotive' },
@@ -37,7 +37,7 @@ const WORKSPACE_ART: Partial<Record<View, string>> = {
   chat: 'agent', studio: 'studio', agents: 'team', investments: 'markets', commerce:'studio', automotive: 'car', settings: 'shark',
 };
 const MODULES = [
-  { view: 'chat', description: 'Разговаряй с SharkAI.' },
+  { view: 'chat', description: 'Разговори и работа с файлове.' },
   { view: 'studio', description: 'Проекти от описание и скрийншоти.' },
   { view: 'agents', description: 'Специализирани роли и резултати.' },
   { view: 'investments', description: 'Лимит, цели и състояние на доставчика.' },
@@ -228,7 +228,7 @@ function Overview({ data, loading, error, onRetry }: { data: Projects | null; lo
           <h1>Команден <span>център</span></h1>
           <p>Твоето работно пространство за AI чат, проекти и задачи.</p>
           <div className="module-actions">
-            <Link href="/chat" className="shark-action">Отвори AI чата <ArrowRight size={17} /></Link>
+            <Link href={VIEWS.chat.href} className="shark-action">Чат с Шарк агент <ArrowRight size={17} aria-hidden="true" /></Link>
             <Link href={VIEWS.studio.href} className="shark-action-secondary">Към Студиото <Code2 size={17} /></Link>
           </div>
         </div>
@@ -533,7 +533,10 @@ function Agents({ user, loading }: { user: User | null; loading: boolean }) {
   }
   return (
     <>
-      <Banner view="agents">Задачи в Студиото и последни резултати от твоите проекти.</Banner>
+      <Banner view="agents">
+        Задачи в Студиото и последни резултати от твоите проекти.
+        {' '}<Link className="module-link" href={VIEWS.chat.href}>Чат с Шарк агент <ArrowRight size={14} aria-hidden="true" /></Link>
+      </Banner>
       <section className="ice-section module-panel module-brain-panel" id="supreme-brain" data-ice-art="agent" aria-labelledby="supreme-brain-title">
         <div className="module-heading">
           <div className="module-brain"><Logo size="md" /><div><h2 id="supreme-brain-title">{SUPREME_BRAIN.name}</h2><p>{SUPREME_BRAIN.description}</p></div></div>
@@ -750,6 +753,9 @@ function DashboardContent() {
           <WorkspaceBrand mobile />
           <span className="module-breadcrumb"><Link href="/dashboard">Работно пространство</Link><span aria-hidden="true">/</span><strong>{VIEWS[view].label}</strong></span>
           <div className="module-header-actions">
+            <Link className="module-agent-shortcut module-utility-button" href={VIEWS.chat.href} aria-label="Чат с Шарк агент" title="Чат с Шарк агент">
+              <MessageSquare size={18} aria-hidden="true" />
+            </Link>
             <WorkspaceSearch projects={data?.projects ?? []} />
             <Link className="module-account-puck" href={data?.user ? VIEWS.settings.href : signIn('/dashboard')}>
               <span aria-hidden="true" />{data?.user ? accountPlanLabel(data.user, 'План ') : 'Вход'}

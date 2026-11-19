@@ -9,7 +9,7 @@ export const homeModules = [
   },
   {
     id: 'chat', tile: 'Чат', title: 'AI чат', icon: MessageSquare,
-    href: '/chat', action: 'Отвори AI чата',
+    href: '/chat', action: 'Чат с Шарк агент',
     description: 'Задавай въпроси, прикачвай файлове и продължавай разговорите си.',
     summary: 'Разговори и работа с файлове',
   },

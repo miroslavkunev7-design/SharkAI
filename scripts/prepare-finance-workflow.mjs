@@ -3,6 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { attachDiagnostics } from '../n8n/module-diagnostics.mjs';
 import { attachComponentChecks } from '../n8n/diagnostic-component-checks.mjs';
+import coreTemplate from '../n8n/workflows/W10-ai-core.json' with { type: 'json' };
 
 const originalId = 'y1RLdFfwaWSdsSGZ';
 const product = 'https://mm-auto-green.vercel.app';
@@ -91,6 +92,14 @@ export function prepareFinanceWorkflow(saved, templates) {
     return matches[0];
   };
   const agent = find('Shark AI агент');
+  // Keep the site introduction in sync with W10, preserving the original agent's tool instructions.
+  const corePrompt = coreTemplate.nodes.find(node => node.name === agent.name).parameters.options.systemMessage;
+  const [siteIntroduction] = corePrompt.split('\n\n');
+  const previousIntro = 'Ти си Shark AI, общ асистент за заявки в България с имотен фокус върху Шумен, Бургас и Варна. Отговаряй на български, освен ако потребителят поиска друг език.';
+  const options = agent.parameters.options;
+  if (!options.systemMessage.includes(siteIntroduction)) {
+    options.systemMessage = siteIntroduction + '\n\n' + options.systemMessage.replace(previousIntro, '').trimStart();
+  }
   const note = find('Портфейл и инвестиции');
   note.parameters.content='## Портфейл и инвестиции\nЛичният депозит е извън бюджета за сделки. Агентът проверява отделената реализирана нетна печалба, прогнозата и целта за избрания период.';
   note.parameters.width = Math.max(930,note.parameters.width);
