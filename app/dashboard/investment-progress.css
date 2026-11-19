@@ -14,4 +14,6 @@
 .investment-idea{padding:1rem 0;border-top:1px solid #66879b66}
 .investment-idea h3{margin:0 0 .4rem}
 .investment-opportunities>label,.investment-progress>label{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin:1rem 0}
+.investment-opportunities select,.investment-progress select{color-scheme:light;color:#153549;background-color:#fff;border:1px solid #567584;border-radius:.4rem;min-height:2.75rem;padding:.35rem .65rem}
+.investment-opportunities select:focus-visible,.investment-progress select:focus-visible{outline:2px solid #075f79;outline-offset:2px}
 @media(max-width:540px){.investment-progress-chart{padding:.6rem}.investment-chart-times{font-size:.65rem}}
