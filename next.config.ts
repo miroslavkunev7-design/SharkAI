@@ -2,6 +2,12 @@ import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  async redirects() {
+    return [
+      {source:'/investment-lab/simulator.html',destination:'/dashboard?view=investments&tab=calculator',permanent:false},
+      {source:'/investment-lab/index.html',destination:'/dashboard?view=investments',permanent:false},
+    ];
+  },
   outputFileTracingIncludes: {
     '/api/chat': [
       './lib/document-worker.cjs',

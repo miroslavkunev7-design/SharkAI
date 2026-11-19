@@ -241,6 +241,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
     </>;
     if (state === 'loading') return <><Link className="shark-action" href="/wallet">Отвори портфейла</Link>
       <p role="status">Зареждане на портфейла и инвестициите…</p></>;
+    if(tab==='opportunities'&&state==='signed_out')return <InvestmentOpportunities publicOnly/>;
     if (state === 'signed_out') return (
       <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
         <h2>Достъп до профила</h2>

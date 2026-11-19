@@ -90,7 +90,7 @@ function WalletSettings({account,update}:{account:Account;update:(next:Account)=
     <section className="sw-panel"><div className="sw-section-head"><h2>Връзка с доставчика</h2><ShieldCheck/></div>
       <p>{providerStatus[data.wallet.status]}. Откриването и потвърждаването на платежната сметка се извършват в Wise.</p>
       {!data.wallet_capabilities.hosted_kyc&&data.wallet.status!=='verified'&&<a className="sw-btn" href="https://wise.com/register" target="_blank" rel="noopener noreferrer">Открий сметка в Wise <ArrowUpRight/></a>}
-      <div className="sw-provider-actions"><WalletProviderActions data={data}/></div>
+      <div className="sw-provider-actions"><WalletProviderActions data={data} action={null}/></div>
     </section>
     <details className="sw-panel sw-disclosure"><summary>Инвестиционни настройки и AI достъп <ChevronDown/></summary>
       <WalletInvestmentsForm key={JSON.stringify(data.settings)} settings={data.settings} busy={busy} onSave={save}/>

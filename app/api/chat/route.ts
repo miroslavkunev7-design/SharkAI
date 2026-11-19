@@ -167,9 +167,9 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
       ? files.find(({ mime }) => !mime) : undefined;
     const priorFile = referencesFile ? compatibleFiles[0] : undefined;
     if (!uploadId) {
-      uploadId = historicalMatch?.file.id ?? legacyFile?.id;
+      uploadId = historicalMatch?.file.id ?? legacyFile?.id ?? priorFile?.id;
     }
-    let upload = uploadId ? await readOwnedUpload(uploadId, userId) : null;
+    const upload = uploadId ? await readOwnedUpload(uploadId, userId) : null;
     if (uploadId && !upload) throw new ChatError('Прикаченият файл не е намерен.', 404);
     const implicitIntent = historicalMatch?.intent ?? (!input.uploadId && uploadId ? directIntent : null);
     if (implicitIntent && upload && ((reference && !reference.matches(upload.mimeType))
@@ -238,7 +238,6 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
       if (!shark) throw new ChatError('Шарк агентът в n8n не върна отговор. Опитай отново.',503);
       assistant='shark'; content=shark.reply;
       tokens=Number.isFinite(remaining)?inputUnits+countChatTextTokens(content):0;
-      onDelta?.(content);
     }
     signal.throwIfAborted();
     const saved = await recordChatTurn({
@@ -246,6 +245,7 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
       uploadId: uploadId ?? undefined, attachmentMime: upload?.mimeType, toolResult: toolResult ?? undefined, tokens,
     });
     const savedTool = saved.toolResult as ChatToolResult | null;
+    if (assistant === 'shark') onDelta?.(content);
     if (savedTool?.imageJobId) kickImageJob(savedTool.imageJobId, userId);
     if (savedTool?.researchId) kickResearchJob(savedTool.researchId, userId);
     return { ...saved, ...(assistant && { assistant }) };

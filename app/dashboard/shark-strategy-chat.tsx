@@ -2,14 +2,17 @@
 
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {Send} from 'lucide-react';
+import './shark-strategy-chat.css';
 
 type Line = {id:string;role:string;content:string};
 
-export function SharkStrategyChat({strategyId,strategyLabel}:{strategyId:string|null;strategyLabel:string|null}) {
-  return <StrategyThread key={strategyId||'general'} strategyId={strategyId} strategyLabel={strategyLabel}/>;
+type Props={strategyId:string|null;strategyLabel:string|null;currency?:string;horizonDays?:number};
+
+export function SharkStrategyChat(props:Props) {
+  return <StrategyThread key={props.strategyId||'general'} {...props}/>;
 }
 
-function StrategyThread({strategyId,strategyLabel}:{strategyId:string|null;strategyLabel:string|null}) {
+function StrategyThread({strategyId,strategyLabel,currency,horizonDays}:Props) {
   const [conversation,setConversation]=useState('');
   const [lines,setLines]=useState<Line[]>([]);
   const [draft,setDraft]=useState('');
@@ -45,7 +48,10 @@ function StrategyThread({strategyId,strategyLabel}:{strategyId:string|null;strat
     const controller=new AbortController();
     active.current=controller;setPending(true);setError('');
     try {
-      const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({conversationId:conversation,requestId:id,message,model:'auto'})});
+      const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({
+        conversationId:conversation,requestId:id,message,model:'auto',
+        ...(strategyId&&{strategy:strategyId,strategyCurrency:currency,strategyDays:horizonDays}),
+      })});
       const data=await response.json();
       if (response.status===401) {setGuest(true);return;}
       if (!response.ok) throw new Error(data.error||'Shark временно е недостъпен.');

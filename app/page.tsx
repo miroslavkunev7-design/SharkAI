@@ -14,7 +14,7 @@ export default function HomePage() {
         <HomeHero />
         <nav id="features" aria-label="Модули на SharkAI" className="shark-launch-summary">
           {homeModules.slice(1).map(({ id, href, title, summary, icon: Icon }) => (
-            <Link key={id} href={href} id={id === 'studio' ? 'loop' : id === 'agents' ? 'agents' : undefined}>
+            <Link key={id} href={href} id={id === 'studio' ? 'loop' : id}>
               <Icon className="shark-launch-summary-icon" size={24} aria-hidden="true" />
               <span><strong>{title}</strong><small>{summary}</small></span>
               <ArrowUpRight className="shark-launch-summary-arrow" size={16} aria-hidden="true" />

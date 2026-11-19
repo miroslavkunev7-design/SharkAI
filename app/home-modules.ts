@@ -1,17 +1,17 @@
-import { BrainCircuit, LayoutDashboard, MessageSquare, PanelsTopLeft, UsersRound } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, PanelsTopLeft, Wallet, ChartNoAxesCombined } from 'lucide-react';
 
 export const homeModules = [
   {
-    id: 'brain', tile: 'Мозък', title: 'Supreme Brain', icon: BrainCircuit,
-    href: '/dashboard?view=agents#supreme-brain', action: 'Отвори Supreme Brain',
-    description: 'Координирай AI агентите и проследявай изпълнението на проектите си.',
-    summary: 'Координация на проекти',
+    id: 'chat', tile: 'Шарк агент', title: 'Шарк агент', icon: MessageSquare,
+    href: '/chat', action: 'Отвори чата',
+    description: 'Обсъждай идеи, работи с файлове и продължавай разговорите си с основния агент на Shark AI.',
+    summary: 'Разговори и инструменти',
   },
   {
-    id: 'chat', tile: 'Чат', title: 'AI чат', icon: MessageSquare,
-    href: '/chat', action: 'Чат с Шарк агент',
-    description: 'Задавай въпроси, прикачвай файлове и продължавай разговорите си.',
-    summary: 'Разговори и работа с файлове',
+    id: 'investments', tile: 'Инвестиции', title: 'Инвестиции', icon: ChartNoAxesCombined,
+    href: '/dashboard?view=investments', action: 'Отвори инвестициите',
+    description: 'Сравнявай стратегии, следи пазарните цени и виж напредъка към целта си.',
+    summary: 'Стратегии, калкулатор и пазари',
   },
   {
     id: 'studio', tile: 'Студио', title: 'Студио', icon: PanelsTopLeft,
@@ -20,10 +20,10 @@ export const homeModules = [
     summary: 'Проекти от описание или референция',
   },
   {
-    id: 'agents', tile: 'Агенти', title: 'AI агенти', icon: UsersRound,
-    href: '/dashboard?view=agents#agent-roles', action: 'Виж агентите',
-    description: 'Разгледай специализираните роли, наличността и резултатите им по проекти.',
-    summary: 'Роли и резултати по проекти',
+    id: 'wallet', tile: 'Портфейл', title: 'Портфейл', icon: Wallet,
+    href: '/wallet', action: 'Отвори портфейла',
+    description: 'Виж баланса, движенията и разрешенията на свързаната си сметка.',
+    summary: 'Баланс и движения по сметката',
   },
   {
     id: 'work', tile: 'Работа', title: 'Работно пространство', icon: LayoutDashboard,

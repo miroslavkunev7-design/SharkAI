@@ -25,7 +25,7 @@ const VIEWS = {
   overview: { label: 'Обзор', icon: LayoutDashboard, href: '/dashboard' },
   chat: { label: 'Шарк агент', icon: MessageSquare, href: '/chat' },
   studio: { label: 'Студио', icon: Code2, href: '/dashboard?view=studio' },
-  agents: { label: 'AI агенти', icon: Users, href: '/dashboard?view=agents' },
+  agents: { label: 'Архив на агентите', icon: Users, href: '/dashboard?view=agents' },
   automotive: { label: 'Автомобили', icon: CarFront, href: '/dashboard?view=automotive' },
   investments: { label: 'Портфейл и инвестиции', icon: TrendingUp, href: '/dashboard?view=investments' },
   commerce: { label: 'Магазин и препродажба', icon: ShoppingBag, href: '/dashboard?view=commerce' },
@@ -39,7 +39,6 @@ const WORKSPACE_ART: Partial<Record<View, string>> = {
 const MODULES = [
   { view: 'chat', description: 'Разговори и работа с файлове.' },
   { view: 'studio', description: 'Проекти от описание и скрийншоти.' },
-  { view: 'agents', description: 'Специализирани роли и резултати.' },
   { view: 'investments', description: 'Пазарни графики, личен портфейл и инвестиционни цели.' },
   { view: 'commerce', description: 'Поръчки, оперативен капитал и реализиран марж.' },
 ] as const;
@@ -103,7 +102,7 @@ function RoleStatus({ status }: { status: AgentRunActivity }) {
 function WorkspaceNav({ view, onNavigate }: { view: View; onNavigate?: () => void }) {
   return (
     <nav className="module-nav" aria-label="Работно пространство">
-      {Object.entries(VIEWS).map(([key, item]) => (
+      {Object.entries(VIEWS).filter(([key]) => key !== 'agents').map(([key, item]) => (
         <Link key={key} href={item.href} aria-current={view === key ? 'page' : undefined}
           onClick={onNavigate} title={item.label}>
           <item.icon size={19} aria-hidden="true" /><span>{item.label}</span>
@@ -637,6 +636,9 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
           )}
       </section>
       {user && <MemorySettings />}
+      <details className="module-disclosure"><summary>Архив на агентите</summary>
+        <Link className="module-link" href={VIEWS.agents.href}>Специализирани роли и предишни изпълнения <ArrowUpRight size={14}/></Link>
+      </details>
     </>
   );
 }

@@ -898,7 +898,7 @@ export default function ChatPage() {
         <nav className="shark-chat-rail-modules" aria-label="Работно пространство">
           <Link href="/dashboard" className="shark-chat-rail-row ice-section" data-ice-art="shark"><LayoutDashboard size={17} /><span>Обзор</span></Link>
           <Link href="/dashboard?view=studio" className="shark-chat-rail-row ice-section" data-ice-art="studio"><AppWindow size={17} /><span>Студио</span></Link>
-          <Link href="/dashboard?view=agents" className="shark-chat-rail-row ice-section" data-ice-art="team"><Sparkles size={17} /><span>AI агенти</span></Link>
+          <Link href="/dashboard?view=investments&tab=strategies" className="shark-chat-rail-row ice-section" data-ice-art="markets"><Sparkles size={17} /><span>Инвестиционни стратегии</span></Link>
         </nav>
         <div className="shark-chat-profile">
           {account ? popupButton('profile', 'Меню на профила', <>

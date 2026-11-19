@@ -89,10 +89,11 @@ export function InvestmentProgress(){
     </>}
   </section>;
 }
-export function InvestmentOpportunities({currency}:{currency?:string|null}){
+export function InvestmentOpportunities({currency,publicOnly=false}:{currency?:string|null;publicOnly?:boolean}){
   const [days,setDays]=useState(7);
-  const query=new URLSearchParams({days:String(days),...(currency?{currency}:{})});
-  const {data,error,refresh}=useReport<OpportunitiesReport>('/api/wallet-investments/progress/opportunities?'+query,300000);
+  const query=new URLSearchParams({days:String(days),...(currency&&!publicOnly?{currency}:{})});
+  const path=publicOnly?'/api/market/opportunities':'/api/wallet-investments/progress/opportunities';
+  const {data,error,refresh}=useReport<Partial<Pick<OpportunitiesReport,'currency'|'strategies'>>&Pick<OpportunitiesReport,'briefs'|'unavailable_sources'>>(path+'?'+query,300000);
   return <section className="ice-section module-panel module-wallet-panel investment-opportunities" data-ice-art="markets">
     <div className="investment-progress-heading"><h2>Инвестиционни възможности за анализ</h2>
       <button type="button" className="shark-action-secondary" onClick={refresh}>Обнови анализа</button></div>
@@ -102,14 +103,14 @@ export function InvestmentOpportunities({currency}:{currency?:string|null}){
     {data&&<>
       {data.briefs.map(b=><article key={b.category} className="investment-idea"><h3>{b.title}</h3><strong>{b.metric} · {b.value}</strong>
         <p>{b.assessment}</p><p>{b.risk}</p><p>{b.source} · {b.period} · {shortDate(b.as_of)}. <a href={b.evidence_url} target="_blank" rel="noreferrer">Данни от източника</a></p></article>)}
-      {data.strategies.map(s=><article key={s.id} className="investment-idea"><h3>{s.rank!==null?s.rank+'. ':''}{s.label}</h3>
+      {(data.strategies??[]).map(s=><article key={s.id} className="investment-idea"><h3>{s.rank!==null?s.rank+'. ':''}{s.label}</h3>
         <small>{s.category==='ETF'?'Борсово търгуван фонд':s.category==='STOCK'?'Акция':'Брокерска стратегия'} · {s.instrument} · {data.currency}</small>
         <p>{s.assessment}</p><dl className="module-wallet-metrics"><div><dt>Медиана след разходите</dt><dd>{percentage(s.median_bps/100)}</dd></div>
           <div><dt>Медиана при проверка</dt><dd>{percentage(s.holdout_bps/100)}</dd></div><div><dt>Най-слаб период</dt><dd>{percentage(s.worst_bps/100)}</dd></div>
           <div><dt>Максимален спад от връх</dt><dd>{percentage(s.drawdown_bps/100)}</dd></div></dl>
         <p>{s.risk}</p>{s.qualifications.map(q=><p key={q}>{q}</p>)}
         <p>{s.samples} периода · {shortDate(s.start)} – {shortDate(s.end)} · {s.source}. <a href={s.source_url} target="_blank" rel="noreferrer">Брокерска справка</a></p></article>)}
-      {!data.strategies.length&&<p>За този профил още няма брокерска стратегия с достатъчно съпоставими наблюдения.</p>}
+      {!publicOnly&&!data.strategies?.length&&<p>За този профил още няма брокерска стратегия с достатъчно съпоставими наблюдения.</p>}
       {data.unavailable_sources.map(s=><p key={s}>{s} · липсват актуални потвърдени данни.</p>)}
     </>}
   </section>;

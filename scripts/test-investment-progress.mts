@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {housingBrief,readOpportunities,readHousing} from '../lib/investments/investment-progress-opportunities.server';
 import {readEuroReference} from '../lib/investments/ecb-euro-reference';
+import {readPublicOpportunities} from '../lib/investments/market-opportunities.public';
+import {GET as marketOpportunities} from '../app/api/market/opportunities/route';
 import {progressWindow,readInvestmentProgress} from '../lib/investments/investment-progress.server';
 import {emptyResearch} from '../lib/research/ranking';
 
@@ -54,10 +56,23 @@ test('opportunity analysis includes research only for eligible original owner, e
   const noBroker=await readOpportunities('owner','EUR',7,now,{...inputs,research:async()=>empty()} as never);
   assert.deepEqual(noBroker.strategies,[]);assert.equal(noBroker.briefs[0].category,'housing');
 });
+test('anonymous route rejects private selectors and its public service exposes only market briefs',async()=>{
+  for(const suffix of ['?currency=EUR','?owner=someone','?days=3','?days=7&days=1']){
+    assert.equal((await marketOpportunities(new Request('https://shark.invalid/api/market/opportunities'+suffix))).status,400);
+  }
+  const result=await readPublicOpportunities(7,now,{housing:async()=>housingBrief(source,now),cash:async()=>({status:'unavailable'})} as never);
+  assert.deepEqual(Object.keys(result).sort(),['as_of','briefs','days','unavailable_sources']);
+  assert.equal(result.briefs[0].category,'housing');
+});
 if(process.argv.includes('--public-sources')){
   test('official public sources provide current evidence without any private connection',async()=>{
     const [housing,cash]=await Promise.all([readHousing(new Date()),readEuroReference('week_1')]);
     assert.ok(housing);assert.equal(cash.status,'available');
     console.log('Eurostat',housing.period,housing.value,'published',housing.as_of,'· ECB €STR',cash.as_of,'matched periods',cash.samples);
+    const anonymous=await marketOpportunities(new Request('https://shark.invalid/api/market/opportunities?days=7'));
+    assert.equal(anonymous.status,200);
+    const publicBody=await anonymous.json();
+    assert.deepEqual(Object.keys(publicBody).sort(),['as_of','briefs','days','unavailable_sources']);
+    assert.deepEqual(publicBody.briefs.map((brief:Record<string,unknown>)=>brief.category),['housing','euro_cash']);
   });
 }

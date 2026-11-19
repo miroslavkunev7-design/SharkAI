@@ -1,0 +1,7 @@
+.shark-strategy-thread { border:1px solid var(--shark-border, #b7cddc); border-radius:18px; padding:clamp(16px,3vw,26px); margin:16px 0; }
+.shark-strategy-thread h3 { margin:0 0 12px; }
+.shark-strategy-thread form { display:grid; gap:10px; }
+.shark-strategy-thread form button { justify-self:start; display:inline-flex; align-items:center; gap:8px; }
+.shark-strategy-thread textarea { width:100%; box-sizing:border-box; border:1px solid #738fa6; border-radius:10px; padding:10px 12px; color:inherit; background:transparent; font:inherit; resize:vertical; }
+.shark-strategy-thread [role="log"] { max-height:26rem; overflow:auto; }
+.shark-strategy-thread [role="log"] p { white-space:pre-wrap; overflow-wrap:anywhere; }

@@ -15,6 +15,7 @@ import {readCommerceAgentAccess,readCommerceDashboard} from '../commerce/commerc
 import {readResaleSettlement} from '../commerce/resale-settlement.server';
 import {commerceRange} from '../commerce/owner-input';
 import {readInvestmentResearch,readProductResearch} from '../research/research.server';
+import {sendSharkAgentRequest} from '../shark-assistant.server';
 
 const definitions = {
   DB:'Връзка и схема в Supabase',W01:'Уеб вход',W02:'Имейл',W03:'WhatsApp (отложен)',W04:'Telegram',
@@ -245,6 +246,14 @@ export async function runModuleDiagnostics(request:Request,probes={schema:schema
   const probe=await readProbe(request);
   if (!probe) return json({status:'invalid'},400);
   const results:Results={W03:evidence('unverified','Каналът е отложен от собственика.')};
+  // A read-only round trip from the service trigger uses its own conversation and no owner grants.
+  const webCheck=env.SHARKAI_N8N_AGENT_KEY ? sendSharkAgentRequest({
+    userId:'shark-service-diagnostic',conversationId:'diagnostic-'+probe,requestId:probe,scopes:['module:read'],
+    message:'Проверка на уеб входа. Колко е 2 + 2? Отговори само с цифрата.',signal:AbortSignal.timeout(12_000),
+  }).then(reply=>reply?.status==='ok' && /^4[.!]?$/.test(reply.reply.trim())
+    ? evidence('passed','Получен е верен отговор от Шарк със същия идентификатор на уеб заявката.')
+    : evidence('failed','Оригиналният Шарк агент не върна проверим отговор на уеб заявката.'))
+    .catch(()=>unavailable) : Promise.resolve(evidence('unverified','Липсва служебната връзка между сайта и уеб входа в n8n.'));
   try { results.DB=await probes.schema() ? evidence('passed','Базата отговори. Задължителните таблици и функции са налични.') : evidence('failed','Липсва част от изискваната схема.'); }
   catch { results.DB=evidence('failed','Няма проверена връзка с приложната база.'); }
   try { results.W39=probes.stripe(); } catch { results.W39=unavailable; }
@@ -253,6 +262,7 @@ export async function runModuleDiagnostics(request:Request,probes={schema:schema
     try {Object.assign(results,await probes.owner(owner));}
     catch {for(const id of ['W04','W21','W23','W24','W25','W29','W30','W31','W32','W33','CAPITAL','MANDATE','WORKER','FEE'] as const) results[id]=unavailable;}
   }
+  results.W01=await webCheck;
   const checks=(Object.keys(definitions) as Id[]).map(id=>{
     const missing=id==='DB'||id==='CAPITAL'||id==='MANDATE'||id==='WORKER'||id==='FEE'||id==='STRATEGIES'||Number(id.slice(1))>20
       ? evidence('unverified','Липсва проверим резултат за разрешения диагностичен профил.') : untestedChannel;
