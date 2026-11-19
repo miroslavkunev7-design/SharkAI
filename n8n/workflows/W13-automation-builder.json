@@ -1,0 +1,73 @@
+{
+  "name": "Shark AI W13 · Automation Builder",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Съставяне на проект\nСамостоятелен работен план, готов за преглед",
+        "width": 635,
+        "height": 295,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        10,
+        -35
+      ],
+      "id": "175b072a-9ccb-4a57-bbc2-130000000010",
+      "name": "Секция: Чернова"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        65,
+        118
+      ],
+      "id": "175b072a-9ccb-4a57-bbc2-130000000020",
+      "name": "Заявка от Tool Router"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const isObject = value => typeof value === 'object' && value !== null && !Array.isArray(value);\nconst hasShape = (value, required, optional = []) => isObject(value) &&\n  required.every(key => Object.hasOwn(value, key)) &&\n  Object.keys(value).every(key => required.includes(key) || optional.includes(key));\nfunction matches(value, schema) {\n  if (schema.type === 'string') {\n    return typeof value === 'string' &&\n      (!schema.enum || schema.enum.includes(value)) &&\n      (!schema.pattern || new RegExp(schema.pattern).test(value)) &&\n      (schema.maxLength === undefined || value.length <= schema.maxLength);\n  }\n  if (schema.type === 'array') {\n    return Array.isArray(value) && value.length >= schema.minItems &&\n      value.length <= schema.maxItems && value.every(item => matches(item, schema.items));\n  }\n  if (schema.type === 'object') {\n    return hasShape(value, schema.required) &&\n      schema.required.every(key => matches(value[key], schema.properties[key]));\n  }\n  return false;\n}\nconst items = $input.all();\nconst packet = items.length === 1 ? items[0].json : undefined;\nconst now = Date.now();\nif (!hasShape(packet, ['route', 'draft_input', 'deadline']) ||\n    packet.route !== 'builder' || !Number.isSafeInteger(packet.deadline) ||\n    packet.deadline <= now || packet.deadline > now + 5000 ||\n    !matches(packet.draft_input, {\n  \"type\": \"object\",\n  \"additionalProperties\": false,\n  \"required\": [\n    \"title\",\n    \"objective\",\n    \"channel\",\n    \"action\"\n  ],\n  \"properties\": {\n    \"title\": {\n      \"type\": \"string\",\n      \"pattern\": \"\\\\S\",\n      \"maxLength\": 120\n    },\n    \"objective\": {\n      \"type\": \"string\",\n      \"pattern\": \"\\\\S\",\n      \"maxLength\": 1600\n    },\n    \"channel\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"webhook\",\n        \"email\",\n        \"whatsapp\",\n        \"telegram\"\n      ]\n    },\n    \"action\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"qualify_lead\",\n        \"draft_listing\",\n        \"draft_follow_up\",\n        \"viewing_checklist\",\n        \"compare_supplied_offers\",\n        \"document_checklist\",\n        \"general_automation\"\n      ]\n    }\n  }\n})) {\n  return [{ json: { status: 'error', error: { code: 'INVALID_DRAFT_REQUEST' } } }];\n}\n\nconst { title, objective, channel, action } = packet.draft_input;\nconst work = {\n  \"qualify_lead\": \"Събери тип имот, район, бюджет, срок и критерии. Отбележи липсващите отговори.\",\n  \"draft_listing\": \"Подготви чернова на обява с потвърдени характеристики, цена и източник.\",\n  \"draft_follow_up\": \"Подготви чернова за последващо съобщение според критериите и предишния контакт.\",\n  \"viewing_checklist\": \"Подготви списък за оглед с въпроси, удобни часове и проверени условия.\",\n  \"compare_supplied_offers\": \"Сравни подадените оферти с еднакви критерии, източник и дата.\",\n  \"document_checklist\": \"Подготви списък с документи и отбележи въпросите за адвокат или нотариус.\",\n  \"general_automation\": \"Опиши необходимите входни полета, преобразуванията и очаквания резултат според целта. Остави интеграциите за отделна проверка.\"\n};\nconst channelSteps = {\n  webhook: 'Приеми заявката от сайта след проверка на потребителската сесия и service-to-service автентикация.',\n  email: 'Приеми заявката през одобрен служебен имейл. Свържи подателя с проверена самоличност.',\n  whatsapp: 'Приеми събитието през одобрения WhatsApp API. Провери подателя, opt-in и прозореца за отговор.',\n  telegram: 'Приеми събитие от одобрения Telegram бот. Провери chat ID и подателя спрямо разрешения потребител и обработи update ID еднократно.',\n};\nreturn [{ json: { mode: 'draft', title: title.trim(), objective: objective.trim(), channel, action,\n  steps: [\n    channelSteps[channel],\n    'Валидирай входните данни и продуктовите права. Прекрати при липса на потвърден контекст.',\n    work[action],\n    'Покажи резултата за преглед. Изискай потвърждение преди изпращане или промяна във външна система.',\n  ],\n  acceptance_checks: [\n    'Синтетична валидна заявка достига до проект за преглед.',\n    'Липсващи права и повторена заявка се обработват безопасно.',\n    'По време на теста използвай само тестов канал и симулиран доставчик.',\n  ] } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        310,
+        118
+      ],
+      "id": "175b072a-9ccb-4a57-bbc2-130000000030",
+      "name": "Подготви проект за автоматизация"
+    }
+  ],
+  "connections": {
+    "Заявка от Tool Router": {
+      "main": [
+        [
+          {
+            "node": "Подготви проект за автоматизация",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromAList",
+    "callerIds": "BIND_W11_TOOL_ROUTER",
+    "executionTimeout": 5,
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  },
+  "pinData": {}
+}

@@ -1,0 +1,218 @@
+{
+  "name": "Shark AI W24 Сверяване при брокера",
+  "nodes": [
+    {
+      "id": "8bf0dd36-e178-4124-892a-ba3aa9dbd900",
+      "name": "Раздел W24 Сверяване при брокера",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -120
+      ],
+      "parameters": {
+        "width": 1320,
+        "height": 425,
+        "color": 4,
+        "content": "## W24 Сверяване при брокера\nБаланси, позиции и поръчки се показват след сверяване с одобрения брокер."
+      }
+    },
+    {
+      "id": "3bd72f5b-b253-430c-ade0-19593de55b36",
+      "name": "Приеми вътрешна заявка",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "14100fb0-3e49-4074-af8b-5ecca56bcd21",
+      "name": "Приеми само разрешение за четене",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        245,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items=$input.all();\nconst payload=items.length===1 ? items[0].json : null;\nconst grant=payload?.status_grant;\nconst valid=payload && typeof payload==='object' && !Array.isArray(payload) && Object.keys(payload).length===1\n  && typeof grant==='string' && grant.length>=48 && grant.length<=2048 && /^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/.test(grant);\nreturn [{json:valid ? {status_grant:grant,allowed:true} : {allowed:false}}];"
+      }
+    },
+    {
+      "id": "8efe8963-58f7-4df4-91c2-c86457048991",
+      "name": "Разрешението е предоставено",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        475,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "5c4b94a2-e28d-4449-b499-dfb6fd0b3db0",
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "fb5710e2-d7ad-4ecd-afa5-b642d50d4f5d",
+      "name": "Извлечи справката от Shark AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        725,
+        70
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://mm-auto-green.vercel.app/api/internal/wallet-investments/investment/reconciliation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Shark-Finance-Grant",
+              "value": "={{ $json.status_grant }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 6500,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "f67f9940-7b78-462f-86a5-55415621217c",
+      "name": "Достъпност на сверяването",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        975,
+        70
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const operation=\"reconciliation\";\nconst supportedCodes=[\"VERIFIED_OWNER_RECONCILIATION\",\"VERIFIED_RECONCILIATION_REQUIRED\",\"RECONCILIATION_INCOMPLETE\"];\nconst response=$input.first().json;\nconst body=response?.body;\nconst reject = (code) => [{json:{status:'unavailable',code,operation,source:'shark-ai-investments',\n  mode:'READ_ONLY',live_orders_enabled:false,timestamp:new Date().toISOString(),data:null}}];\nif (response?.statusCode!==200) return reject(response?.statusCode===403 ? 'FINANCE_READ_GRANT_DENIED' : 'BACKEND_UNAVAILABLE');\nif (!body || body.source!=='shark-ai-investments' || body.operation!==operation || body.mode!=='READ_ONLY'\n    || body.live_orders_enabled!==false || !supportedCodes.includes(body.code) || !['ok','blocked','unavailable'].includes(body.status)\n    || typeof body.timestamp!=='string' || !Number.isFinite(Date.parse(body.timestamp))\n    || (body.data!==null && typeof body.data!=='object')) return reject('INVALID_PRODUCT_RESPONSE');\nreturn [{json:{ status:body.status,code:body.code,operation,source:body.source,mode:body.mode,\n  live_orders_enabled:false,timestamp:body.timestamp,data:body.data }}];"
+      }
+    },
+    {
+      "id": "c8dbd867-ef49-4c39-bbf2-26a48d25c018",
+      "name": "Върни отказ без заявка",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        725,
+        235
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{status:'blocked',code:'FINANCE_READ_GRANT_REQUIRED',operation:\"reconciliation\",\n  source:'shark-ai-investments',mode:'READ_ONLY',live_orders_enabled:false,timestamp:new Date().toISOString(),data:null}}];"
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Приеми вътрешна заявка": {
+      "main": [
+        [
+          {
+            "node": "Приеми само разрешение за четене",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Приеми само разрешение за четене": {
+      "main": [
+        [
+          {
+            "node": "Разрешението е предоставено",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разрешението е предоставено": {
+      "main": [
+        [
+          {
+            "node": "Извлечи справката от Shark AI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Върни отказ без заявка",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Извлечи справката от Shark AI": {
+      "main": [
+        [
+          {
+            "node": "Достъпност на сверяването",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromAList",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "callerIds": "y1RLdFfwaWSdsSGZ",
+    "saveExecutionProgress": false
+  },
+  "tags": []
+}

@@ -1,0 +1,466 @@
+{
+  "normalized-request.schema.json": [
+    {
+      "id": "webhook-text",
+      "valid": true,
+      "value": {
+        "user_id": "synthetic-user",
+        "conversation_id": "synthetic-conversation",
+        "channel": "webhook",
+        "message": "Направи чернова на обява за имот в Шумен.",
+        "attachments": [],
+        "locale": "bg-BG",
+        "request_id": "synthetic-webhook-request",
+        "permission_context": {
+          "scopes": [
+            "listings:draft"
+          ],
+          "entitlements": [],
+          "consents": []
+        }
+      }
+    },
+    {
+      "id": "email-text",
+      "valid": true,
+      "value": {
+        "user_id": "synthetic-user",
+        "conversation_id": "synthetic-conversation",
+        "channel": "email",
+        "message": "Направи чернова на обява за имот в Шумен.",
+        "attachments": [],
+        "locale": "bg-BG",
+        "request_id": "synthetic-email-request",
+        "permission_context": {
+          "scopes": [
+            "listings:draft"
+          ],
+          "entitlements": [],
+          "consents": []
+        }
+      }
+    },
+    {
+      "id": "whatsapp-attachment-only",
+      "valid": true,
+      "value": {
+        "user_id": "synthetic-user",
+        "conversation_id": "synthetic-conversation",
+        "channel": "whatsapp",
+        "message": "",
+        "attachments": [
+          {
+            "attachment_id": "synthetic-image",
+            "media_type": "image/jpeg"
+          }
+        ],
+        "locale": "bg-BG",
+        "request_id": "synthetic-whatsapp-request",
+        "permission_context": {
+          "scopes": [
+            "listings:draft"
+          ],
+          "entitlements": [],
+          "consents": []
+        }
+      }
+    },
+    {
+      "id": "telegram-text",
+      "valid": true,
+      "value": {
+        "user_id": "synthetic-user",
+        "conversation_id": "synthetic-conversation",
+        "channel": "telegram",
+        "message": "Помогни ми с чернова на имотна обява за Варна.",
+        "attachments": [],
+        "locale": "bg-BG",
+        "request_id": "synthetic-telegram-request",
+        "permission_context": {
+          "scopes": []
+        }
+      }
+    },
+    {
+      "id": "no-authorization-context",
+      "valid": false,
+      "value": {
+        "user_id": "synthetic-user",
+        "conversation_id": "synthetic-conversation",
+        "channel": "webhook",
+        "message": "Направи чернова на обява за имот в Шумен.",
+        "attachments": [],
+        "locale": "bg-BG",
+        "request_id": "synthetic-webhook-request"
+      }
+    },
+    {
+      "id": "unsupported-channel",
+      "valid": false,
+      "value": {
+        "user_id": "synthetic-user",
+        "conversation_id": "synthetic-conversation",
+        "channel": "unknown",
+        "message": "Направи чернова на обява за имот в Шумен.",
+        "attachments": [],
+        "locale": "bg-BG",
+        "request_id": "synthetic-webhook-request",
+        "permission_context": {
+          "scopes": [
+            "listings:draft"
+          ],
+          "entitlements": [],
+          "consents": []
+        }
+      }
+    },
+    {
+      "id": "blank-request",
+      "valid": false,
+      "value": {
+        "user_id": "synthetic-user",
+        "conversation_id": "synthetic-conversation",
+        "channel": "webhook",
+        "message": "   ",
+        "attachments": [],
+        "locale": "bg-BG",
+        "request_id": "synthetic-webhook-request",
+        "permission_context": {
+          "scopes": [
+            "listings:draft"
+          ],
+          "entitlements": [],
+          "consents": []
+        }
+      }
+    },
+    {
+      "id": "raw-attachment-url",
+      "valid": false,
+      "value": {
+        "user_id": "synthetic-user",
+        "conversation_id": "synthetic-conversation",
+        "channel": "webhook",
+        "message": "Направи чернова на обява за имот в Шумен.",
+        "attachments": [
+          {
+            "url": "https://example.invalid/attachment"
+          }
+        ],
+        "locale": "bg-BG",
+        "request_id": "synthetic-webhook-request",
+        "permission_context": {
+          "scopes": [
+            "listings:draft"
+          ],
+          "entitlements": [],
+          "consents": []
+        }
+      }
+    },
+    {
+      "id": "session-token-field-rejected",
+      "valid": false,
+      "value": {
+        "user_id": "synthetic-user",
+        "conversation_id": "synthetic-conversation",
+        "channel": "webhook",
+        "message": "Направи чернова на обява за имот в Шумен.",
+        "attachments": [],
+        "locale": "bg-BG",
+        "request_id": "synthetic-webhook-request",
+        "permission_context": {
+          "scopes": [
+            "listings:draft"
+          ],
+          "entitlements": [],
+          "consents": [],
+          "session_token": "synthetic-value"
+        }
+      }
+    }
+  ],
+  "tool-contract.schema.json": [
+    {
+      "id": "draft-tool",
+      "valid": true,
+      "value": {
+        "tool_id": "synthetic_listing_draft",
+        "version": "1.0.0",
+        "risk": "draft",
+        "required_scope": "listings:draft",
+        "timeout_ms": 5000,
+        "idempotency_policy": "none",
+        "error_policy": {
+          "max_attempts": 1,
+          "retry_on": []
+        },
+        "source": "synthetic-fixture",
+        "input_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "city": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "city"
+          ]
+        },
+        "output_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "draft": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "draft"
+          ]
+        }
+      }
+    },
+    {
+      "id": "write-tool-with-idempotency",
+      "valid": true,
+      "value": {
+        "tool_id": "synthetic_listing_draft",
+        "version": "1.0.0",
+        "risk": "write_with_approval",
+        "required_scope": "listings:draft",
+        "timeout_ms": 5000,
+        "idempotency_policy": "required",
+        "error_policy": {
+          "max_attempts": 2,
+          "retry_on": [
+            "timeout"
+          ]
+        },
+        "source": "synthetic-fixture",
+        "input_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "city": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "city"
+          ]
+        },
+        "output_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "draft": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "draft"
+          ]
+        }
+      }
+    },
+    {
+      "id": "write-tool-without-idempotency",
+      "valid": false,
+      "value": {
+        "tool_id": "synthetic_listing_draft",
+        "version": "1.0.0",
+        "risk": "write_with_approval",
+        "required_scope": "listings:draft",
+        "timeout_ms": 5000,
+        "idempotency_policy": "none",
+        "error_policy": {
+          "max_attempts": 1,
+          "retry_on": []
+        },
+        "source": "synthetic-fixture",
+        "input_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "city": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "city"
+          ]
+        },
+        "output_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "draft": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "draft"
+          ]
+        }
+      }
+    },
+    {
+      "id": "retries-without-error-categories",
+      "valid": false,
+      "value": {
+        "tool_id": "synthetic_listing_draft",
+        "version": "1.0.0",
+        "risk": "draft",
+        "required_scope": "listings:draft",
+        "timeout_ms": 5000,
+        "idempotency_policy": "none",
+        "error_policy": {
+          "max_attempts": 2,
+          "retry_on": []
+        },
+        "source": "synthetic-fixture",
+        "input_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "city": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "city"
+          ]
+        },
+        "output_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "draft": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "draft"
+          ]
+        }
+      }
+    },
+    {
+      "id": "invalid-input-schema",
+      "valid": false,
+      "value": {
+        "tool_id": "synthetic_listing_draft",
+        "version": "1.0.0",
+        "risk": "draft",
+        "required_scope": "listings:draft",
+        "timeout_ms": 5000,
+        "idempotency_policy": "none",
+        "error_policy": {
+          "max_attempts": 1,
+          "retry_on": []
+        },
+        "source": "synthetic-fixture",
+        "input_schema": {
+          "type": "not-a-json-schema-type"
+        },
+        "output_schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "draft": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "draft"
+          ]
+        }
+      }
+    }
+  ],
+  "tool-contract.schema.json#/$defs/result": [
+    {
+      "id": "ok-with-source-and-time",
+      "valid": true,
+      "value": {
+        "source": "synthetic-fixture",
+        "timestamp": "2026-11-19T09:00:00Z",
+        "status": "ok",
+        "data": {
+          "draft": "Огледите се уговарят предварително."
+        }
+      }
+    },
+    {
+      "id": "approval-with-preview-and-reference",
+      "valid": true,
+      "value": {
+        "source": "synthetic-fixture",
+        "timestamp": "2026-11-19T09:00:00Z",
+        "status": "approval_required",
+        "data": {
+          "preview": "Чернова за потвърждение"
+        },
+        "approval_id": "synthetic-approval"
+      }
+    },
+    {
+      "id": "error-with-safe-code-and-message",
+      "valid": true,
+      "value": {
+        "source": "synthetic-fixture",
+        "timestamp": "2026-11-19T09:00:00Z",
+        "status": "error",
+        "error": {
+          "code": "TIMEOUT",
+          "message": "Източникът не отговори навреме."
+        }
+      }
+    },
+    {
+      "id": "success-without-source",
+      "valid": false,
+      "value": {
+        "timestamp": "2026-11-19T09:00:00Z",
+        "status": "ok",
+        "data": {}
+      }
+    },
+    {
+      "id": "approval-without-reference",
+      "valid": false,
+      "value": {
+        "source": "synthetic-fixture",
+        "timestamp": "2026-11-19T09:00:00Z",
+        "status": "approval_required",
+        "data": {}
+      }
+    },
+    {
+      "id": "error-with-success-payload",
+      "valid": false,
+      "value": {
+        "source": "synthetic-fixture",
+        "timestamp": "2026-11-19T09:00:00Z",
+        "status": "error",
+        "data": {},
+        "error": {
+          "code": "TIMEOUT",
+          "message": "Превишено време."
+        }
+      }
+    },
+    {
+      "id": "invalid-timestamp",
+      "valid": false,
+      "value": {
+        "source": "synthetic-fixture",
+        "timestamp": "yesterday",
+        "status": "ok",
+        "data": {}
+      }
+    }
+  ]
+}

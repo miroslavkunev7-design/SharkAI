@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shark AI normalized request",
+  "description": "Internal request envelope emitted after channel authentication and server-side identity, ownership, rate-limit, consent, and entitlement checks.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "user_id",
+    "conversation_id",
+    "channel",
+    "message",
+    "attachments",
+    "locale",
+    "request_id",
+    "permission_context"
+  ],
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "Opaque user identifier issued by the Shark AI backend."
+    },
+    "conversation_id": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "Conversation identifier whose ownership has been checked for the user."
+    },
+    "channel": {
+      "enum": [
+        "webhook",
+        "email",
+        "whatsapp",
+        "telegram"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/attachment"
+      }
+    },
+    "locale": {
+      "type": "string",
+      "pattern": "\\S",
+      "default": "bg-BG"
+    },
+    "request_id": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "Correlation identifier for this request."
+    },
+    "permission_context": {
+      "$ref": "#/$defs/permission_context"
+    }
+  },
+  "anyOf": [
+    {
+      "properties": {
+        "message": {
+          "pattern": "\\S"
+        }
+      }
+    },
+    {
+      "properties": {
+        "attachments": {
+          "minItems": 1
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "attachment": {
+      "description": "Opaque attachment reference resolved inside the user's authorized context.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attachment_id"
+      ],
+      "properties": {
+        "attachment_id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "media_type": {
+          "type": "string",
+          "pattern": "\\S"
+        }
+      }
+    },
+    "permission_context": {
+      "description": "Short-lived context derived from current backend state. Consumers must check current authorization before tool execution.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scopes"
+      ],
+      "properties": {
+        "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
+        },
+        "entitlements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
+        },
+        "consents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "name": "W19 Shark AI | Грешки и наблюдение",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Грешки и наблюдение\nПодготвя събитие само с разрешени метаданни. Доставката към оператор и DLQ изискват одобрени канали и хранилище. Повторно изпълнение се разглежда ръчно.",
+        "width": 850,
+        "height": 515,
+        "color": 3
+      },
+      "id": "462a0000-0000-4000-8000-000000000019",
+      "name": "Секция 19",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -190,
+        -205
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "462a0000-0000-4000-8000-000000000319",
+      "name": "При автоматична грешка",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -115,
+        -45
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "462a0000-0000-4000-8000-000000000119",
+      "name": "Извикване от тестов workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -115,
+        125
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const event = $json;\nconst validWorkflowId = (value) =>\n  typeof value === 'string' && /^[A-Za-z0-9_-]{1,32}$/.test(value) ? value : undefined;\nconst validExecutionId = (value) =>\n  typeof value === 'string' && /^\\d{1,20}$/.test(value) ? value : undefined;\nconst validRequestId = (value) =>\n  typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value) ? value : undefined;\nconst knownCodes = new Set(['UPSTREAM_TIMEOUT', 'UPSTREAM_UNAVAILABLE', 'AUTHORIZATION_DENIED', 'INVALID_REQUEST']);\n\nconst classification = event.trigger ? 'TRIGGER_FAILURE' : 'EXECUTION_FAILURE';\nconst record = {\n  status: 'error',\n  type: 'shark_ai.workflow_failure',\n  code: knownCodes.has(event.code) ? event.code : classification,\n  timestamp: new Date().toISOString(),\n  workflow_id: validWorkflowId(event.workflow?.id),\n  execution_id: validExecutionId(event.execution?.id),\n  retry_of: validExecutionId(event.execution?.retryOf),\n  request_id: validRequestId(event.request_id),\n  replay: 'manual_review_required',\n  alert_delivery: 'unconfigured',\n};\n\nreturn { json: Object.fromEntries(Object.entries(record).filter(([, value]) => value !== undefined)) };"
+      },
+      "id": "462a0000-0000-4000-8000-000000000219",
+      "name": "Стандартно събитие без съдържание",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        185,
+        35
+      ]
+    }
+  ],
+  "connections": {
+    "При автоматична грешка": {
+      "main": [
+        [
+          {
+            "node": "Стандартно събитие без съдържание",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Извикване от тестов workflow": {
+      "main": [
+        [
+          {
+            "node": "Стандартно събитие без съдържание",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Sofia",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false,
+    "executionTimeout": 15
+  }
+}

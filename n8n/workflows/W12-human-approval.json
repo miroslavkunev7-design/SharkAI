@@ -1,0 +1,72 @@
+{
+  "name": "W12 Shark AI | Човешко одобрение",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Човешки преглед\nПодготвя безопасни метаданни за преглед. Свързването към одобряващ, съхранението и изпълнението изискват потвърден Shark AI backend. Този workflow не допуска изпълнение.",
+        "width": 850,
+        "height": 395,
+        "color": 2
+      },
+      "id": "462a0000-0000-4000-8000-000000000012",
+      "name": "Секция 12",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -190,
+        -205
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "462a0000-0000-4000-8000-000000000112",
+      "name": "Извикване от Shark AI",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -115,
+        15
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const request = $json;\nconst validId = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);\nconst request_id = validId(request.request_id) ? request.request_id : null;\nconst base = { request_id, execution_allowed: false, timestamp: new Date().toISOString() };\nconst deny = (code) => ({ json: { ...base, status: 'blocked', error: { code } } });\n\nif (request.risk === 'restricted_finance') return deny('FINANCE_MODULE_REQUIRED');\n\nif (!request_id || request.risk !== 'write_with_approval' || !validId(request.tool_id)) {\n  return deny('INVALID_REVIEW_REQUEST');\n}\n\nif (request.operation !== 'preview') return deny('APPROVAL_BACKEND_UNCONFIGURED');\n\nreturn {\n  json: {\n    ...base,\n    status: 'review_required',\n    review: { tool_id: request.tool_id, risk: 'write_with_approval' },\n    approval_task: 'unconfigured',\n  },\n};"
+      },
+      "id": "462a0000-0000-4000-8000-000000000212",
+      "name": "Проверка за човешки преглед",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180,
+        15
+      ]
+    }
+  ],
+  "connections": {
+    "Извикване от Shark AI": {
+      "main": [
+        [
+          {
+            "node": "Проверка за човешки преглед",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Sofia",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false,
+    "executionTimeout": 15
+  }
+}

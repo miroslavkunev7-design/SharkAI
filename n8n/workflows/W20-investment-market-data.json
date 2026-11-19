@@ -1,0 +1,343 @@
+{
+  "name": "Shark AI W20 · ECB EUR/USD Reference",
+  "nodes": [
+    {
+      "name": "Раздел за котировки на ЕЦБ",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -75,
+        -120
+      ],
+      "parameters": {
+        "width": 1575,
+        "height": 484,
+        "color": 4,
+        "content": "## W20 Официален референтен курс\nEUR/USD от ЕЦБ, един източник, право само за четене. Определя последната очаквана публикация по календар TARGET и местно време във Франкфурт.\n\n[Референтни курсове](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html) · [Условия на ЕЦБ](https://www.ecb.europa.eu/services/using-our-site/disclaimer/html/index.en.html)"
+      },
+      "id": "ff83a4da-ea4f-4b9f-a393-584a886850b5"
+    },
+    {
+      "name": "Приеми заявка за EUR USD",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        45
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "afcb6d8a-fdc2-442a-b324-ea84738ef134"
+    },
+    {
+      "name": "Провери заявката за курс",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        195,
+        45
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const common = (request_id, now) => ({\n  mode:'READ_ONLY', instrument:'EUR/USD', quote_kind:'reference_rate', source:'ecb-exr-eurusd-reference',\n  source_url:'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml',\n  unit:'USD per EUR', timezone:'Europe/Berlin', retrieved_at:now.toISOString(),\n  ...(request_id ? {request_id} : {}),\n});\nconst items=$input.all();\nconst payload=items.length===1 ? items[0].json : null;\nconst safeId = value => typeof value==='string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);\nconst request_id = safeId(payload?.request_id) ? payload.request_id : null;\nconst valid=payload && typeof payload==='object' && !Array.isArray(payload) &&\n  Object.keys(payload).every(key=>['instrument','request_id'].includes(key)) &&\n  (!Object.hasOwn(payload,'request_id') || request_id) &&\n  (!Object.hasOwn(payload,'instrument') || payload.instrument==='EUR/USD');\nif (!valid) return [{json:{...common(request_id,new Date()),status:'unavailable',error:{code:'UNSUPPORTED_QUOTE_REQUEST'}}}];\nreturn [{json:{request_id,decision:'fetch'}}];"
+      },
+      "id": "662e0828-8637-49eb-af1f-776a9d83759c"
+    },
+    {
+      "name": "Поддържан курс",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        390,
+        45
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.decision ?? '' }}",
+              "rightValue": "fetch",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "fa1d5f9e-986b-4279-be7f-4f85fd3536d7"
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "leftValue": ""
+          }
+        },
+        "options": {}
+      },
+      "id": "342827eb-e6a5-40da-ac90-c5d580427462"
+    },
+    {
+      "name": "Вземи дневния XML от ЕЦБ",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        585,
+        45
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml",
+        "options": {
+          "timeout": 7000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "onError": "continueErrorOutput",
+      "alwaysOutputData": true,
+      "retryOnFail": false,
+      "id": "43b7ab68-da0d-4f28-91dc-ece88db78229"
+    },
+    {
+      "name": "Ограничи XML отговора",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        45
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items=$input.all();\nconst data=items.length===1?items[0].json.data:null;\nif (typeof data !== 'string' || !data.trim() || data.length>32768 || /<!DOCTYPE|<!ENTITY/i.test(data)) {\n  return [{json:{decision:'invalid_feed'}}];\n}\nreturn [{json:{decision:'parse',data}}];"
+      },
+      "id": "736ae801-6eec-4390-97ca-d9c65c5edbb4"
+    },
+    {
+      "name": "Валиден XML вход",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        965,
+        45
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "leftValue": "={{ $json.decision ?? '' }}",
+              "rightValue": "parse",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "id": "9855566c-87f2-467d-82ba-c655733f20a4"
+            }
+          ],
+          "combinator": "and",
+          "options": {
+            "version": 2,
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "leftValue": ""
+          }
+        },
+        "options": {}
+      },
+      "id": "21324ec7-5950-4559-98cd-6118a7ad6257"
+    },
+    {
+      "name": "Разчети XML на ЕЦБ",
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        1150,
+        45
+      ],
+      "parameters": {
+        "mode": "xmlToJson",
+        "dataPropertyName": "data",
+        "options": {
+          "explicitArray": false,
+          "explicitRoot": true,
+          "ignoreAttrs": false,
+          "mergeAttrs": false,
+          "trim": true
+        }
+      },
+      "onError": "continueErrorOutput",
+      "alwaysOutputData": true,
+      "id": "a90c5d26-f996-49c3-b7ca-6413386ad54d"
+    },
+    {
+      "name": "Провери дата и EUR USD",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1350,
+        45
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const common = (request_id, now) => ({\n  mode:'READ_ONLY', instrument:'EUR/USD', quote_kind:'reference_rate', source:'ecb-exr-eurusd-reference',\n  source_url:'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml',\n  unit:'USD per EUR', timezone:'Europe/Berlin', retrieved_at:now.toISOString(),\n  ...(request_id ? {request_id} : {}),\n});\n\nfunction workingDay(day) {\n  const month=day.getUTCMonth()+1, date=day.getUTCDate(), year=day.getUTCFullYear();\n  if ([0,6].includes(day.getUTCDay()) || (month===1 && date===1) || (month===5 && date===1) ||\n      (month===12 && [25,26].includes(date))) return false;\n  const a=year%19, b=Math.floor(year/100), c=year%100, d=Math.floor(b/4), e=b%4;\n  const f=Math.floor((b+8)/25), g=Math.floor((b-f+1)/3);\n  const h=(19*a+b-d-g+15)%30, i=Math.floor(c/4), k=c%4;\n  const l=(32+2*e+2*i-h-k)%7, m=Math.floor((a+11*h+22*l)/451);\n  const offsets=h+l-7*m+114;\n  const easter=Date.UTC(year,Math.floor(offsets/31)-1,offsets%31+1);\n  return day.valueOf()!==easter-2*86400000 && day.valueOf()!==easter+86400000;\n}\nconst local = new Intl.DateTimeFormat('en-GB', {\n  timeZone:'Europe/Berlin',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'\n});\nconst getCivilDate = now => {\n  const fields=Object.fromEntries(local.formatToParts(now).map(part=>[part.type,part.value]));\n  return {date:fields.year+'-'+fields.month+'-'+fields.day,hour:Number(fields.hour)};\n};\nfunction expectedDate(now) {\n  const localDay=getCivilDate(now);\n  const day=new Date(localDay.date+'T00:00:00.000Z');\n  if (localDay.hour<17) day.setUTCDate(day.getUTCDate()-1);\n  while (!workingDay(day)) day.setUTCDate(day.getUTCDate()-1);\n  return {today:localDay.date,expected:day.toISOString().slice(0,10)};\n}\n\nconst internal=$('Провери заявката за курс').first().json;\nconst now=new Date();\nconst base=common(internal.request_id,now);\nconst calendar=expectedDate(now);\nconst freshness = {expected_observation_date:calendar.expected,cutoff_local:'17:00',reference_calendar:'TARGET'};\nconst unavailable = code => [{json:{...base,status:'unavailable',freshness:{...freshness,state:'unavailable'},error:{code}}}];\nconst items=$input.all();\nif (items.length!==1 || items[0].json?.error) return unavailable('ECB_UNAVAILABLE');\nconst envelope=items[0].json?.['gesmes:Envelope'];\nif (envelope?.$?.xmlns!=='http://www.ecb.int/vocabulary/2002-08-01/eurofxref' ||\n    envelope['gesmes:subject']!=='Reference rates' ||\n    envelope['gesmes:Sender']?.['gesmes:name']!=='European Central Bank') return unavailable('ECB_INVALID_FEED');\nconst dataset=envelope.Cube?.Cube;\nconst value=dataset?.$?.time;\nconst entries=dataset?.Cube;\nif (typeof value!=='string' || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value) || !Array.isArray(entries)) {\n  return unavailable('ECB_INVALID_OBSERVATION');\n}\nconst observed=new Date(value+'T00:00:00.000Z');\nif (!Number.isFinite(observed.valueOf()) || observed.toISOString().slice(0,10)!==value ||\n    value>calendar.today || !workingDay(observed)) return unavailable('ECB_INVALID_OBSERVATION');\nconst usd=entries.filter(entry=>entry?.$?.currency==='USD');\nconst rate=usd[0]?.$?.rate;\nif (usd.length!==1 || typeof rate!=='string' ||\n    !/^(?:0|[1-9]\\d{0,8})(?:\\.\\d{1,12})?$/.test(rate) || Number(rate)<=0) {\n  return unavailable('ECB_INVALID_USD_RATE');\n}\nif (value<calendar.expected) {\n  return [{json:{...base,status:'stale',observation_date:value,freshness:{...freshness,state:'stale'},\n    error:{code:'ECB_STALE_OBSERVATION'}}}];\n}\nreturn [{json:{...base,status:'ok',rate,observation_date:value,freshness:{...freshness,state:'as_published'}}}];"
+      },
+      "id": "fef57a01-9b7c-4666-a8c8-3948ed174392"
+    },
+    {
+      "name": "Върни недостъпен курс",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        230
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const common = (request_id, now) => ({\n  mode:'READ_ONLY', instrument:'EUR/USD', quote_kind:'reference_rate', source:'ecb-exr-eurusd-reference',\n  source_url:'https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml',\n  unit:'USD per EUR', timezone:'Europe/Berlin', retrieved_at:now.toISOString(),\n  ...(request_id ? {request_id} : {}),\n});\nconst request=$('Провери заявката за курс').first().json;\nconst reason=$input.all()[0]?.json?.decision==='invalid_feed'?'ECB_INVALID_FEED':'ECB_UNAVAILABLE';\nreturn [{json:{...common(request.request_id,new Date()),status:'unavailable',freshness:{state:'unavailable',cutoff_local:'17:00',reference_calendar:'TARGET'},error:{code:reason}}}];"
+      },
+      "id": "27ac4fee-d605-43ff-abd3-cbf6a452af67"
+    },
+    {
+      "name": "Върни отказ за вход",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        390,
+        230
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return $input.all();"
+      },
+      "id": "7f638dab-4c6f-465c-ab89-09b2c0886530"
+    }
+  ],
+  "connections": {
+    "Приеми заявка за EUR USD": {
+      "main": [
+        [
+          {
+            "node": "Провери заявката за курс",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Провери заявката за курс": {
+      "main": [
+        [
+          {
+            "node": "Поддържан курс",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Поддържан курс": {
+      "main": [
+        [
+          {
+            "node": "Вземи дневния XML от ЕЦБ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Върни отказ за вход",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Вземи дневния XML от ЕЦБ": {
+      "main": [
+        [
+          {
+            "node": "Ограничи XML отговора",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Върни недостъпен курс",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ограничи XML отговора": {
+      "main": [
+        [
+          {
+            "node": "Валиден XML вход",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Валиден XML вход": {
+      "main": [
+        [
+          {
+            "node": "Разчети XML на ЕЦБ",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Върни недостъпен курс",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разчети XML на ЕЦБ": {
+      "main": [
+        [
+          {
+            "node": "Провери дата и EUR USD",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Върни недостъпен курс",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromAList",
+    "callerIds": "y1RLdFfwaWSdsSGZ",
+    "executionTimeout": 15,
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  },
+  "pinData": {}
+}

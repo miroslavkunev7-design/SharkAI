@@ -5,9 +5,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  ArrowRight, ArrowUpRight, CarFront, CircleHelp, Code2, Download, FolderOpen, Gauge,
+  ArrowRight, ArrowUpRight, CarFront, Code2, Download, FolderOpen, Gauge,
   ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare, Mic, Plus,
-  Search, Settings, Sparkles, TrendingUp, Upload, Users, X,
+  Search, Settings, ShoppingBag, Sparkles, TrendingUp, Upload, Users, X,
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import {
@@ -17,6 +17,8 @@ import {
 import { isTerminalStudioStatus, TRACKED_STUDIO_RUNS, type AgentRunActivity } from '@/lib/studio-activity';
 import { accountPlanLabel, hasLifetimeUltra, type AccountPlan } from '../account-plan';
 import { MemorySettings } from './memory-settings';
+import { WalletInvestments } from './wallet-investments';
+import { Commerce } from './commerce';
 import './workspace.css';
 
 const VIEWS = {
@@ -25,19 +27,21 @@ const VIEWS = {
   studio: { label: 'Студио', icon: Code2, href: '/dashboard?view=studio' },
   agents: { label: 'AI агенти', icon: Users, href: '/dashboard?view=agents' },
   automotive: { label: 'Автомобили', icon: CarFront, href: '/dashboard?view=automotive' },
-  investments: { label: 'Инвестиции', icon: TrendingUp, href: '/dashboard?view=investments' },
+  investments: { label: 'Портфейл и инвестиции', icon: TrendingUp, href: '/dashboard?view=investments' },
+  commerce: { label: 'Магазин и препродажба', icon: ShoppingBag, href: '/dashboard?view=commerce' },
   settings: { label: 'Настройки', icon: Settings, href: '/dashboard?view=settings' },
 };
 
 type View = keyof typeof VIEWS;
 const WORKSPACE_ART: Partial<Record<View, string>> = {
-  chat: 'agent', studio: 'studio', agents: 'team', investments: 'markets', automotive: 'car', settings: 'shark',
+  chat: 'agent', studio: 'studio', agents: 'team', investments: 'markets', commerce:'studio', automotive: 'car', settings: 'shark',
 };
 const MODULES = [
   { view: 'chat', description: 'Разговаряй с SharkAI.' },
   { view: 'studio', description: 'Проекти от описание и скрийншоти.' },
   { view: 'agents', description: 'Специализирани роли и резултати.' },
-  { view: 'investments', description: 'Няма свързан източник.' },
+  { view: 'investments', description: 'Лимит, цели и състояние на доставчика.' },
+  { view: 'commerce', description: 'Поръчки, оперативен капитал и реализиран марж.' },
 ] as const;
 const PROJECT_STATUS: Record<string, string> = {
   ANALYZING: 'Анализира се', BUILDING: 'Създават се файлове', RUNNING: 'Изпълнява се',
@@ -768,12 +772,10 @@ function DashboardContent() {
           </>}
           {view === 'agents' && <Agents user={data?.user ?? null} loading={loading} />}
           {view === 'automotive' && <Automotive />}
+          {view === 'commerce' && <><Banner view="commerce" /><Commerce signInHref={signIn(VIEWS.commerce.href)} /></>}
           {view === 'investments' && <>
-            <Banner view="investments">Състояние на свързания портфейл.</Banner>
-            <section className="ice-section module-panel module-note" data-ice-art="markets">
-              <div className="module-heading"><h2><CircleHelp size={19} /> Няма свързан източник</h2></div>
-              <p>За портфейл, наличности и движения е нужен конфигуриран доставчик с достъп за четене.</p>
-            </section>
+            <Banner view="investments" />
+            <WalletInvestments signInHref={signIn(VIEWS.investments.href)} />
           </>}
           {view === 'settings' && <Account user={data?.user ?? null} loading={loading} error={error} />}
         </main>

@@ -1,0 +1,218 @@
+{
+  "name": "Shark AI W30 · Статус на откриване на портфейла",
+  "nodes": [
+    {
+      "id": "2c66ded9-531b-496c-b93e-82fba96a3254",
+      "name": "Финансови данни",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -80,
+        -120
+      ],
+      "parameters": {
+        "width": 1320,
+        "height": 425,
+        "color": 4,
+        "content": "## Проверка на портфейла\nРазрешена справка за потвърдения профил на Shark AI."
+      }
+    },
+    {
+      "id": "6b5eb453-db88-4a7c-931f-d1058b05908f",
+      "name": "Приеми вътрешна заявка",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        100
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "fdebf7fa-025a-4e57-8f49-0ff55cc634b0",
+      "name": "Приеми само разрешение за четене",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        245,
+        100
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items=$input.all();\nconst payload=items.length===1 ? items[0].json : null;\nconst grant=payload?.status_grant;\nconst valid=payload && typeof payload==='object' && !Array.isArray(payload) && Object.keys(payload).length===1\n  && typeof grant==='string' && grant.length>=48 && grant.length<=2048 && /^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/.test(grant);\nreturn [{json:valid ? {status_grant:grant,allowed:true} : {allowed:false}}];"
+      }
+    },
+    {
+      "id": "fa02829d-9a70-4419-bc44-00205f499689",
+      "name": "Разрешението е предоставено",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        475,
+        100
+      ],
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "5c4b94a2-e28d-4449-b499-dfb6fd0b3db0",
+              "leftValue": "={{ $json.allowed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0cbb5d1c-7a9e-489c-bec9-76debaf431aa",
+      "name": "Извлечи справката от Shark AI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        725,
+        70
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://mm-auto-green.vercel.app/api/internal/wallet-investments/wallet/onboarding",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Shark-Finance-Grant",
+              "value": "={{ $json.status_grant }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 6500,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "dc8b850a-0993-4ec6-ad38-210fa888f0e7",
+      "name": "Проверка на портфейла",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        975,
+        70
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const operation=\"onboarding\";\nconst success=[\"VERIFIED_PROVIDER_REVIEW\",\"ACCOUNT_LINKED\"];\nconst response = $input.first().json;\nconst body = response.body;\nconst fail = code => [{json:{operation,status:'unavailable',code,data:null}}];\nif (response.statusCode !== 200 || !body || body.operation !== operation || body.source !== 'shark-ai-wallet') {\n  return fail(response.statusCode === 403 ? 'FINANCE_READ_GRANT_DENIED' : 'BACKEND_UNAVAILABLE');\n}\nconst observed = Date.parse(body.timestamp);\nif (!Number.isFinite(observed) || observed > Date.now() + 5000 || observed < Date.now() - 300000) return fail('STALE_PROVIDER_STATUS');\nif (body.status === 'unavailable') return fail(['VERIFIED_STATEMENT_REQUIRED','VERIFIED_WALLET_REQUIRED'].includes(body.code) ? body.code : 'BACKEND_UNAVAILABLE');\nconst data = body.data;\nif (body.status !== (operation === 'withdrawal' ? 'needs_human' : 'ok') || !success.includes(body.code) || !data || data.provider !== 'wise') return fail('INVALID_PROVIDER_STATUS');\nif (operation === 'balance' && (data.status !== 'verified' || data.source !== 'wise_balance_api' || !/^(0|[1-9]\\d*)$/.test(data.balance_minor))) return fail('INVALID_PROVIDER_STATUS');\nif (operation === 'deposit' && (data.source !== 'wise_balance_statement' || !Number.isSafeInteger(data.count) || data.count < 0)) return fail('INVALID_PROVIDER_STATUS');\nif (operation === 'withdrawal' && data.provider_home !== 'https://wise.com/home/') return fail('INVALID_PROVIDER_STATUS');\nreturn [{json:{operation,status:body.status,code:body.code,data,timestamp:body.timestamp,source:body.source}}];"
+      }
+    },
+    {
+      "id": "f088d18f-bf6a-47d9-b8f4-903f36a254e6",
+      "name": "Върни отказ без заявка",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        725,
+        235
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:{operation:\"onboarding\",status:'unavailable',code:'FINANCE_READ_GRANT_REQUIRED',data:null}}];"
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Приеми вътрешна заявка": {
+      "main": [
+        [
+          {
+            "node": "Приеми само разрешение за четене",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Приеми само разрешение за четене": {
+      "main": [
+        [
+          {
+            "node": "Разрешението е предоставено",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Разрешението е предоставено": {
+      "main": [
+        [
+          {
+            "node": "Извлечи справката от Shark AI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Върни отказ без заявка",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Извлечи справката от Shark AI": {
+      "main": [
+        [
+          {
+            "node": "Проверка на портфейла",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromAList",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "callerIds": "y1RLdFfwaWSdsSGZ",
+    "saveExecutionProgress": false
+  },
+  "tags": []
+}

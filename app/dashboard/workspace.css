@@ -49,7 +49,7 @@
   -webkit-text-fill-color: transparent;
 }
 
-.module-nav { display: grid; gap: 4px; margin-top: 19px; }
+.module-nav { display: grid; grid-template-columns: minmax(0,1fr); gap: 4px; margin-top: 19px; }
 .module-nav a, .module-sidebar-account {
   display: flex;
   align-items: center;
@@ -61,7 +61,9 @@
   font-size: .87rem;
   font-weight: 620;
 }
-.module-nav a span, .module-sidebar-account span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.module-nav a { min-width:0; }
+.module-nav a span { min-width:0; overflow-wrap:anywhere; line-height:1.2; }
+.module-sidebar-account span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .module-nav svg, .module-sidebar-account svg { flex: none; color: #a3d6ff; }
 .module-nav a:nth-child(even) svg { color: #c4b6ff; }
 .module-nav a:hover, .module-sidebar-account:hover { background: #8fbdf019; color: #fff; }

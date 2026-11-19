@@ -1,0 +1,263 @@
+{
+  "name": "Shark AI · W04 · Вход от Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## W04 Вход от Telegram\nТози адаптер приема нормализирани заявки от Shark AI backend. Свържи отделна n8n Header Auth credential.\n\nНативният Telegram чат се настройва в оригиналния workflow с потвърдена връзка към Shark AI профил.",
+        "width": 750,
+        "height": 350,
+        "color": 6
+      },
+      "id": "a10470dc-6da2-4456-9dc2-30fa02228828",
+      "name": "Секция за вход",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -530,
+        -205
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Общ AI Core\nСвържи Execute Sub-workflow с W10 AI Core в този проект. Отговорът се връща на удостоверения backend.",
+        "width": 795,
+        "height": 350,
+        "color": 7
+      },
+      "id": "375bd5d9-5e4d-4cbe-9afd-010922800263",
+      "name": "Секция за AI Core",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        285,
+        -205
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Невалидна заявка\nВръща HTTP 400. Достъпът до AI Core спира на проверката на входа.",
+        "width": 450,
+        "height": 210,
+        "color": 3
+      },
+      "id": "2b60afec-0460-4253-ae6f-5aabfdab0021",
+      "name": "Секция за отхвърлен вход",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        285,
+        165
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "shark-ai/module-1/telegram",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "7342584f-b9b8-48fd-ad4b-1fe96250367e",
+      "name": "Удостоверен вход",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -465,
+        -25
+      ],
+      "webhookId": "23edfa62-0329-4c72-817d-fb492d96e987"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const body = $input.first().json.body;\nconst channel = \"telegram\";\nconst requestKeys = ['user_id', 'conversation_id', 'channel', 'message', 'attachments', 'locale', 'request_id', 'permission_context'];\nconst permissionKeys = ['scopes', 'entitlements', 'consents'];\nconst attachmentKeys = ['attachment_id', 'name', 'media_type'];\n\nconst isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);\nconst isText = (value) => typeof value === 'string' && /\\S/.test(value);\nconst hasOnly = (value, keys) => Object.keys(value).every((key) => keys.includes(key));\nconst isTextList = (value) => Array.isArray(value) && value.every(isText) && new Set(value).size === value.length;\n\nfunction isPermissionContext(value) {\n  return isObject(value) && hasOnly(value, permissionKeys)\n    && Object.hasOwn(value, 'scopes')\n    && Object.values(value).every(isTextList);\n}\n\nfunction isAttachment(value) {\n  return isObject(value) && hasOnly(value, attachmentKeys)\n    && Object.hasOwn(value, 'attachment_id')\n    && Object.values(value).every(isText);\n}\n\nif (!isObject(body) || !hasOnly(body, requestKeys) || !requestKeys.every((key) => Object.hasOwn(body, key))\n    || body.channel !== channel || !isText(body.user_id) || !isText(body.conversation_id)\n    || !isText(body.request_id) || !isText(body.locale) || typeof body.message !== 'string'\n    || !Array.isArray(body.attachments) || !body.attachments.every(isAttachment)\n    || (!isText(body.message) && body.attachments.length === 0)\n    || !isPermissionContext(body.permission_context)) {\n  return [{ json: {\n    http_status: 400,\n    response: { status: 'invalid_request', request_id: null, channel, reply: \"Заявката не отговаря на формата за този канал.\" },\n  } }];\n}\n\nreturn [{ json: body }];"
+      },
+      "id": "f82f3091-20c8-41dc-8bb8-82fb7e9d6f61",
+      "name": "Провери заявката",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -245,
+        -25
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "80f6b342-2e7f-4961-bfbc-0e3fd8df0386",
+              "leftValue": "={{ $json.channel === 'telegram' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f2daa10c-9e83-450a-96c7-38441a354edf",
+      "name": "Валиден вход",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -25,
+        -25
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "BIND_W10_AI_CORE"
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "6ea828e4-f3df-4d29-a3b4-39c0096abcb9",
+      "name": "Изпълни W10 AI Core",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        345,
+        -25
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $(\"Провери заявката\").first().json;\nconst items = $input.all();\nconst result = items.length === 1 ? items[0].json : null;\nconst resultMatchesRequest = result && !Object.hasOwn(result, 'error')\n  && result.request_id === request.request_id && result.channel === request.channel;\n\nfunction response(status, http_status, reply) {\n  return [{ json: {\n    http_status,\n    response: { status, request_id: request.request_id, channel: request.channel, reply },\n  } }];\n}\n\nif (resultMatchesRequest && ['ok', 'needs_human'].includes(result.status)\n    && typeof result.reply === 'string' && /\\S/.test(result.reply)) {\n  return response(result.status, 200, result.reply);\n}\nif (resultMatchesRequest && result.status === 'invalid_request') {\n  return response('invalid_request', 400, \"Заявката не отговаря на формата за този канал.\");\n}\nreturn response('unavailable', 503, \"Shark AI временно не може да обработи заявката.\");"
+      },
+      "id": "9896bad4-c75e-4607-a671-f8302cf12dc0",
+      "name": "Провери отговора",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        575,
+        -25
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.response }}",
+        "options": {
+          "responseCode": "={{ $json.http_status }}"
+        }
+      },
+      "id": "116444ac-c6a5-4344-b607-cc94944cbc1e",
+      "name": "Върни отговора",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        805,
+        -25
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.response }}",
+        "options": {
+          "responseCode": "={{ $json.http_status }}"
+        }
+      },
+      "id": "0257518f-18de-4e69-bf6b-d57d13a1b501",
+      "name": "Върни HTTP 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        345,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Удостоверен вход": {
+      "main": [
+        [
+          {
+            "node": "Провери заявката",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Провери заявката": {
+      "main": [
+        [
+          {
+            "node": "Валиден вход",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Валиден вход": {
+      "main": [
+        [
+          {
+            "node": "Изпълни W10 AI Core",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Върни HTTP 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Изпълни W10 AI Core": {
+      "main": [
+        [
+          {
+            "node": "Провери отговора",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Провери отговора": {
+      "main": [
+        [
+          {
+            "node": "Върни отговора",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  }
+}

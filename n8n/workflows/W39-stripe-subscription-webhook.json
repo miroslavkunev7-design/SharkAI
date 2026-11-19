@@ -1,0 +1,124 @@
+{
+  "name": "Shark AI W39 · Потвърдени абонаментни права",
+  "nodes": [
+    {
+      "id": "45b0c13c-e6ac-4b89-8be6-efa37f1cc59a",
+      "name": "Финансови данни",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -44,
+        -172
+      ],
+      "parameters": {
+        "width": 752,
+        "height": 345,
+        "color": 4,
+        "content": "## Stripe подписите, подновяванията и повторенията се обработват от съществуващия /api/payments/webhook. Тук се четат само приложните права."
+      }
+    },
+    {
+      "id": "a047ecc2-2fec-4c38-9bf1-fc1b957383ac",
+      "name": "От Shark AI",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "inputSource": "passthrough"
+      }
+    },
+    {
+      "id": "a601d67b-a4e1-4d09-8437-5bb4ce49e150",
+      "name": "Провери разрешението и данните",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        248,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://mm-auto-green.vercel.app/api/internal/wallet-investments/status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Shark-Finance-Grant",
+              "value": "={{ $json.status_grant || \"\" }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 6500,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "07e19b05-40f6-4a2d-8679-a015e2d993a5",
+      "name": "Потвърдени абонаментни права",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        510,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const received = $input.first().json;\nconst response = received.body;\nconst now = new Date().toISOString();\nconst out = (status, code, data = null) => [{json:{status,code,operation:\"entitlement\",timestamp:now,data}}];\nif (received.statusCode !== 200 || !response || typeof response !== 'object') return out('unavailable','VERIFIED_PRODUCT_DATA_REQUIRED');\nconst wallet = response.wallet;\nconst op = \"entitlement\";\nif (op === 'entitlement') {\n  const e = response.entitlement;\n  return e && e.source === 'shark-ai-backend' && ['FREE','PRO','ULTRA'].includes(e.plan)\n    ? out('ok','SUBSCRIPTION_ENTITLEMENT',{plan:e.plan,source:e.source})\n    : out('unavailable','ENTITLEMENT_UNAVAILABLE');\n}\nif (!wallet || wallet.status === 'provider_unconfigured') return out('unavailable','WALLET_PROVIDER_UNCONFIGURED');\nif (op === 'withdrawal') return out('needs_human','USER_MUST_CONFIRM_WITH_PROVIDER');\nif (op === 'deposit') return out('unavailable','VERIFIED_PROVIDER_TRANSACTION_REQUIRED');\nif (op === 'onboarding') return wallet.provider && ['available','active'].includes(wallet.status)\n  ? out('ok','ACCOUNT_LINKED',{provider:wallet.provider}) : out('unavailable','ONBOARDING_NOT_CONFIRMED');\nconst observed = Date.parse(wallet.observed_at);\nconst age = Date.now() - observed;\nif (!['available','active'].includes(wallet.status) || typeof wallet.source !== 'string' || !wallet.source.trim() ||\n    !Number.isFinite(age) || age < 0 || age > 300000 || !/^[A-Z]{3}$/.test(wallet.currency) ||\n    typeof wallet.balance_minor !== 'string' || !/^(0|[1-9]\\d{0,23})$/.test(wallet.balance_minor)) return out('unavailable','UNVERIFIED_OR_STALE_BALANCE');\nreturn out('ok','VERIFIED_WALLET_BALANCE',{available_minor:wallet.balance_minor,currency:wallet.currency,provider:wallet.provider,observed_at:wallet.observed_at,source:wallet.source});"
+      }
+    }
+  ],
+  "connections": {
+    "От Shark AI": {
+      "main": [
+        [
+          {
+            "node": "Провери разрешението и данните",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Провери разрешението и данните": {
+      "main": [
+        [
+          {
+            "node": "Потвърдени абонаментни права",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromAList",
+    "callerIds": "y1RLdFfwaWSdsSGZ",
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false
+  },
+  "active": false
+}

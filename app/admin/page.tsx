@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Banknote, BarChart3, Boxes, CalendarCheck, ChevronLeft, ChevronRight, Crown, KeyRound, Landmark, MessageSquare, RefreshCw, Shield, TestTube, Users, Zap, type LucideIcon } from 'lucide-react';
 import { Logo } from '@/components/Logo';
+import { PerformanceFeesPanel } from './performance-fees';
 import { accountPlanLabel, type AccountPlan } from '../account-plan';
 import '../operator-workspace.css';
 import './workspace.css';
@@ -223,6 +224,113 @@ function TransfersSection({ data, busy, approve }: { data?: PendingPayments; bus
   );
 }
 
+function TelegramPairingPanel() {
+  const [state, setState] = useState<{ linked: boolean; configured: boolean } | null>(null);
+  const [challenge, setChallenge] = useState<{ code: string; expires_at: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const command = challenge ? '/start ' + challenge.code : '';
+
+  const refresh = useCallback(async (signal?: AbortSignal) => {
+    setError('');
+    setBusy(true);
+    try {
+      const response = await fetch('/api/admin/telegram', { cache: 'no-store', signal });
+      if (!response.ok) throw new Error('Pairing status unavailable');
+      const latest: { linked: boolean; configured: boolean } = await response.json();
+      if (signal?.aborted) return;
+      setState(latest);
+      if (latest.linked) setChallenge(null);
+    } catch {
+      if (!signal?.aborted) setError('Статусът на Telegram връзката е недостъпен.');
+    } finally {
+      if (!signal?.aborted) setBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void refresh(controller.signal);
+    return () => controller.abort();
+  }, [refresh]);
+
+  async function changePairing(method: 'POST' | 'DELETE') {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const response = await fetch('/api/admin/telegram', { method, cache: 'no-store' });
+      if (!response.ok) throw new Error('Pairing change failed');
+      if (method === 'POST') {
+        const issued: { code: string; expires_at: string } = await response.json();
+        setChallenge(issued);
+      } else {
+        setState((previous) => previous && { ...previous, linked: false });
+        setChallenge(null);
+        setNotice('Връзката и активният код са отменени.');
+      }
+    } catch {
+      setError('Промяната не можа да се извърши. Обнови статуса и опитай отново.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyCommand() {
+    try {
+      await navigator.clipboard.writeText(command);
+      setNotice('Командата е копирана.');
+    } catch {
+      setNotice('Маркирай и копирай командата от полето.');
+    }
+  }
+
+  return (
+    <AdminSection id="telegram" title="Telegram" icon={MessageSquare} art="agent">
+      <div className="operator-admin-panel-data grid gap-3" aria-busy={busy}>
+        {state?.linked && <p>Свързан администраторски Telegram чат.</p>}
+        {state && !state.linked && (
+          <p>{state.configured ? 'Свържи своя частен чат за работа с Shark AI.' : 'Telegram услугата предстои да се настрои.'}</p>
+        )}
+        {challenge && (
+          <label className="grid gap-2 text-sm">
+            Изпрати еднократната команда на потвърдения Shark AI бот в частен чат.
+            <input className="operator-input font-mono" readOnly value={command} onFocus={(event) => event.target.select()} />
+            <small className="operator-muted">
+              Валидна до {new Date(challenge.expires_at).toLocaleTimeString('bg-BG', {
+                timeZone: 'Europe/Sofia', hour: '2-digit', minute: '2-digit',
+              })} софийско време.
+            </small>
+          </label>
+        )}
+        {error && <p role="alert" className="operator-admin-error">{error}</p>}
+        {notice && <p role="status">{notice}</p>}
+        <div className="flex flex-wrap gap-2">
+          {state?.configured && !state.linked && (
+            <button className="shark-action" type="button" disabled={busy} onClick={() => void changePairing('POST')}>
+              {challenge ? 'Издай нов код' : 'Издай код'}
+            </button>
+          )}
+          {challenge && (
+            <button className="shark-action-secondary" type="button" disabled={busy} onClick={() => void copyCommand()}>
+              Копирай командата
+            </button>
+          )}
+          {(state?.linked || challenge) && (
+            <button className="shark-action-secondary" type="button" disabled={busy} onClick={() => void changePairing('DELETE')}>
+              {state?.linked ? 'Прекъсни връзката' : 'Отмени кода'}
+            </button>
+          )}
+          <button className="shark-action-secondary" type="button" disabled={busy} onClick={() => void refresh()}>
+            Обнови статуса
+          </button>
+        </div>
+      </div>
+    </AdminSection>
+  );
+}
+
 export default function AdminPage() {
   const router = useRouter();
   const [data, setData] = useState<AdminData | null>(null);
@@ -419,6 +527,10 @@ export default function AdminPage() {
             </AdminSection>
             <TransfersSection data={transfers} busy={busy} approve={approveTransfer} />
           </div>
+          <TelegramPairingPanel />
+          <AdminSection id="performance-fees" title="Регистрации и комисиони" icon={Banknote} art="markets">
+            <PerformanceFeesPanel />
+          </AdminSection>
           <nav className="ice-section operator-admin-links" data-ice-art="studio" aria-label="Операторски инструменти">
             <div>
               <Link href="/chat" className="shark-action-secondary">AI чат</Link>

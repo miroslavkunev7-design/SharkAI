@@ -1,0 +1,166 @@
+{
+  "nodes": [
+    {
+      "id": "67d16bb8-3c64-4007-9636-dbf4d1707945",
+      "name": "Портфейл и инвестиции",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -180
+      ],
+      "parameters": {
+        "color": 5,
+        "width": 875,
+        "height": 430,
+        "content": "## Shark Wallet и Investments\nАгентът изчислява целта и чете потвърдените данни за същия профил. Салдо, брокерски позиции и абонаментни права имат отделни източници."
+      }
+    },
+    {
+      "id": "890a49d0-9496-4181-a29d-0bc4e15df06f",
+      "name": "shark_profit_target",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.3,
+      "position": [
+        192,
+        0
+      ],
+      "parameters": {
+        "description": "Изчислява необходимата процентна доходност за въведена цел. Използвай само за математически въпроси. Това не е прогнозна или обещана печалба.",
+        "jsCode": "let caller;\ntry { caller = $('Провери заявката').first().json; } catch { caller = null; }\nconst scopes = caller?.router_context?.permission_context?.scopes;\nif (caller?.route !== 'agent' || !Array.isArray(scopes) || !scopes.some(s => s === 'module:read' || s === 'finance:status:read'))\n  return JSON.stringify({status:'unavailable',code:'SCOPE_REQUIRED'});\nlet input;\ntry { input = typeof query === 'string' ? JSON.parse(query) : query; } catch { input = null; }\nconst invalid = () => JSON.stringify({status:'unavailable',code:'INVALID_TARGET'});\nif (!input || !/^[A-Z]{3}$/.test(input.currency) || !/^[1-9]\\d{0,14}$/.test(input.capital_minor) ||\n    !/^(0|[1-9]\\d{0,14})$/.test(input.profit_minor) || !Number.isInteger(input.days) || input.days<1 || input.days>366) return invalid();\nconst capital = BigInt(input.capital_minor), goal = BigInt(input.profit_minor);\nconst percentHundredths = (goal*10000n + capital/2n) / capital;\nreturn JSON.stringify({status:'ok',source:'shark-ai-target-arithmetic',currency:input.currency,days:input.days,\n  capital_minor:capital.toString(),target_profit_minor:goal.toString(),required_return_percent:(percentHundredths/100n).toString()+'.'+(percentHundredths%100n).toString().padStart(2,'0'),\n  interpretation:'Потребителска цел за целия период. Прогнозата изисква потвърдени средства и история след такси.',timestamp:new Date().toISOString()});",
+        "specifyInputSchema": true,
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"currency\": {\n      \"type\": \"string\"\n    },\n    \"capital_minor\": {\n      \"type\": \"string\"\n    },\n    \"profit_minor\": {\n      \"type\": \"string\"\n    },\n    \"days\": {\n      \"type\": \"integer\"\n    }\n  },\n  \"required\": [\n    \"currency\",\n    \"capital_minor\",\n    \"profit_minor\",\n    \"days\"\n  ]\n}"
+      }
+    },
+    {
+      "id": "ec0fb3d7-59ec-4a28-92e9-cfd495d0e9eb",
+      "name": "shark_finance_status",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://mm-auto-green.vercel.app/api/internal/wallet-investments/status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Shark-Finance-Grant",
+              "value": "={{ $(\"Уеб вход\").isExecuted ? $(\"Уеб вход\").first().json.headers[\"x-shark-finance-grant\"] || \"\" : \"\" }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 6500,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "toolDescription": "Прочита състоянието на портфейла, инвестиционните права, целта и проверената прогноза за потвърдения профил в Shark AI. Не приема аргументи. Използвай само успешен отговор. Наличност и поръчка имат различен източник."
+      },
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Нужни са публикуван статус API, индивидуално разрешение и служебно удостоверение."
+    },
+    {
+      "id": "fecc0624-b3d5-47e1-86b1-2e063975fee2",
+      "name": "shark_investment_report",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        684,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ [\"https://mm-auto-green.vercel.app/api/internal/wallet-investments/investment/weekly-report\",\"https://mm-auto-green.vercel.app/api/internal/wallet-investments/investment/reconciliation\",\"https://mm-auto-green.vercel.app/api/internal/wallet-investments/investment/analysis\",\"https://mm-auto-green.vercel.app/api/internal/wallet-investments/investment/order-gateway\",\"https://mm-auto-green.vercel.app/api/internal/wallet-investments/investment/kill-switch\"][[\"weekly-report\",\"reconciliation\",\"analysis\",\"order-gateway\",\"kill-switch\"].indexOf($fromAI(\"operation\", \"Избери точно една стойност: weekly-report, reconciliation, analysis, order-gateway или kill-switch.\", \"string\"))] || \"https://mm-auto-green.vercel.app/api/internal/wallet-investments/investment/unavailable\" }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Shark-Finance-Grant",
+              "value": "={{ $(\"Уеб вход\").isExecuted ? $(\"Уеб вход\").first().json.headers[\"x-shark-finance-grant\"] || \"\" : \"\" }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {
+          "timeout": 6500,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        },
+        "toolDescription": "За седмичен нетен резултат, сверяване на позиции, историческа оценка или проверка дали търговията е спряна. Избери операцията. Данните са само за потвърдения потребител. Използвай само потвърден успешен резултат и дата. Статусът на стопа се чете без промяна."
+      },
+      "disabled": true,
+      "notesInFlow": true,
+      "notes": "Седмичен отчет, сверяване на позиции, анализ и статус на търговията за свързания профил."
+    }
+  ],
+  "connections": {
+    "shark_profit_target": {
+      "ai_tool": [
+        [
+          {
+            "node": "Shark AI агент",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "shark_finance_status": {
+      "ai_tool": [
+        [
+          {
+            "node": "Shark AI агент",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "shark_investment_report": {
+      "ai_tool": [
+        [
+          {
+            "node": "Shark AI агент",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

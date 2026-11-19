@@ -1,0 +1,72 @@
+{
+  "name": "W14 Shark AI | Памет и контекст",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Памет и контекст\nИзисква потвърдена собственост на разговора и изолирано хранилище в Shark AI backend. При липса на хранилище връща празен контекст. Сроковете и изтриването се конфигурират при свързване.",
+        "width": 850,
+        "height": 395,
+        "color": 6
+      },
+      "id": "462a0000-0000-4000-8000-000000000014",
+      "name": "Секция 14",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -190,
+        -205
+      ]
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "462a0000-0000-4000-8000-000000000114",
+      "name": "Извикване от Shark AI",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -115,
+        15
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const request = $json;\nconst validId = (value) => typeof value === 'string' && /^[A-Za-z0-9_-]{1,128}$/.test(value);\nconst request_id = validId(request.request_id) ? request.request_id : null;\nconst response = { request_id, context: [], timestamp: new Date().toISOString() };\n\nif (!request_id || !validId(request.user_id) || !validId(request.conversation_id)\n    || !['read', 'append', 'delete'].includes(request.operation)) {\n  return { json: { ...response, status: 'blocked', error: { code: 'INVALID_CONTEXT_REQUEST' } } };\n}\n\nreturn {\n  json: {\n    ...response,\n    status: 'unavailable',\n    error: { code: 'CONTEXT_STORAGE_UNCONFIGURED' },\n  },\n};"
+      },
+      "id": "462a0000-0000-4000-8000-000000000214",
+      "name": "Проверка на заявката за контекст",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        180,
+        15
+      ]
+    }
+  ],
+  "connections": {
+    "Извикване от Shark AI": {
+      "main": [
+        [
+          {
+            "node": "Проверка на заявката за контекст",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Sofia",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false,
+    "executionTimeout": 15
+  }
+}

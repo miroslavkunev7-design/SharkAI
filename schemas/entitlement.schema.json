@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shark AI finance entitlement",
+  "description": "Owner-scoped plan projection produced by the Shark AI backend and consumed by W39. The effective plan is only one input to a trading authorization decision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan",
+    "source"
+  ],
+  "properties": {
+    "plan": {
+      "type": "string",
+      "enum": [
+        "FREE",
+        "PRO",
+        "ULTRA"
+      ]
+    },
+    "source": {
+      "const": "shark-ai-backend"
+    }
+  }
+}

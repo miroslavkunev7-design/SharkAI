@@ -1,0 +1,263 @@
+{
+  "name": "Shark AI · W03 · Вход от WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## W03 Вход от WhatsApp\nShark AI backend проверява доставчика, opt-in, шаблоните и лимитите. Официалният доставчик предстои да се свърже.\n\nСвържи отделна n8n Header Auth credential за този канал.",
+        "width": 750,
+        "height": 350,
+        "color": 6
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000000",
+      "name": "Секция за вход",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -530,
+        -205
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Общ AI Core\nСвържи Execute Sub-workflow с W10 AI Core в този проект. Отговорът се връща на удостоверения backend.",
+        "width": 795,
+        "height": 350,
+        "color": 7
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000001",
+      "name": "Секция за AI Core",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        285,
+        -205
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Невалидна заявка\nВръща HTTP 400. Достъпът до AI Core спира на проверката на входа.",
+        "width": 450,
+        "height": 210,
+        "color": 3
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000002",
+      "name": "Секция за отхвърлен вход",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        285,
+        165
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "shark-ai/module-1/whatsapp",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000003",
+      "name": "Удостоверен вход",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.2,
+      "position": [
+        -465,
+        -25
+      ],
+      "webhookId": "9c23a2f0-8259-470b-a121-00030000000b"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const body = $input.first().json.body;\nconst channel = \"whatsapp\";\nconst requestKeys = ['user_id', 'conversation_id', 'channel', 'message', 'attachments', 'locale', 'request_id', 'permission_context'];\nconst permissionKeys = ['scopes', 'entitlements', 'consents'];\nconst attachmentKeys = ['attachment_id', 'name', 'media_type'];\n\nconst isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);\nconst isText = (value) => typeof value === 'string' && /\\S/.test(value);\nconst hasOnly = (value, keys) => Object.keys(value).every((key) => keys.includes(key));\nconst isTextList = (value) => Array.isArray(value) && value.every(isText) && new Set(value).size === value.length;\n\nfunction isPermissionContext(value) {\n  return isObject(value) && hasOnly(value, permissionKeys)\n    && Object.hasOwn(value, 'scopes')\n    && Object.values(value).every(isTextList);\n}\n\nfunction isAttachment(value) {\n  return isObject(value) && hasOnly(value, attachmentKeys)\n    && Object.hasOwn(value, 'attachment_id')\n    && Object.values(value).every(isText);\n}\n\nif (!isObject(body) || !hasOnly(body, requestKeys) || !requestKeys.every((key) => Object.hasOwn(body, key))\n    || body.channel !== channel || !isText(body.user_id) || !isText(body.conversation_id)\n    || !isText(body.request_id) || !isText(body.locale) || typeof body.message !== 'string'\n    || !Array.isArray(body.attachments) || !body.attachments.every(isAttachment)\n    || (!isText(body.message) && body.attachments.length === 0)\n    || !isPermissionContext(body.permission_context)) {\n  return [{ json: {\n    http_status: 400,\n    response: { status: 'invalid_request', request_id: null, channel, reply: \"Заявката не отговаря на формата за този канал.\" },\n  } }];\n}\n\nreturn [{ json: body }];"
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000004",
+      "name": "Провери заявката",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -245,
+        -25
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9c23a2f0-8259-470b-a121-00030000000a",
+              "leftValue": "={{ $json.channel === 'whatsapp' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000005",
+      "name": "Валиден вход",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -25,
+        -25
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "BIND_W10_AI_CORE"
+        },
+        "mode": "once",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000006",
+      "name": "Изпълни W10 AI Core",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        345,
+        -25
+      ],
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $(\"Провери заявката\").first().json;\nconst items = $input.all();\nconst result = items.length === 1 ? items[0].json : null;\nconst resultMatchesRequest = result && !Object.hasOwn(result, 'error')\n  && result.request_id === request.request_id && result.channel === request.channel;\n\nfunction response(status, http_status, reply) {\n  return [{ json: {\n    http_status,\n    response: { status, request_id: request.request_id, channel: request.channel, reply },\n  } }];\n}\n\nif (resultMatchesRequest && ['ok', 'needs_human'].includes(result.status)\n    && typeof result.reply === 'string' && /\\S/.test(result.reply)) {\n  return response(result.status, 200, result.reply);\n}\nif (resultMatchesRequest && result.status === 'invalid_request') {\n  return response('invalid_request', 400, \"Заявката не отговаря на формата за този канал.\");\n}\nreturn response('unavailable', 503, \"Shark AI временно не може да обработи заявката.\");"
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000007",
+      "name": "Провери отговора",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        575,
+        -25
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.response }}",
+        "options": {
+          "responseCode": "={{ $json.http_status }}"
+        }
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000008",
+      "name": "Върни отговора",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        805,
+        -25
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json.response }}",
+        "options": {
+          "responseCode": "={{ $json.http_status }}"
+        }
+      },
+      "id": "9c23a2f0-8259-470b-a121-000300000009",
+      "name": "Върни HTTP 400",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        345,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Удостоверен вход": {
+      "main": [
+        [
+          {
+            "node": "Провери заявката",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Провери заявката": {
+      "main": [
+        [
+          {
+            "node": "Валиден вход",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Валиден вход": {
+      "main": [
+        [
+          {
+            "node": "Изпълни W10 AI Core",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Върни HTTP 400",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Изпълни W10 AI Core": {
+      "main": [
+        [
+          {
+            "node": "Провери отговора",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Провери отговора": {
+      "main": [
+        [
+          {
+            "node": "Върни отговора",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "none",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  }
+}

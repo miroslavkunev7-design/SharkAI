@@ -48,3 +48,7 @@ npx tsx scripts/reconcile-stripe-period.ts --user <sharkai-user-id> --invoice <s
 За теста с два акаунта задайте тестовите PostgreSQL променливи и изпълнете `node scripts/test-workspace.cjs` срещу локалното приложение. `SHARKAI_TEST_CHAT_PROVIDER=1` включва проверката с реалния конфигуриран модел.
 
 Вижте [приемателния отчет](docs/SHARKAI_ACCEPTANCE_BG.md) за проверения обхват и зависимостите.
+
+За общия агент, портфейла и реалните брокерски интеграции вижте [диаграмата, диагностиката и резултатите](docs/wallet-investments.md) и [настройването на връзките](docs/operations-runbook.md).
+
+В раздела „Магазин и препродажба“ собственикът определя фирмен капитал, седмична цел и личния си дял от приключената печалба. [Магазин, поръчки и разпределение](docs/commerce-dropshipping.md) · [Сравнение на продукти и стратегии](docs/strategy-product-research.md)

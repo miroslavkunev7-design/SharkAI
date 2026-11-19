@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shark AI tool registry contract",
+  "description": "A versioned descriptor for a server-side allowlisted tool. The router validates input and output against the registered schemas and enforces current authorization.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tool_id",
+    "version",
+    "risk",
+    "required_scope",
+    "timeout_ms",
+    "idempotency_policy",
+    "error_policy",
+    "source",
+    "input_schema",
+    "output_schema"
+  ],
+  "properties": {
+    "tool_id": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "risk": {
+      "enum": [
+        "read",
+        "draft",
+        "write_with_approval",
+        "restricted_finance"
+      ]
+    },
+    "required_scope": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "timeout_ms": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "idempotency_policy": {
+      "description": "Side-effecting tools require a stable operation key across retries. The execution service enforces replay behavior.",
+      "enum": [
+        "none",
+        "required"
+      ]
+    },
+    "error_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_attempts",
+        "retry_on"
+      ],
+      "properties": {
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "retry_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "timeout",
+              "transient_provider_error",
+              "rate_limited"
+            ]
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "max_attempts": {
+            "minimum": 2
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "retry_on": {
+            "minItems": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "retry_on": {
+            "maxItems": 0
+          }
+        }
+      }
+    },
+    "source": {
+      "type": "string",
+      "pattern": "\\S",
+      "description": "Approved tool data source identifier."
+    },
+    "input_schema": {
+      "type": "object",
+      "$ref": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "output_schema": {
+      "type": "object",
+      "$ref": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  "if": {
+    "properties": {
+      "risk": {
+        "enum": [
+          "write_with_approval",
+          "restricted_finance"
+        ]
+      }
+    }
+  },
+  "then": {
+    "properties": {
+      "idempotency_policy": {
+        "const": "required"
+      }
+    }
+  },
+  "$defs": {
+    "result": {
+      "description": "Normalized tool result. Successful payloads also satisfy the registered output schema.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "source",
+        "timestamp"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "ok",
+            "approval_required",
+            "error"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "data": {},
+        "approval_id": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "code",
+            "message"
+          ],
+          "properties": {
+            "code": {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            "message": {
+              "type": "string",
+              "pattern": "\\S"
+            }
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "ok"
+            },
+            "approval_id": false,
+            "error": false
+          },
+          "required": [
+            "data"
+          ]
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "approval_required"
+            },
+            "error": false
+          },
+          "required": [
+            "data",
+            "approval_id"
+          ]
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "error"
+            },
+            "approval_id": false,
+            "data": false
+          },
+          "required": [
+            "error"
+          ]
+        }
+      ]
+    }
+  }
+}

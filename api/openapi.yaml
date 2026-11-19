@@ -1,0 +1,1923 @@
+openapi: 3.1.0
+info:
+  title: Shark AI wallet, investments, commerce and research API
+  version: 1.0.0
+  description: >-
+    Owner-facing website routes and private n8n, broker-evidence and trading-worker routes.
+    Minor-unit strings represent exact integers in the named currency. Provider availability and
+    authorization are checked at runtime. A read grant confers no permission to submit a broker order.
+paths:
+  /api/research/{domain}:
+    get:
+      operationId: getOwnerResearch
+      summary: "Compare verified investment strategies or drop-shipping products."
+      description: "Optional horizonDays applies only to investments and defaults to seven. Ties, preliminary catalog entries or missing independent evidence can leave leader_id null."
+      security: [{Session: []}]
+      parameters:
+        - {name: domain, in: path, required: true, schema: {enum: [investments, products]}}
+        - {name: currency, in: query, required: false, schema: {type: string, pattern: '^[A-Z]{3}$'}, description: "A single supported currency."}
+        - {name: horizonDays, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 366}}
+      responses:
+        '200':
+          description: Successful request. Consult the result status for readiness or confirmation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/ResearchResult'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '404': {$ref: '#/components/responses/HTTP404'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/research/investments:
+    post:
+      operationId: readScopedStrategyResearch
+      summary: "Read investment comparisons for the grant owner."
+      description: "Uses the currency and horizon in the owner’s saved settings."
+      security: [{FinanceService: [], FinanceGrant: []}]
+      requestBody:
+        required: false
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/Empty'}}
+      responses:
+        '200':
+          description: Successful request. Consult the result status for readiness or confirmation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/ResearchResult'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/research/products:
+    post:
+      operationId: readScopedProductResearch
+      summary: "Read owner-scoped product comparisons."
+      description: "Requires a current commerce analytics grant; send an empty JSON object."
+      security: [{FinanceService: [], CommerceGrant: []}]
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/CommerceGrantBody'}}
+      responses:
+        '200':
+          description: Successful request. Consult the result status for readiness or confirmation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/ResearchResult'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/commerce:
+    get:
+      operationId: getCommerceDashboard
+      summary: "Read store orders, daily financials and approved fulfillment capital."
+      description: "The authenticated owner sees only data for the selected period and currency."
+      security: [{Session: []}]
+      parameters:
+        - {name: from, in: query, required: false, schema: {type: string, format: date}, description: "Defaults to 29 days before today in Europe/Sofia."}
+        - {name: to, in: query, required: false, schema: {type: string, format: date}, description: "Defaults to today. Maximum difference from the start is 366 days."}
+        - {name: currency, in: query, required: false, schema: {enum: [EUR, USD, GBP, BGN], default: EUR}}
+      responses:
+        '200':
+          description: Successful request. Consult the result status for readiness or confirmation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/CommerceDashboard'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/commerce/shopify-connection:
+    get:
+      operationId: getShopifyConnection
+      summary: Verify the signed-in owner's bound Shopify store and read access.
+      description: Checks the store identity and distinguishes a confirmed empty order history in Shopify's normal 60-day window from an unverified order query.
+      security: [{Session: []}]
+      responses:
+        '200': {description: Connection checked., content: {application/json: {schema: {$ref: '#/components/schemas/ShopifyConnection'}}}}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/commerce/procurement:
+    get:
+      operationId: getOwnerProcurement
+      summary: Read warehouse offers, approved mandates and reconciled receipts.
+      description: Returns up to 100 inventory offers for the owner.
+      security: [{Session: []}]
+      responses:
+        '200': {description: Request processed., content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementSummary'}}}}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+    post:
+      operationId: changeOwnerProcurement
+      summary: Review or confirm an offer or grant or revoke bounded automation.
+      description: A confirmed purchase order is sent only to the approved supplier through the bound Zoho organization. An uncertain submission requires supplier reconciliation.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/ProcurementInput'}}
+      responses:
+        '200': {description: Request processed., content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementOutput'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/commerce/procurement-run:
+    post:
+      operationId: runApprovedPurchases
+      summary: Process approved warehouse procurement.
+      description: Checks at most three due stock offers against the current mandate and fresh supplier records. Explicit owner authorization, spending limits and budget checks apply before dispatch.
+      security: [{ProcurementScheduler: []}]
+      responses:
+        '200': {description: Request processed., content: {application/json: {schema: {$ref: '#/components/schemas/ProcurementRun'}}}}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/commerce/procurement-evidence:
+    post:
+      operationId: receiveStockEvidence
+      summary: Verify a cleared stock purchase, received inventory or settled resale statement.
+      description: HMAC over sharkai-stock/v1 plus LF, collector ID plus LF, Unix seconds plus LF and the exact raw bytes. Maximum age is 30 seconds and body size is 8192 bytes. A receipt also requires a matching provider warehouse record.
+      security: [{CommerceSignature: []}]
+      parameters:
+        - {name: X-Shark-Commerce-Collector, in: header, required: true, schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,64}$'}}
+        - {name: X-Shark-Commerce-Time, in: header, required: true, schema: {$ref: '#/components/schemas/UnixTime'}}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/StockEvidence'}}
+      responses:
+        '200': {description: Request processed., content: {application/json: {schema: {$ref: '#/components/schemas/Status'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/commerce/settlement:
+    get:
+      operationId: getResaleSettlement
+      summary: Read verified weekly resale gains, loss and owner allocations.
+      security: [{Session: []}]
+      parameters:
+        - {name: currency, in: query, required: false, schema: {enum: [EUR, USD, GBP, BGN], default: EUR}}
+      responses:
+        '200': {description: Owner request processed., content: {application/json: {schema: {$ref: '#/components/schemas/ResaleSettlement'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+    put:
+      operationId: setResaleTarget
+      summary: Set the current weekly resale target in the chosen currency.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/ResaleTarget'}}
+      responses:
+        '200': {description: Owner request processed., content: {application/json: {schema: {$ref: '#/components/schemas/Status'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+    post:
+      operationId: allocateSettledResaleProfit
+      summary: Choose the amount to reinvest from a closed week. The remainder is reserved for the owner.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/ResaleAllocation'}}
+      responses:
+        '200': {description: Owner request processed., content: {application/json: {schema: {$ref: '#/components/schemas/Status'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/commerce/capital:
+    put:
+      operationId: setCommerceCapital
+      summary: "Set the owner’s commerce capital limit and optionally permit agent reads."
+      description: "Authorization is specific to the signed-in owner and approved currency."
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/CommerceCapInput'}}
+      responses:
+        '200':
+          description: Successful request. Consult the result status for readiness or confirmation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/commerce/fulfillment:
+    post:
+      operationId: reviewOrConfirmFulfillment
+      summary: "Review or explicitly confirm a Printful order."
+      description: "Confirmation can commit real supplier funds and requires a valid review of the same paid Shopify order and bounded cost. An uncertain outcome requires provider reconciliation."
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/CommerceFulfillmentInput'}}
+      responses:
+        '200':
+          description: Successful request. Consult the result status for readiness or confirmation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/CommerceFulfillmentResult'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/commerce/overview:
+    post:
+      operationId: readScopedCommerceOverview
+      summary: "Read summarized store performance and available commerce capital."
+      description: "Requires the owner’s commerce analytics grant; send an empty JSON object."
+      security: [{FinanceService: [], CommerceGrant: []}]
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/CommerceGrantBody'}}
+      responses:
+        '200':
+          description: Successful request. Consult the result status for readiness or confirmation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/CommerceOverview'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/commerce/evidence:
+    post:
+      operationId: recordCommerceEvidence
+      summary: "Record an approved catalog, daily settled report or segregated cash statement."
+      description: "Sign the lines sharkai-commerce/v1, collector ID and Unix timestamp, each followed by LF, then the exact raw JSON bytes. Maximum age ±30 seconds and body 262144 bytes. Source role and registered store contract must match the event."
+      security: [{CommerceSignature: []}]
+      parameters:
+        - {name: X-Shark-Commerce-Collector, in: header, required: true, schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,64}$'}}
+        - {name: X-Shark-Commerce-Time, in: header, required: true, schema: {$ref: '#/components/schemas/UnixTime'}}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/CommerceEvidence'}}
+      responses:
+        '200':
+          description: Successful request. Consult the result status for readiness or confirmation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '415': {description: Expected application/json.}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/integrations/commerce/printful:
+    post:
+      operationId: receivePrintfulNotification
+      summary: Record a supplier order notification for a configured store.
+      description: Verify the raw body with the secret selected by the Printful public key. An observation does not release reserved money.
+      security: [{PrintfulSignature: []}]
+      parameters:
+        - {name: X-PF-Webhook-Public-Key, in: header, required: true, schema: {type: string, pattern: '^[A-Za-z0-9+/=_-]{12,512}$'}}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/PrintfulNotification'}}
+      responses:
+        '200': {description: 'Observation recorded, replayed or unmatched.', content: {application/json: {schema: {$ref: '#/components/schemas/Status'}}}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/integrations/commerce/shopify:
+    post:
+      operationId: receiveShopifyNotification
+      summary: "Verify a Shopify order or refund notification."
+      description: "Read the original body to verify the Shopify HMAC. The service subsequently verifies the order against the bound store."
+      security: [{ShopifySignature: []}]
+      parameters:
+        - {name: X-Shopify-Shop-Domain, in: header, required: true, schema: {type: string, pattern: '^[a-z0-9][a-z0-9-]{0,61}\.myshopify\.com$'}}
+        - {name: X-Shopify-Topic, in: header, required: true, schema: {enum: [orders/paid, orders/updated, orders/cancelled, refunds/create]}}
+        - {name: X-Shopify-Webhook-Id, in: header, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/ShopifyNotification'}}
+      responses:
+        '200':
+          description: Successful request. Consult the result status for readiness or confirmation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/admin/performance-fees:
+    get:
+      operationId: getAdministratorFeeReceipts
+      summary: Read registrations by plan, paginated members and provider fee totals for a date range.
+      description: >-
+        Requires the named beneficiary administrator's session. Dates are inclusive in Europe/Sofia.
+        The default range starts on the first day of the current month and ends today. Registrations
+        and the existing product plans are reported separately from accrued fees, credits and reversals.
+      security: [{Session: []}]
+      parameters:
+        - {in: query, name: from, schema: {type: string, format: date}, description: First date of the report.}
+        - {in: query, name: to, schema: {type: string, format: date}, description: Last date on or after from.}
+        - {in: query, name: page, schema: {type: integer, minimum: 1, maximum: 999999999, default: 1}, description: Page of 20 members.}
+      responses:
+        '200':
+          description: Member counts and paginated registrations with per-currency settlement totals.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/AdministratorFees'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/performance-fee:
+    post:
+      operationId: recordPerformanceFeeStatement
+      summary: Record a settled period, an already-posted fee credit, or its full reversal.
+      description: >-
+        This receipt endpoint does not initiate an external payment. A separately registered licensed
+        partner must post both the client debit and the approved beneficiary credit. Send UTF-8 JSON
+        with at most 4096 bytes. Sign the lines sharkai-performance-fee/v1, collector ID and Unix
+        timestamp, each followed by LF, then the exact body bytes with the fee collector's HMAC-SHA256
+        key. The signed timestamp must be within 60 seconds of server time.
+      security: [{FeeSignature: []}]
+      parameters:
+        - {in: header, name: X-Shark-Fee-Collector, required: true, schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,64}$'}}
+        - {in: header, name: X-Shark-Fee-Time, required: true, schema: {$ref: '#/components/schemas/UnixTime'}}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/FeeEvent'}}
+      responses:
+        '200':
+          description: Credited, reversed, or identical evidence replayed.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '201':
+          description: A reconciled period was recorded.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '415':
+          description: Expected application/json.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments:
+    get:
+      operationId: getWalletDashboard
+      summary: "Read the signed-in owner’s wallet and investment dashboard."
+      security: [{Session: []}]
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/OwnerDashboard'}}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+    put:
+      operationId: saveWalletSettings
+      summary: "Save the authorized capital, analysis access, instrument, strategy and target period."
+      description: >-
+        Saving settings refreshes the access revision. Live trading requires a separate confirmed broker mandate.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/SettingsInput'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/OwnerDashboard'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments/agent:
+    post:
+      operationId: askWalletAgent
+      summary: "Ask the original Shark AI agent a question."
+      description: >-
+        The server adds the scoped finance grant when analysis access is enabled.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/AgentQuestion'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/AgentReply'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments/revoke:
+    post:
+      operationId: revokeWalletAccess
+      summary: "Revoke the owner’s AI access and stop further authorized trading."
+      description: >-
+        Returns the updated dashboard. Broker orders already submitted may still require reconciliation.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/OwnerDashboard'}}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments/status-grant:
+    post:
+      operationId: issueFinanceGrant
+      summary: "Issue a two-minute, revocable finance read grant."
+      description: >-
+        Requires analysis access. The grant is issued to the signed-in owner.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Grant'}}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments/trading-consent:
+    get:
+      operationId: getBrokerMandates
+      summary: "Read current broker mandate terms and offers."
+      description: >-
+        An offer includes a signed, owner-bound five-minute review token. Disabled or ineligible accounts can receive an empty offer list.
+      security: [{Session: []}]
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/MandateView'}}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+    post:
+      operationId: confirmBrokerMandate
+      summary: "Accept the exact terms in a current review."
+      description: >-
+        Requires the owner session, a current paid plan, a valid account policy and fresh evidence. Maximum request size 2048 bytes.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/Consent'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Accepted'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments/provider/deposits:
+    post:
+      operationId: getOwnerDeposits
+      summary: "Read posted deposits from the owner’s Wise balance statement."
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/OwnerDeposits'}}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments/provider/review:
+    post:
+      operationId: getOwnerKycReview
+      summary: "Read the owner’s verified Wise KYC review status."
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/ReviewStatus'}}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/wallet-investments/provider/onboarding:
+    post:
+      operationId: openOwnerOnboarding
+      summary: "Open the owner’s Wise hosted verification session."
+      description: >-
+        Onboarding redirects to the validated provider URL, or to the dashboard with wallet_review=unavailable when no link is available.
+      security: [{Session: []}]
+      parameters:
+        - {$ref: '#/components/parameters/Origin'}
+      responses:
+        '303': {$ref: '#/components/responses/HTTP303'}
+        '401': {$ref: '#/components/responses/HTTP401'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+  /api/internal/wallet-investments/status:
+    post:
+      operationId: getScopedFinanceStatus
+      summary: "Read the finance projection for the subject of the grant."
+      security: [{FinanceService: [], FinanceGrant: []}]
+      requestBody:
+        required: false
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/Empty'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/ScopedDashboard'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/investment/{operation}:
+    post:
+      operationId: readInvestmentOperation
+      summary: "Read the selected investment workflow’s status."
+      description: >-
+        Order gateway and kill-switch here are read-only status checks. Broker submission has a separate worker route.
+      security: [{FinanceService: [], FinanceGrant: []}]
+      parameters:
+        - {$ref: '#/components/parameters/InvestmentOperation'}
+      requestBody:
+        required: false
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/Empty'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/InvestmentRead'}}
+        '404': {$ref: '#/components/responses/HTTP404'}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/wallet/{operation}:
+    post:
+      operationId: readWalletOperation
+      summary: "Read one wallet workflow projection."
+      description: >-
+        Withdrawal returns a Wise owner-confirmation handoff when available. No balance is changed by these reads.
+      security: [{FinanceService: [], FinanceGrant: []}]
+      parameters:
+        - {$ref: '#/components/parameters/WalletOperation'}
+      requestBody:
+        required: false
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/Empty'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/WalletRead'}}
+        '404': {$ref: '#/components/responses/HTTP404'}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/diagnostics:
+    post:
+      operationId: runModuleDiagnostics
+      summary: "Probe configured systems and report individual results."
+      description: >-
+        Uses the server-selected diagnostic owner. A successful response may contain failed or unverified checks.
+      security: [{FinanceService: []}]
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/Probe'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/DiagnosticReport'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+  /api/internal/wallet-investments/forecast-source:
+    post:
+      operationId: ingestForecastEvidence
+      summary: "Record broker funding, strategy history or a completed weekly report."
+      description: >-
+        HMAC-SHA256 over sharkai-broker-forecast/v1, connector ID and timestamp, each followed by LF, then the exact raw body. The timestamp must fall within 60 seconds of server time. Maximum body 3,000,000 bytes.
+      security: [{ForecastSignature: []}]
+      parameters:
+        - {$ref: '#/components/parameters/ForecastConnector'}
+        - {$ref: '#/components/parameters/ForecastTime'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/ForecastEvidence'}}
+      responses:
+        '200':
+          description: Identical evidence replayed.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '201':
+          description: Evidence recorded.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '413': {$ref: '#/components/responses/HTTP413'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/worker/signal:
+    post:
+      operationId: recordStrategySignal
+      summary: "Record a strategy decision against a specific broker mandate."
+      description: >-
+        Use the registered strategy signer. Matching separately signed broker evidence is required to queue the job. HMAC-SHA256 over shark-order-v1, the operation, signer ID and timestamp, each followed by LF, then the exact UTF-8 JSON bytes. The timestamp must be between zero and 15 seconds old. Maximum body 4096 bytes.
+      security: [{OrderSignature: []}]
+      parameters:
+        - {$ref: '#/components/parameters/OrderSigner'}
+        - {$ref: '#/components/parameters/OrderTime'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/Signal'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/worker/quote:
+    post:
+      operationId: recordBrokerQuote
+      summary: "Record a fresh broker quote and maximum charges for a signal."
+      description: >-
+        Use the independently registered broker-evidence signer. Both packets must agree on the order terms. HMAC-SHA256 over shark-order-v1, the operation, signer ID and timestamp, each followed by LF, then the exact UTF-8 JSON bytes. The timestamp must be between zero and 15 seconds old. Maximum body 4096 bytes.
+      security: [{OrderSignature: []}]
+      parameters:
+        - {$ref: '#/components/parameters/OrderSigner'}
+        - {$ref: '#/components/parameters/OrderTime'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/Quote'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/worker/account-snapshot:
+    post:
+      operationId: recordBrokerSnapshot
+      summary: "Record verified settled cash, exposure, holdings and optional mandate performance."
+      description: >-
+        Use the broker-evidence signer. Only list reconciled closed jobs. HMAC-SHA256 over shark-order-v1, the operation, signer ID and timestamp, each followed by LF, then the exact UTF-8 JSON bytes. The timestamp must be between zero and 15 seconds old. Maximum body 32768 bytes.
+      security: [{OrderSignature: []}]
+      parameters:
+        - {$ref: '#/components/parameters/OrderSigner'}
+        - {$ref: '#/components/parameters/OrderTime'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/AccountSnapshot'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/worker/profit-evidence:
+    post:
+      operationId: recordAuditedProfitEvidence
+      summary: Reconcile cleared trading profits for the registered non-recourse account.
+      description: >-
+        Requires an independent profit auditor with a distinct signer ID, HMAC key and database role.
+        Sign the lines shark-order-v1, profit-evidence, signer ID and Unix timestamp, each followed by
+        LF, then the exact JSON bytes. Maximum age 15 seconds and maximum body 4096 bytes. The signed
+        policy digest and settled broker snapshot must match an approved segregated account. Counters
+        are cumulative for its immutable history. Principal, external contributions and unrealized
+        gains cannot fund orders. Record gross gains and losses separately, all costs including fees,
+        distributions, open cost basis, unrealized losses and the actual cash remaining in that account.
+      security: [{OrderSignature: []}]
+      parameters:
+        - {$ref: '#/components/parameters/OrderSigner'}
+        - {$ref: '#/components/parameters/OrderTime'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/ProfitEvidence'}}
+      responses:
+        '200':
+          description: Immutable evidence recorded or replayed.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/worker/submit:
+    post:
+      operationId: submitApprovedJob
+      summary: "Submit a previously approved single-use job to its actual broker."
+      description: >-
+        Use the registered execution worker. Execution can move real funds and requires a current bounded owner mandate. A 202 UNKNOWN result requires reconciliation before any further submission. HMAC-SHA256 over shark-order-v1, the operation, signer ID and timestamp, each followed by LF, then the exact UTF-8 JSON bytes. The timestamp must be between zero and 15 seconds old. Maximum body 512 bytes.
+      security: [{OrderSignature: []}]
+      parameters:
+        - {$ref: '#/components/parameters/OrderSigner'}
+        - {$ref: '#/components/parameters/OrderTime'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/JobCommand'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '202':
+          description: Provider result uncertain. Inspect durable state and reconcile.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '404': {$ref: '#/components/responses/HTTP404'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+  /api/internal/wallet-investments/worker/poll:
+    post:
+      operationId: pollSubmittedJob
+      summary: "Read and reconcile broker-confirmed progress for an existing job."
+      description: >-
+        Use the registered execution worker and the original submission nonce. Polling does not create another order. HMAC-SHA256 over shark-order-v1, the operation, signer ID and timestamp, each followed by LF, then the exact UTF-8 JSON bytes. The timestamp must be between zero and 15 seconds old. Maximum body 512 bytes.
+      security: [{OrderSignature: []}]
+      parameters:
+        - {$ref: '#/components/parameters/OrderSigner'}
+        - {$ref: '#/components/parameters/OrderTime'}
+      requestBody:
+        required: true
+        content:
+          application/json: {schema: {$ref: '#/components/schemas/JobCommand'}}
+      responses:
+        '200':
+          description: Successful operation.
+          content:
+            application/json: {schema: {$ref: '#/components/schemas/Status'}}
+        '400': {$ref: '#/components/responses/HTTP400'}
+        '403': {$ref: '#/components/responses/HTTP403'}
+        '409': {$ref: '#/components/responses/HTTP409'}
+        '404': {$ref: '#/components/responses/HTTP404'}
+        '503': {$ref: '#/components/responses/HTTP503'}
+components:
+  securitySchemes:
+    CommerceGrant: {type: apiKey, in: header, name: X-Shark-Commerce-Grant, description: Owner-bound two-minute HS256 JWT with commerce:analytics:read scope and current revision.}
+    CommerceSignature: {type: apiKey, in: header, name: X-Shark-Commerce-Signature, description: Lowercase hexadecimal HMAC-SHA256 from the registered commerce collector.}
+    ShopifySignature: {type: apiKey, in: header, name: X-Shopify-Hmac-Sha256, description: Base64 HMAC-SHA256 of the raw Shopify body under the authenticated shop secret.}
+    ProcurementScheduler: {type: http, scheme: bearer, description: Dedicated stock scheduler service credential.}
+    PrintfulSignature: {type: apiKey, in: header, name: X-PF-Webhook-Signature, description: Hex HMAC-SHA256 of the raw Printful body using the registered store secret.}
+    FeeSignature: {type: apiKey, in: header, name: X-Shark-Fee-Signature, description: Lowercase hexadecimal HMAC-SHA256 from the independently registered fee collector.}
+    Session: {type: apiKey, in: cookie, name: sharkai_token, description: Signed HTTP-only Shark AI session cookie.}
+    FinanceService: {type: http, scheme: bearer, description: Private finance service credential configured on the server.}
+    FinanceGrant: {type: apiKey, in: header, name: X-Shark-Finance-Grant, description: Owner-bound HS256 JWT with finance:status:read scope and current access revision.}
+    ForecastSignature: {type: apiKey, in: header, name: X-Shark-Forecast-Signature, description: Lowercase hexadecimal HMAC-SHA256 with the registered connector key.}
+    OrderSignature: {type: apiKey, in: header, name: X-Shark-Order-Signature, description: Lowercase hexadecimal HMAC-SHA256 with the key for the operation-specific signer role.}
+  parameters:
+    Origin: {name: Origin, in: header, required: true, description: Must match request protocol and Host., schema: {type: string, format: uri}}
+    ForecastConnector: {name: X-Shark-Forecast-Connector, in: header, required: true, schema: {$ref: '#/components/schemas/Identifier'}}
+    ForecastTime: {name: X-Shark-Forecast-Signed-At, in: header, required: true, schema: {$ref: '#/components/schemas/UnixTime'}}
+    OrderSigner: {name: X-Shark-Order-Worker, in: header, required: true, schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,64}$'}}
+    OrderTime: {name: X-Shark-Order-Time, in: header, required: true, schema: {$ref: '#/components/schemas/UnixTime'}}
+    InvestmentOperation: {name: operation, in: path, required: true, schema: {$ref: '#/components/schemas/InvestmentOperation'}}
+    WalletOperation: {name: operation, in: path, required: true, schema: {$ref: '#/components/schemas/WalletOperation'}}
+  responses:
+    HTTP303:
+      description: Owner browser redirect to Wise or the dashboard.
+      headers:
+        Location: {required: true, schema: {type: string, format: uri-reference}}
+    HTTP400:
+      description: "Malformed or unexpected request."
+      content:
+        application/json: {schema: {$ref: '#/components/schemas/Status'}}
+    HTTP401:
+      description: "A current owner session is required."
+      content:
+        application/json: {schema: {$ref: '#/components/schemas/Status'}}
+    HTTP403:
+      description: "Origin, grant, ownership or signer check failed."
+      content:
+        application/json: {schema: {$ref: '#/components/schemas/Status'}}
+    HTTP404:
+      description: "Unknown operation or job."
+      content:
+        application/json: {schema: {$ref: '#/components/schemas/Status'}}
+    HTTP409:
+      description: "Review, evidence or broker state does not allow this operation."
+      content:
+        application/json: {schema: {$ref: '#/components/schemas/Status'}}
+    HTTP413:
+      description: "Forecast evidence body is missing, oversized or could not be read within the deadline."
+      content:
+        application/json: {schema: {$ref: '#/components/schemas/Status'}}
+    HTTP503:
+      description: "The configured service, data source or prerequisite is unavailable."
+      content:
+        application/json: {schema: {$ref: '#/components/schemas/Status'}}
+  schemas:
+    ResearchResult:
+      type: "object"
+      additionalProperties: false
+      required: ["domain", "status", "as_of", "currency", "criteria", "candidates", "leader_id"]
+      properties:
+        domain: {enum: ["investments", "dropshipping"]}
+        status: {enum: ["ranked", "insufficient_data", "unavailable"]}
+        as_of: {type: "string", format: "date-time"}
+        currency: {type: ["string", "null"], pattern: "^[A-Z]{3}$"}
+        criteria: {type: "array", items: {type: "string"}}
+        candidates: {type: "array", items: {$ref: "#/components/schemas/ResearchCandidate"}}
+        leader_id: {type: ["string", "null"]}
+    ResearchCandidate:
+      type: "object"
+      additionalProperties: false
+      required: ["id", "label", "rank", "status", "metrics", "reasons"]
+      properties:
+        id: {type: "string"}
+        label: {type: "string"}
+        rank: {type: ["integer", "null"], minimum: 1}
+        status: {enum: ["eligible", "insufficient_data", "validation_candidate"]}
+        metrics:
+          type: "object"
+          additionalProperties: {type: ["number", "string", "null"]}
+          description: "Ratios are basis points. Amounts ending in _minor are exact integer strings. Includes provider timestamps, historical windows and sample sizes."
+        reasons: {type: "array", items: {type: "string"}}
+    CommerceGrantBody: {type: "object", maxProperties: 0}
+    CommerceCapInput:
+      type: "object"
+      additionalProperties: false
+      required: ["currency", "amount_minor"]
+      properties:
+        currency: {enum: ["EUR", "USD", "GBP", "BGN"]}
+        amount_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+        agent_read_allowed: {type: "boolean"}
+    CommerceFulfillmentInput:
+      oneOf:
+        - {type: "object", additionalProperties: false, required: ["order_ref", "action"], properties: {order_ref: {type: "string", pattern: "^[1-9][0-9]{0,19}$"}, action: {const: "review"}}}
+        - {type: "object", additionalProperties: false, required: ["order_ref", "action", "review_id"], properties: {order_ref: {type: "string", pattern: "^[1-9][0-9]{0,19}$"}, action: {const: "confirm"}, review_id: {type: "string", format: "uuid"}}}
+    CommerceFulfillmentResult:
+      oneOf:
+        - {type: "object", additionalProperties: false, required: ["status", "review_id", "currency", "max_cost_minor", "expires_at"], properties: {status: {const: "reviewed"}, review_id: {type: "string", format: "uuid"}, currency: {enum: ["EUR", "USD", "GBP", "BGN"]}, max_cost_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}, expires_at: {type: "string", format: "date-time"}}}
+        - {type: "object", additionalProperties: false, required: ["status"], properties: {status: {enum: ["blocked", "accepted", "uncertain", "unavailable"]}}}
+    CommerceDashboard:
+      type: "object"
+      additionalProperties: false
+      required: ["status", "currency", "from", "to", "source_observed_at", "period_complete", "shop", "capital", "orders", "daily"]
+      properties:
+        status: {enum: ["available", "unavailable"]}
+        currency: {enum: ["EUR", "USD", "GBP", "BGN"]}
+        from: {type: "string", format: "date"}
+        to: {type: "string", format: "date"}
+        source_observed_at: {type: ["string", "null"], format: "date-time"}
+        period_complete: {type: "boolean"}
+        shop:
+          type: "object"
+          additionalProperties: false
+          required: ["connected", "supplier_connected"]
+          properties: {connected: {type: "boolean"}, supplier_connected: {type: "boolean"}}
+        capital:
+          type: "object"
+          additionalProperties: false
+          required: ["limit_minor", "cash_minor", "held_minor", "available_minor", "observed_at", "agent_read_allowed"]
+          properties:
+            limit_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+            cash_minor: {type: ["string", "null"], pattern: "^(0|[1-9][0-9]*)$"}
+            held_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+            available_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+            observed_at: {type: ["string", "null"], format: "date-time"}
+            agent_read_allowed: {type: "boolean"}
+        orders:
+          type: "array"
+          items:
+            type: "object"
+            additionalProperties: false
+            required: ["order_ref", "status", "total_minor", "refunded_minor", "ordered_at", "source_observed_at", "fulfillment"]
+            properties:
+              order_ref: {type: "string", pattern: "^[1-9][0-9]{0,19}$"}
+              status: {enum: ["paid", "pending", "cancelled", "refunded", "partially_refunded"]}
+              total_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+              refunded_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+              ordered_at: {type: "string", format: "date-time"}
+              source_observed_at: {type: "string", format: "date-time"}
+              fulfillment: {enum: ["none", "reviewed", "submitting", "accepted", "uncertain"]}
+          maxItems: 100
+        daily:
+          type: "array"
+          items:
+            type: "object"
+            additionalProperties: false
+            required: ["date", "orders", "units", "revenue_minor", "refunds_minor", "goods_minor", "fulfillment_minor", "advertising_minor", "fees_minor", "other_costs_minor"]
+            properties:
+              date: {type: "string", format: "date"}
+              orders: {type: "integer", minimum: 0}
+              units: {type: "integer", minimum: 0}
+              revenue_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+              refunds_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+              goods_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+              fulfillment_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+              advertising_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+              fees_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+              other_costs_minor: {type: "string", pattern: "^(0|[1-9][0-9]*)$"}
+          maxItems: 367
+    CommerceOverview:
+      oneOf:
+        - {"type":"object","additionalProperties":false,"required":["status","source","reason"],"properties":{"status":{"const":"unavailable"},"source":{"const":"shark-ai-commerce"},"reason":{"const":"verified_store_required"}}}
+        - {"type":"object","additionalProperties":false,"required":["status","source","currency","from","to","observed_at","period_complete","verified_days","reported","capital","weekly","recent_procurement"],"properties":{"status":{"enum":["available","unavailable"]},"source":{"const":"shark-ai-commerce"},"currency":{"enum":["EUR","USD","GBP","BGN"]},"from":{"type":"string","format":"date"},"to":{"type":"string","format":"date"},"observed_at":{"type":["string","null"],"format":"date-time"},"period_complete":{"type":"boolean"},"verified_days":{"type":"integer","minimum":0},"reported":{"type":["object","null"],"additionalProperties":false,"required":["orders","units","revenue_minor","refunds_minor","cost_minor","net_margin_minor"],"properties":{"orders":{"type":"integer","minimum":0},"units":{"type":"integer","minimum":0},"revenue_minor":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"},"refunds_minor":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"},"cost_minor":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"},"net_margin_minor":{"type":"string","pattern":"^-?(0|[1-9][0-9]*)$"}}},"capital":{"type":"object","additionalProperties":false,"required":["available_minor","held_minor","observed_at"],"properties":{"available_minor":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"},"held_minor":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"},"observed_at":{"type":["string","null"],"format":"date-time"}}},"weekly":{"type":"object","additionalProperties":false,"required":["period","last_closed","owner_reserved_minor","owner_paid_minor"],"properties":{"period":{"type":["object","null"],"additionalProperties":false,"required":["start_date","end_date","target_minor","verified_profit_minor","verified_days"],"properties":{"start_date":{"type":"string","format":"date"},"end_date":{"type":"string","format":"date"},"target_minor":{"type":["string","null"],"pattern":"^(0|[1-9][0-9]*)$"},"verified_profit_minor":{"type":["string","null"],"pattern":"^(0|-?[1-9][0-9]*)$"},"verified_days":{"type":"integer","minimum":0,"maximum":7}}},"last_closed":{"type":["object","null"],"additionalProperties":false,"required":["start_date","end_date","target_minor","profit_minor","allocable_minor","reinvested_minor","owner_minor","status"],"properties":{"start_date":{"type":"string","format":"date"},"end_date":{"type":"string","format":"date"},"target_minor":{"type":["string","null"],"pattern":"^(0|[1-9][0-9]*)$"},"profit_minor":{"type":"string","pattern":"^(0|-?[1-9][0-9]*)$"},"allocable_minor":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"},"reinvested_minor":{"type":["string","null"],"pattern":"^(0|[1-9][0-9]*)$"},"owner_minor":{"type":["string","null"],"pattern":"^(0|[1-9][0-9]*)$"},"status":{"enum":["awaiting_allocation","allocated","no_profit"]}}},"owner_reserved_minor":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"},"owner_paid_minor":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"}}},"recent_procurement":{"type":["object","null"],"additionalProperties":false,"required":["offers_shown","limit","issued","received_units","confirmed_sold_units"],"properties":{"offers_shown":{"type":"integer","minimum":0,"maximum":100},"limit":{"const":100},"issued":{"type":"integer","minimum":0},"received_units":{"type":"integer","minimum":0},"confirmed_sold_units":{"type":["integer","null"],"minimum":0}}}}}
+    CommerceEvidence:
+      oneOf:
+        - {$ref: '#/components/schemas/ResaleWeekEvidence'}
+        - {$ref: '#/components/schemas/ResaleOwnerPayoutEvidence'}
+        - {$ref: "#/components/schemas/CommerceCashEvidence"}
+        - {$ref: "#/components/schemas/CommerceCatalogEvidence"}
+        - {$ref: "#/components/schemas/CommerceDayEvidence"}
+    StockPaymentEvidence:
+      type: "object"
+      additionalProperties: false
+      required: ["offer_id","currency","contract_digest","po_id","product_id","observed_at","report_ref","kind","basis","cost_minor","cash_report_ref"]
+      properties:
+        offer_id: {"type":"string","format":"uuid"}
+        currency: {"enum":["EUR","USD","GBP","BGN"]}
+        contract_digest: {"type":"string","pattern":"^[a-f0-9]{64}$"}
+        po_id: {"type":"string","pattern":"^[1-9][0-9]{0,19}$"}
+        product_id: {"type":"string","pattern":"^[A-Za-z0-9_.:-]{1,100}$"}
+        observed_at: {"type":"string","format":"date-time"}
+        report_ref: {"type":"string","pattern":"^[A-Za-z0-9_.:-]{1,100}$"}
+        kind: {"const":"stock_payment"}
+        basis: {"const":"final_cleared_all_in_business_purchase"}
+        cost_minor: {"type":"string","pattern":"^(0|[1-9][0-9]{0,11})$"}
+        cash_report_ref: {"type":"string","pattern":"^[A-Za-z0-9_.:-]{1,100}$"}
+    StockReceiptEvidence:
+      type: "object"
+      additionalProperties: false
+      required: ["offer_id","currency","contract_digest","po_id","product_id","observed_at","report_ref","kind","basis","warehouse_id","vendor_id","units_received"]
+      properties:
+        offer_id: {"type":"string","format":"uuid"}
+        currency: {"enum":["EUR","USD","GBP","BGN"]}
+        contract_digest: {"type":"string","pattern":"^[a-f0-9]{64}$"}
+        po_id: {"type":"string","pattern":"^[1-9][0-9]{0,19}$"}
+        product_id: {"type":"string","pattern":"^[A-Za-z0-9_.:-]{1,100}$"}
+        observed_at: {"type":"string","format":"date-time"}
+        report_ref: {"type":"string","pattern":"^[1-9][0-9]{0,19}$"}
+        kind: {"const":"stock_receipt"}
+        basis: {"const":"posted_zoho_owned_warehouse_receipt"}
+        warehouse_id: {"type":"string","pattern":"^[1-9][0-9]{0,19}$"}
+        vendor_id: {"type":"string","pattern":"^[1-9][0-9]{0,19}$"}
+        units_received: {"type":"integer","minimum":1,"maximum":1000000}
+    StockSalesEvidence:
+      type: "object"
+      additionalProperties: false
+      required: ["offer_id","currency","contract_digest","po_id","product_id","observed_at","report_ref","kind","basis","units_sold","units_on_hand","settled_revenue_minor","refunded_minor","selling_cost_minor"]
+      properties:
+        offer_id: {"type":"string","format":"uuid"}
+        currency: {"enum":["EUR","USD","GBP","BGN"]}
+        contract_digest: {"type":"string","pattern":"^[a-f0-9]{64}$"}
+        po_id: {"type":"string","pattern":"^[1-9][0-9]{0,19}$"}
+        product_id: {"type":"string","pattern":"^[A-Za-z0-9_.:-]{1,100}$"}
+        observed_at: {"type":"string","format":"date-time"}
+        report_ref: {"type":"string","pattern":"^[A-Za-z0-9_.:-]{1,100}$"}
+        kind: {"const":"stock_sales"}
+        basis: {"const":"cumulative_settled_merchant_resales_net_of_discounts_ex_tax"}
+        units_sold: {"type":"integer","minimum":0,"maximum":1000000}
+        units_on_hand: {"type":"integer","minimum":0,"maximum":1000000}
+        settled_revenue_minor: {"type":"string","pattern":"^(0|[1-9][0-9]{0,11})$"}
+        refunded_minor: {"type":"string","pattern":"^(0|[1-9][0-9]{0,11})$"}
+        selling_cost_minor: {"type":"string","pattern":"^(0|[1-9][0-9]{0,11})$"}
+    StockEvidence:
+      oneOf:
+        - {"$ref":"#/components/schemas/StockPaymentEvidence"}
+        - {"$ref":"#/components/schemas/StockReceiptEvidence"}
+        - {"$ref":"#/components/schemas/StockSalesEvidence"}
+    ProcurementInput:
+      oneOf:
+        - {"type":"object","additionalProperties":false,"required":["action","offer_id"],"properties":{"action":{"const":"review"},"offer_id":{"type":"string","format":"uuid"}}}
+        - {"type":"object","additionalProperties":false,"required":["action","offer_id","review_id"],"properties":{"action":{"const":"confirm"},"offer_id":{"type":"string","format":"uuid"},"review_id":{"type":"string","format":"uuid"}}}
+        - {"type":"object","additionalProperties":false,"required":["action","offer_id","accepted","max_per_po_minor","total_minor","expires_at"],"properties":{"action":{"const":"enable_automation"},"offer_id":{"type":"string","format":"uuid"},"accepted":{"const":true},"max_per_po_minor":{"type":"string","pattern":"^[1-9][0-9]{0,11}$"},"total_minor":{"type":"string","pattern":"^[1-9][0-9]{0,11}$"},"expires_at":{"type":"string","format":"date-time"}}}
+        - {"type":"object","additionalProperties":false,"required":["action","mandate_id"],"properties":{"action":{"const":"disable_automation"},"mandate_id":{"type":"string","format":"uuid"}}}
+    ProcurementOutput:
+      oneOf:
+        - {"type":"object","additionalProperties":false,"required":["status","review_id","currency","max_cost_minor","expires_at"],"properties":{"status":{"const":"reviewed"},"review_id":{"type":"string","format":"uuid"},"currency":{"enum":["EUR","USD","GBP","BGN"]},"max_cost_minor":{"type":"string","pattern":"^[1-9][0-9]{0,19}$"},"expires_at":{"type":"string"}}}
+        - {"type":"object","additionalProperties":false,"required":["status"],"properties":{"status":{"enum":["issued","uncertain","blocked","enabled","revoked","unavailable"]}}}
+    ProcurementRun:
+      type: "object"
+      additionalProperties: false
+      required: ["status","processed"]
+      properties:
+        status: {"enum":["disabled","needs_reconciliation","checked"]}
+        processed: {"type":"integer","minimum":0,"maximum":3}
+    ProcurementSummary:
+      type: "object"
+      additionalProperties: false
+      required: ["status","mandates","items"]
+      properties:
+        status: {"enum":["available","unavailable"]}
+        mandates: {"type":"array","items":{"type":"object","additionalProperties":false,"required":["mandate_id","product_id","supplier_name","currency","max_per_po_minor","total_minor","expires_at"],"properties":{"mandate_id":{"type":"string","format":"uuid"},"product_id":{"type":"string"},"supplier_name":{"type":"string"},"currency":{"enum":["EUR","USD","GBP","BGN"]},"max_per_po_minor":{"type":"string","pattern":"^[1-9][0-9]{0,19}$"},"total_minor":{"type":"string","pattern":"^[1-9][0-9]{0,19}$"},"expires_at":{"type":"string"}}}}
+        items: {"type":"array","items":{"type":"object","additionalProperties":false,"required":["offer_id","product_name","supplier_name","units","currency","max_cost_minor","state","received_units","sold_units","stock_units","realized_margin_minor"],"properties":{"offer_id":{"type":"string","format":"uuid"},"product_name":{"type":"string"},"supplier_name":{"type":"string"},"units":{"type":"integer","minimum":0,"maximum":1000000},"currency":{"enum":["EUR","USD","GBP","BGN"]},"max_cost_minor":{"type":"string","pattern":"^[1-9][0-9]{0,19}$"},"state":{"enum":["offered","reviewed","submitting","issued","uncertain","received"]},"received_units":{"type":"integer","minimum":0,"maximum":1000000},"sold_units":{"type":["integer","null"],"minimum":0,"maximum":1000000},"stock_units":{"type":["integer","null"],"minimum":0,"maximum":1000000},"realized_margin_minor":{"type":["string","null"],"pattern":"^-?\\d+$"}}},"maxItems":100}
+    ResaleTarget:
+      type: "object"
+      additionalProperties: false
+      required: ["action","currency","target_minor"]
+      properties:
+        action: {"const":"target"}
+        currency: {"enum":["EUR","USD","GBP","BGN"]}
+        target_minor: {"type":"string","pattern":"^(0|[1-9][0-9]{0,11})$"}
+    ResaleAllocation:
+      type: "object"
+      additionalProperties: false
+      required: ["action","currency","period_start","reinvest_minor"]
+      properties:
+        action: {"const":"allocate"}
+        currency: {"enum":["EUR","USD","GBP","BGN"]}
+        period_start: {"type":"string","format":"date"}
+        reinvest_minor: {"type":"string","pattern":"^(0|[1-9][0-9]{0,11})$"}
+    ResaleSettlement:
+      type: "object"
+      additionalProperties: false
+      required: ["status","currency","period","closed","reinvested_total_minor","owner_reserved_minor","owner_paid_minor","owner_payout_url"]
+      properties:
+        status: {"enum":["available","unavailable"]}
+        currency: {"enum":["EUR","USD","GBP","BGN"]}
+        period: {"type":["object","null"],"additionalProperties":false,"required":["start_date","end_date","target_minor","verified_profit_minor","verified_days"],"properties":{"start_date":{"type":"string","format":"date"},"end_date":{"type":"string","format":"date"},"target_minor":{"type":["string","null"],"pattern":"^(0|[1-9][0-9]*)$"},"verified_profit_minor":{"type":["string","null"],"pattern":"^(0|-?[1-9][0-9]*)$"},"verified_days":{"type":"integer","minimum":0,"maximum":7}}}
+        closed: {"type":"array","maxItems":104,"items":{"type":"object","additionalProperties":false,"required":["start_date","end_date","target_minor","profit_minor","allocable_minor","reinvested_minor","owner_minor","status"],"properties":{"start_date":{"type":"string","format":"date"},"end_date":{"type":"string","format":"date"},"target_minor":{"type":["string","null"],"pattern":"^(0|[1-9][0-9]*)$"},"profit_minor":{"type":"string","pattern":"^(0|-?[1-9][0-9]*)$"},"allocable_minor":{"type":"string","pattern":"^(0|[1-9][0-9]*)$"},"reinvested_minor":{"type":["string","null"],"pattern":"^(0|[1-9][0-9]*)$"},"owner_minor":{"type":["string","null"],"pattern":"^(0|[1-9][0-9]*)$"},"status":{"enum":["awaiting_allocation","allocated","no_profit"]}}}}
+        reinvested_total_minor: {"type":"string","pattern":"^(0|[1-9][0-9]*)$"}
+        owner_reserved_minor: {"type":"string","pattern":"^(0|[1-9][0-9]*)$"}
+        owner_paid_minor: {"type":"string","pattern":"^(0|[1-9][0-9]*)$"}
+        owner_payout_url: {"enum":["https://wise.com/home/",null]}
+    ResaleWeekEvidence:
+      type: object
+      additionalProperties: false
+      description: "The registered ledger signer closes a fully settled UTC Monday–Sunday with contiguous, immutable references. Receipts exclude external inflows and outflows. Net equals receipts minus all seven cost lines. The closing balance equals the previous closing balance plus net. Recovered amounts must reconcile to cleared Shark purchase charges for sold inventory."
+      required: [store_id, currency, contract_digest, report_ref, observed_at, shop, custody_ref, evidence_sha256, kind, basis, week_start, week_end, previous_report_ref, opening_cumulative_net_minor, closing_cumulative_net_minor, net_minor, settled_receipts_minor, refunds_minor, goods_minor, fulfillment_minor, advertising_minor, fees_minor, taxes_minor, other_costs_minor, recovered_purchase_cost_minor, recovered_purchases]
+      properties:
+        store_id: {type: string, format: uuid}
+        currency: {enum: [EUR, USD, GBP, BGN]}
+        contract_digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+        report_ref: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,100}$'}
+        observed_at: {type: string, format: date-time}
+        shop: {type: string, pattern: '^[a-z0-9][a-z0-9-]{0,61}\.myshopify\.com$'}
+        custody_ref: {type: string, minLength: 1, maxLength: 200}
+        evidence_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        kind: {const: resale_week}
+        basis: {const: settled_resale_after_all_costs_excluding_external_flows}
+        week_start: {type: string, format: date}
+        week_end: {type: string, format: date}
+        previous_report_ref: {type: [string, 'null'], pattern: '^[A-Za-z0-9_.:-]{1,100}$'}
+        opening_cumulative_net_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,11})$'}
+        closing_cumulative_net_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,11})$'}
+        net_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,11})$'}
+        settled_receipts_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        refunds_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        goods_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        fulfillment_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        advertising_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        fees_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        taxes_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        other_costs_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        recovered_purchase_cost_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        recovered_purchases: {type: array, maxItems: 1000, items: {type: object, additionalProperties: false, required: [kind, ref, amount_minor], properties: {kind: {enum: [fulfillment, procurement]}, ref: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,100}$'}, amount_minor: {type: string, pattern: '^[1-9][0-9]{0,11}$'}}}}
+    ResaleOwnerPayoutEvidence:
+      type: object
+      additionalProperties: false
+      description: "The registered cash signer authenticates an already settled same-currency debit and matching credit to the approved beneficiary. Funds remain set aside until this evidence is accepted."
+      required: [store_id, currency, contract_digest, report_ref, observed_at, shop, custody_ref, evidence_sha256, kind, basis, beneficiary_digest, amount_minor, debit_ref, credit_ref]
+      properties:
+        store_id: {type: string, format: uuid}
+        currency: {enum: [EUR, USD, GBP, BGN]}
+        contract_digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+        report_ref: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,100}$'}
+        observed_at: {type: string, format: date-time}
+        shop: {type: string, pattern: '^[a-z0-9][a-z0-9-]{0,61}\.myshopify\.com$'}
+        custody_ref: {type: string, minLength: 1, maxLength: 200}
+        evidence_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        kind: {const: resale_owner_payout}
+        basis: {const: settled_same_currency_owner_profit_payout}
+        beneficiary_digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+        amount_minor: {type: string, pattern: '^[1-9][0-9]{0,11}$'}
+        debit_ref: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,100}$'}
+        credit_ref: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,100}$'}
+    CommerceCashEvidence:
+      oneOf:
+        - {required: [resale_basis, resale_contributed_minor]}
+        - {not: {anyOf: [{required: [resale_basis]}, {required: [resale_contributed_minor]}]}}
+      type: "object"
+      additionalProperties: false
+      required: ["store_id", "currency", "contract_digest", "report_ref", "observed_at", "kind", "basis", "cash_minor", "hard_charge_cap_minor", "settled_orders"]
+      properties:
+        store_id: {type: "string", format: "uuid"}
+        currency: {enum: ["EUR", "USD", "GBP", "BGN"]}
+        contract_digest: {type: "string", pattern: "^[a-f0-9]{64}$"}
+        report_ref: {type: "string", pattern: "^[A-Za-z0-9_.:-]{1,100}$"}
+        observed_at: {type: "string", format: "date-time"}
+        kind: {const: "cash"}
+        basis: {const: "settled_dedicated_commerce_no_recourse"}
+        cash_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+        hard_charge_cap_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+        resale_basis: {const: reconciled_net_owner_contributions_excluding_all_sales_and_earnings}
+        resale_contributed_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,11})$'}
+        settled_orders:
+          type: "array"
+          items:
+            type: "object"
+            additionalProperties: false
+            required: ["order_ref", "supplier_id", "cost_minor"]
+            properties:
+              order_ref: {type: "string", pattern: "^[1-9][0-9]{0,19}$"}
+              supplier_id: {type: "string", pattern: "^[1-9][0-9]{0,19}$"}
+              cost_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+          maxItems: 200
+    CommerceCatalogEvidence:
+      type: "object"
+      additionalProperties: false
+      required: ["store_id", "currency", "contract_digest", "report_ref", "observed_at", "kind", "basis", "product_count", "products"]
+      properties:
+        store_id: {type: "string", format: "uuid"}
+        currency: {enum: ["EUR", "USD", "GBP", "BGN"]}
+        contract_digest: {type: "string", pattern: "^[a-f0-9]{64}$"}
+        report_ref: {type: "string", pattern: "^[A-Za-z0-9_.:-]{1,100}$"}
+        observed_at: {type: "string", format: "date-time"}
+        kind: {const: "catalog"}
+        basis: {const: "complete_approved_supplier_catalog"}
+        product_count: {type: "integer", minimum: 0, maximum: 10000000}
+        products:
+          type: "array"
+          items:
+            type: "object"
+            additionalProperties: false
+            required: ["product_id", "name", "shopify_variant", "inventory_units"]
+            properties:
+              product_id: {type: "string", pattern: "^[A-Za-z0-9_.:-]{1,100}$"}
+              name: {type: "string", minLength: 1, maxLength: 120}
+              shopify_variant: {type: "string", pattern: "^[1-9][0-9]{0,19}$"}
+              printful_variant: {type: ["string","null"], pattern: "^[1-9][0-9]{0,19}$"}
+              inventory_units: {type: "integer", minimum: 0, maximum: 10000000}
+          maxItems: 200
+    CommerceDayEvidence:
+      type: "object"
+      additionalProperties: false
+      required: ["store_id", "currency", "contract_digest", "report_ref", "observed_at", "kind", "basis", "date", "catalog_ref", "distinct_orders", "products"]
+      properties:
+        store_id: {type: "string", format: "uuid"}
+        currency: {enum: ["EUR", "USD", "GBP", "BGN"]}
+        contract_digest: {type: "string", pattern: "^[a-f0-9]{64}$"}
+        report_ref: {type: "string", pattern: "^[A-Za-z0-9_.:-]{1,100}$"}
+        observed_at: {type: "string", format: "date-time"}
+        kind: {const: "day"}
+        basis: {const: "complete_utc_settled_after_discounts_including_shipping_before_refunds_ex_tax"}
+        date: {type: "string", format: "date"}
+        catalog_ref: {type: "string", pattern: "^[A-Za-z0-9_.:-]{1,100}$"}
+        distinct_orders: {type: "integer", minimum: 0, maximum: 10000000}
+        products:
+          type: "array"
+          items:
+            type: "object"
+            additionalProperties: false
+            required: ["product_id", "orders", "units", "revenue_minor", "refunds_minor", "goods_minor", "fulfillment_minor", "advertising_minor", "fees_minor", "other_costs_minor", "customer_count", "largest_customer_revenue_minor"]
+            properties:
+              product_id: {type: "string", pattern: "^[A-Za-z0-9_.:-]{1,100}$"}
+              orders: {type: "integer", minimum: 0, maximum: 10000000}
+              units: {type: "integer", minimum: 0, maximum: 10000000}
+              revenue_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+              refunds_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+              goods_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+              fulfillment_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+              advertising_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+              fees_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+              other_costs_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+              customer_count: {type: "integer", minimum: 0, maximum: 10000000}
+              largest_customer_revenue_minor: {type: "string", pattern: "^(0|[1-9][0-9]{0,11})$"}
+          maxItems: 200
+    ShopifyConnection:
+      type: object
+      additionalProperties: false
+      required: [status, shop, orders_last_60_days, checked_at]
+      properties:
+        status: {enum: [connected, not_configured, unauthorized, identity_mismatch, unavailable]}
+        shop: {type: [string, 'null'], pattern: '^[a-z0-9][a-z0-9-]{0,61}\.myshopify\.com$'}
+        orders_last_60_days: {enum: [none, present, unverified]}
+        checked_at: {type: string, format: date-time}
+    PrintfulNotification:
+      type: object
+      required: [type, occurred_at, store_id, data]
+      properties:
+        type: {enum: [order_updated, order_failed, order_canceled, order_put_hold, order_remove_hold, order_refunded, shipment_sent]}
+        occurred_at: {type: string, format: date-time}
+        store_id: {type: integer, minimum: 1, maximum: 9007199254740991}
+        data:
+          type: object
+          required: [order]
+          properties:
+            order:
+              type: object
+              required: [id, external_id, store_id, status]
+              properties:
+                id: {type: integer, minimum: 1, maximum: 9007199254740991}
+                external_id: {type: string, minLength: 1, maxLength: 80}
+                store_id: {type: integer, minimum: 1, maximum: 9007199254740991}
+                status: {type: string, maxLength: 30}
+    ShopifyNotification:
+      type: "object"
+      description: "Native Shopify order or refund webhook. The authenticated Admin API is read again before accepting order state. Refund events require order_id. Order events identify the order by admin_graphql_api_id or id."
+      properties:
+        admin_graphql_api_id: {type: "string", pattern: "^gid://shopify/Order/[1-9][0-9]{0,19}$"}
+        id: {anyOf: [{type: "string", pattern: "^[1-9][0-9]{0,19}$"}, {type: "integer", minimum: 1, maximum: 9007199254740991}]}
+        order_id: {anyOf: [{type: "string", pattern: "^[1-9][0-9]{0,19}$"}, {type: "integer", minimum: 1, maximum: 9007199254740991}]}
+    FeeDigest: {type: string, pattern: '^[a-f0-9]{64}$'}
+    FeeMoney: {type: string, pattern: '^(0|-?[1-9][0-9]{0,18})$', description: Signed 64-bit minor-unit integer.}
+    FeeEvent:
+      description: Signed evidence for a single verified provider event.
+      type: object
+      required: [operation, agreement_digest, currency, period_end]
+      properties:
+        operation: {enum: [period, credit, reversal]}
+        agreement_digest: {$ref: '#/components/schemas/FeeDigest'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        period_end: {type: string, format: date}
+      oneOf:
+        - properties:
+            operation: {const: period}
+            mandate_id: {type: string, format: uuid}
+            period_start: {type: string, format: date}
+            basis: {const: cumulative_settled_realized_after_all_costs_before_platform_fee_ex_flow}
+            opening_net_minor: {$ref: '#/components/schemas/FeeMoney'}
+            closing_net_minor: {$ref: '#/components/schemas/FeeMoney'}
+            closing_unrealized_loss_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,18})$'}
+            report_ref: {$ref: '#/components/schemas/Identifier'}
+          required: [mandate_id, period_start, basis, opening_net_minor, closing_net_minor, closing_unrealized_loss_minor, report_ref]
+        - allOf:
+            - {$ref: '#/components/schemas/FeePosting'}
+            - properties:
+                operation: {const: credit}
+                posting: {const: provider_final_client_debit_and_beneficiary_credit}
+                debited_account_hash: {$ref: '#/components/schemas/FeeDigest'}
+              required: [posting, debited_account_hash]
+        - allOf:
+            - {$ref: '#/components/schemas/FeePosting'}
+            - properties:
+                operation: {const: reversal}
+                posting: {const: provider_final_full_fee_reversal}
+                original_credit_ref: {$ref: '#/components/schemas/Identifier'}
+              required: [posting, original_credit_ref]
+      unevaluatedProperties: false
+    FeePosting:
+      type: object
+      required: [amount_minor, beneficiary_hash, receipt_ref, posted_at]
+      properties:
+        amount_minor: {$ref: '#/components/schemas/PositiveMinor'}
+        beneficiary_hash: {$ref: '#/components/schemas/FeeDigest'}
+        receipt_ref: {$ref: '#/components/schemas/Identifier'}
+        posted_at: {type: string, format: date-time}
+    AdministratorFees:
+      type: object
+      additionalProperties: false
+      required: [status, from, to, timezone, registrations, members, page, pageSize, hasMore, totalRegistrations, currencies]
+      properties:
+        status: {const: available}
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        timezone: {const: Europe/Sofia}
+        registrations:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items: {type: object, required: [plan, count], properties: {plan: {enum: [FREE, PRO, ULTRA]}, count: {type: integer, minimum: 0}}}
+        members:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            required: [id, name, email, plan, signupPlan, createdAt]
+            properties:
+              id: {type: string}
+              name: {type: [string, 'null']}
+              email: {type: string}
+              plan: {enum: [FREE, PRO, ULTRA]}
+              signupPlan: {enum: [FREE, PRO, ULTRA, null]}
+              createdAt: {type: string, format: date-time}
+        page: {type: integer, minimum: 1}
+        pageSize: {const: 20}
+        hasMore: {type: boolean}
+        totalRegistrations: {type: integer, minimum: 0}
+        currencies:
+          type: array
+          items:
+            type: object
+            required: [currency, earned_minor, accrued_minor, credited_minor, reversed_minor, net_received_minor]
+            properties:
+              currency: {type: string, pattern: '^[A-Z]{3}$'}
+              earned_minor: {$ref: '#/components/schemas/FeeMoney'}
+              accrued_minor: {$ref: '#/components/schemas/FeeMoney'}
+              credited_minor: {$ref: '#/components/schemas/FeeMoney'}
+              reversed_minor: {$ref: '#/components/schemas/FeeMoney'}
+              net_received_minor: {$ref: '#/components/schemas/FeeMoney'}
+    OwnerFee:
+      type: object
+      required: [status, rate_bps, currency, period_end, eligible_profit_minor, period_result_minor, fee_minor, client_net_minor, settlement]
+      properties:
+        status: {enum: [available, unavailable]}
+        rate_bps: {const: 1000}
+        currency: {type: [string, 'null'], pattern: '^[A-Z]{3}$'}
+        period_end: {type: [string, 'null'], format: date}
+        eligible_profit_minor: {type: [string, 'null'], pattern: '^-?[0-9]+$'}
+        period_result_minor: {type: [string, 'null'], pattern: '^-?[0-9]+$'}
+        fee_minor: {type: [string, 'null'], pattern: '^-?[0-9]+$'}
+        client_net_minor: {type: [string, 'null'], pattern: '^-?[0-9]+$'}
+        settlement: {enum: [accrued, credited, reversed, null]}
+    Status: {type: object, required: [status], properties: {status: {type: string}, code: {type: string}}}
+    Empty: {type: object, maxProperties: 0, description: 'An empty HTTP body is also accepted.'}
+    Identifier: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+    UnixTime: {type: string, pattern: '^[0-9]{10}$'}
+    PositiveMinor:
+      type: string
+      pattern: '^[1-9][0-9]{0,18}$'
+      description: 'Positive decimal integer within signed 64-bit range for settings.'
+    AgentQuestion:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties: {message: {type: string, minLength: 1, maxLength: 16000}}
+    AgentReply:
+      type: object
+      additionalProperties: false
+      required: [status, reply]
+      properties: {status: {enum: [ok, 'needs_human']}, reply: {type: string, minLength: 1, maxLength: 16000}}
+    Grant:
+      type: object
+      additionalProperties: false
+      required: [grant, 'expires_in']
+      properties: {grant: {type: string, description: 'Short-lived owner-bound JWT.'}, expires_in: {const: 120}}
+    Accepted: {type: object, additionalProperties: false, required: [status], properties: {status: {const: accepted}}}
+    Consent:
+      type: object
+      additionalProperties: false
+      required: [review, accepted]
+      properties:
+        review:
+          type: string
+          minLength: 50
+          maxLength: 1500
+          description: 'Short-lived signed review for the authenticated owner and immutable terms.'
+        accepted: {const: true}
+    MandateTerms:
+      type: object
+      additionalProperties: false
+      required: ['policy_id', provider, plan, currency, 'capital_minor', 'max_loss_minor', 'max_positions', assets, strategy, period, days, 'start_date', 'goal_minor', 'goal_bps', 'expires_at', 'capital_source', 'protection_policy_id', 'protection_digest', 'performance_fee_bps']
+      properties:
+        policy_id: {type: string, format: uuid}
+        provider: {enum: [ibkr, saxo]}
+        plan: {enum: [PRO, ULTRA]}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        capital_minor: {$ref: '#/components/schemas/PositiveMinor'}
+        max_loss_minor: {$ref: '#/components/schemas/PositiveMinor'}
+        max_positions: {type: integer, minimum: 1, maximum: 64}
+        assets: {type: array, items: {type: string, minLength: 1, maxLength: 128}, minItems: 1, maxItems: 64}
+        strategy: {type: string, minLength: 1, maxLength: 100}
+        period: {enum: [DAY, WEEK, 'CUSTOM_DAYS', MONTH]}
+        days: {type: [integer, 'null'], minimum: 1}
+        start_date: {type: string, format: date}
+        goal_minor: {anyOf: [{$ref: '#/components/schemas/PositiveMinor'}, {type: 'null'}]}
+        goal_bps: {type: [integer, 'null'], minimum: 1}
+        expires_at: {type: string, format: date-time}
+        capital_source: {const: 'verified_settled_realized_profit_only'}
+        protection_policy_id: {type: string, format: uuid}
+        protection_digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+        performance_fee_bps: {const: 1000}
+    MandateView:
+      type: object
+      additionalProperties: false
+      required: [active, offers]
+      properties:
+        active:
+          type: [object, 'null']
+          additionalProperties: false
+          required: [terms, 'accepted_at', valid]
+          properties:
+            terms: {$ref: '#/components/schemas/MandateTerms'}
+            accepted_at: {type: string, format: date-time}
+            valid: {type: boolean}
+        offers:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [terms, review]
+            properties:
+              terms: {$ref: '#/components/schemas/MandateTerms'}
+              review:
+                type: string
+                minLength: 50
+                maxLength: 1500
+                description: 'Short-lived signed review for the authenticated owner and immutable terms.'
+          maxItems: 5
+    Target:
+      description: 'Custom days is populated only for period days. At most one goal amount or basis-point return may be set. The start date must yield a valid calendar horizon.'
+      type: object
+      additionalProperties: false
+      required: [period, days, 'amount_minor', 'return_bps', 'start_date']
+      properties:
+        period: {enum: [day, days, week, month]}
+        days: {type: [integer, 'null'], minimum: 1, maximum: 2147483647}
+        amount_minor: {anyOf: [{$ref: '#/components/schemas/PositiveMinor'}, {type: 'null'}]}
+        return_bps: {type: [integer, 'null'], minimum: 1, maximum: 2147483647}
+        start_date: {type: string, format: date}
+    SettingsInput:
+      description: 'Currency is required for monetary limits. Supply null for unselected values.'
+      type: object
+      additionalProperties: false
+      required: [currency, 'authorized_amount_minor', 'instrument_code', 'strategy_label', 'ai_access', target]
+      properties:
+        currency: {type: [string, 'null'], pattern: '^[A-Z]{3}$'}
+        authorized_amount_minor: {anyOf: [{$ref: '#/components/schemas/PositiveMinor'}, {type: 'null'}]}
+        instrument_code: {type: [string, 'null'], pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,31}$'}
+        strategy_label: {type: [string, 'null'], minLength: 1, maxLength: 100}
+        ai_access: {enum: ['off', 'analysis_only']}
+        target: {anyOf: [{$ref: '#/components/schemas/Target'}, {type: 'null'}]}
+    SettingsView:
+      type: object
+      additionalProperties: false
+      required: [currency, 'authorized_amount_minor', 'instrument_code', 'strategy_label', 'ai_access', horizon, target, 'trading_consent']
+      properties:
+        currency: {type: [string, 'null'], pattern: '^[A-Z]{3}$'}
+        authorized_amount_minor: {anyOf: [{$ref: '#/components/schemas/PositiveMinor'}, {type: 'null'}]}
+        instrument_code: {type: [string, 'null'], pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]{0,31}$'}
+        strategy_label: {type: [string, 'null'], minLength: 1, maxLength: 100}
+        ai_access: {enum: ['off', 'analysis_only']}
+        horizon:
+          type: [object, 'null']
+          additionalProperties: false
+          required: [period, days, 'start_date', 'target_date', 'horizon_days']
+          properties:
+            period: {enum: [day, days, week, month]}
+            days: {type: [integer, 'null'], minimum: 1, maximum: 2147483647}
+            start_date: {type: string, format: date}
+            target_date: {type: string, format: date}
+            horizon_days: {type: integer}
+        target:
+          type: [object, 'null']
+          additionalProperties: false
+          required: [period, days, 'amount_minor', 'return_bps', 'start_date', 'target_date', 'horizon_days']
+          properties:
+            period: {enum: [day, days, week, month]}
+            days: {type: [integer, 'null'], minimum: 1, maximum: 2147483647}
+            amount_minor: {anyOf: [{$ref: '#/components/schemas/PositiveMinor'}, {type: 'null'}]}
+            return_bps: {type: [integer, 'null'], minimum: 1, maximum: 2147483647}
+            start_date: {type: string, format: date}
+            target_date: {type: string, format: date}
+            horizon_days: {type: integer}
+        trading_consent:
+          type: object
+          additionalProperties: false
+          required: [status, 'recorded_at']
+          properties: {status: {enum: [revoked, 'not_granted']}, recorded_at: {type: [string, 'null'], format: date-time}}
+    Wallet:
+      type: object
+      additionalProperties: false
+      required: [status, provider, 'balance_minor', currency, 'observed_at', source]
+      properties:
+        status: {enum: ['provider_unconfigured', 'provider_unlinked', unavailable, stale, verified]}
+        provider: {enum: [wise, null]}
+        balance_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        currency: {type: [string, 'null'], pattern: '^[A-Z]{3}$'}
+        observed_at: {type: [string, 'null'], format: date-time}
+        source: {type: [string, 'null']}
+    Funding:
+      type: object
+      additionalProperties: false
+      required: [status, provider, 'cash_available_minor', 'equity_minor', currency, 'observed_at', source, 'live_orders_enabled', 'kill_switch_active', 'trading_status', 'profit_budget']
+      properties:
+        status: {enum: ['provider_unconfigured', 'provider_unlinked', unavailable, stale, verified]}
+        provider: {enum: [ibkr, saxo, null]}
+        cash_available_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        equity_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        currency: {type: [string, 'null'], pattern: '^[A-Z]{3}$'}
+        observed_at: {type: [string, 'null'], format: date-time}
+        source: {type: [string, 'null']}
+        live_orders_enabled: {const: false}
+        kill_switch_active: {const: true}
+        trading_status: {const: 'provider_unconfigured'}
+        profit_budget: {$ref: '#/components/schemas/ProfitBudget'}
+    FeeCoverage:
+      type: object
+      additionalProperties: false
+      required: [execution, ongoing, financing, currencyConversion]
+      properties:
+        execution: {enum: [included, 'not_applicable']}
+        ongoing: {enum: [included, 'not_applicable']}
+        financing: {enum: [included, 'not_applicable']}
+        currencyConversion: {enum: [included, 'not_applicable']}
+    Forecast:
+      type: object
+      additionalProperties: false
+      required: [status, reason, currency, 'instrument_code', 'strategy_label', 'authorized_funded_minor', 'lower_minor', 'median_minor', 'upper_minor', 'worst_observed_minor', 'best_observed_minor', 'as_of', 'window_start', 'window_end', 'sample_count', source, 'funding_source', 'fee_coverage', 'horizon_days', method, percentiles, 'performance_fee_basis', 'platform_performance_fee_bps']
+      properties:
+        status: {enum: [available, unavailable]}
+        reason: {enum: ['insufficient_verified_data', 'no_authorized_capital', null, 'unverified_profit_capital']}
+        currency: {type: [string, 'null'], pattern: '^[A-Z]{3}$'}
+        instrument_code: {type: [string, 'null']}
+        strategy_label: {type: [string, 'null']}
+        authorized_funded_minor: {type: string, pattern: '^(0|[1-9][0-9]*)$'}
+        lower_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        median_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        upper_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        worst_observed_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        best_observed_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        as_of: {type: [string, 'null'], format: date-time}
+        window_start: {type: [string, 'null']}
+        window_end: {type: [string, 'null']}
+        sample_count: {type: [integer, 'null']}
+        source: {type: [string, 'null']}
+        funding_source: {type: [string, 'null']}
+        fee_coverage: {anyOf: [{$ref: '#/components/schemas/FeeCoverage'}, {type: 'null'}]}
+        horizon_days: {type: [integer, 'null']}
+        method: {const: 'historical_nonoverlapping_after_fees'}
+        percentiles: {const: [5, 50, 95]}
+        performance_fee_basis: {const: 'before_platform_performance_fee'}
+        platform_performance_fee_bps: {const: 1000}
+    WeeklyReport:
+      type: object
+      additionalProperties: false
+      required: [status, period, 'window_start', 'window_end', 'reported_as_of', source, currency, 'realized_minor', 'unrealized_minor', 'net_minor', 'fees_minor', 'deposits_minor', 'withdrawals_minor', method, 'realized_after_fees_minor', 'unrealized_closing_minor']
+      properties:
+        status: {enum: [available, unavailable]}
+        period: {const: WEEK}
+        window_start: {type: string, format: date-time}
+        window_end: {type: string, format: date-time}
+        reported_as_of: {type: [string, 'null'], format: date-time}
+        source: {type: [string, 'null']}
+        currency: {type: [string, 'null'], pattern: '^[A-Z]{3}$'}
+        realized_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        unrealized_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        net_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        fees_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        deposits_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        withdrawals_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        method: {enum: ['realized_plus_change_in_unrealized_less_fees', null]}
+        realized_after_fees_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        unrealized_closing_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+    BaseDashboard:
+      type: object
+      required: [settings, wallet, investments, forecast, 'weekly_report', entitlement]
+      properties:
+        settings: {$ref: '#/components/schemas/SettingsView'}
+        wallet: {$ref: '#/components/schemas/Wallet'}
+        investments: {$ref: '#/components/schemas/Funding'}
+        forecast: {$ref: '#/components/schemas/Forecast'}
+        weekly_report: {$ref: '#/components/schemas/WeeklyReport'}
+        entitlement: {$ref: '../schemas/entitlement.schema.json'}
+    ScopedDashboard:
+      allOf:
+        - {$ref: '#/components/schemas/BaseDashboard'}
+        - {type: object, required: [status, source, 'observed_at'], properties: {status: {const: ok}, source: {const: shark-ai-backend}, observed_at: {type: string, format: date-time}}}
+    OwnerDashboard:
+      allOf:
+        - {$ref: '#/components/schemas/BaseDashboard'}
+        - {type: object, required: ['broker_activity', 'wallet_capabilities', 'performance_fee'], properties: {broker_activity: {$ref: '#/components/schemas/BrokerActivity'}, wallet_capabilities: {type: object, additionalProperties: false, required: ['deposit_statements', 'hosted_kyc'], properties: {deposit_statements: {type: boolean}, hosted_kyc: {type: boolean}}}, performance_fee: {$ref: '#/components/schemas/OwnerFee'}}}
+    BrokerActivity:
+      type: object
+      additionalProperties: false
+      required: [status, accounts]
+      properties:
+        status: {enum: ['provider_unconfigured', 'provider_unlinked', available, unavailable]}
+        accounts: {type: array, items: {$ref: '#/components/schemas/BrokerAccount'}, maxItems: 5}
+    BrokerAccount:
+      type: object
+      additionalProperties: false
+      required: [provider, currency, 'halted_at', reconciliation, 'snapshot_at', positions, 'recent_orders']
+      properties:
+        provider: {enum: [ibkr, saxo]}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        halted_at: {type: [string, 'null'], format: date-time}
+        reconciliation: {enum: [verified, pending, stale, unavailable]}
+        snapshot_at: {type: [string, 'null'], format: date-time}
+        positions:
+          type: [array, 'null']
+          items:
+            type: object
+            additionalProperties: false
+            required: [instrument, units]
+            properties: {instrument: {type: string}, units: {type: string, pattern: '^-?(0|[1-9][0-9]*)$'}}
+          maxItems: 20
+        recent_orders:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [instrument, side, status, units, 'filled_units', 'recorded_at', 'provider_observed_at', 'reconciliation_required']
+            properties:
+              instrument: {type: string}
+              side: {enum: [BUY, SELL]}
+              status:
+                enum: [RESERVED, SUBMITTING, ACKNOWLEDGED, PENDING, WORKING, 'PARTIALLY_FILLED', 'CANCEL_PENDING', 'REVIEW_REQUIRED', FILLED, CANCELED, REJECTED, UNKNOWN, VOIDED]
+              units: {type: string, pattern: '^-?(0|[1-9][0-9]*)$'}
+              filled_units: {type: string, pattern: '^-?(0|[1-9][0-9]*)$'}
+              recorded_at: {type: string, format: date-time}
+              provider_observed_at: {type: [string, 'null'], format: date-time}
+              reconciliation_required: {type: boolean}
+          maxItems: 10
+    OwnerDeposits:
+      type: object
+      additionalProperties: false
+      required: [deposits]
+      properties:
+        deposits:
+          type: object
+          additionalProperties: false
+          required: [provider, currency, source, from, to, 'observed_at', count, latest]
+          properties:
+            provider: {const: wise}
+            currency: {type: string, pattern: '^[A-Z]{3}$'}
+            source: {const: 'wise_balance_statement'}
+            from: {type: string, format: date-time}
+            to: {type: string, format: date-time}
+            observed_at: {type: string, format: date-time}
+            count: {type: integer, minimum: 0}
+            latest:
+              type: [object, 'null']
+              additionalProperties: false
+              required: ['amount_minor', 'occurred_at']
+              properties:
+                amount_minor: {type: string, pattern: '^-?(0|[1-9][0-9]*)$'}
+                occurred_at: {type: string, format: date-time}
+    ReviewStatus:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties: {status: {enum: [NEW, PASSED, 'PASSED_WITH_REQUIREMENTS', 'WAITING_CUSTOMER_INPUT', PROCESSING, EXPIRED]}}
+    WalletOperation: {enum: [onboarding, balance, deposit, withdrawal]}
+    InvestmentOperation: {enum: [analysis, order-gateway, reconciliation, weekly-report, kill-switch]}
+    WalletRead:
+      type: object
+      additionalProperties: false
+      required: [status, code, source, timestamp, data, operation]
+      properties:
+        status: {enum: [ok, unavailable, 'needs_human']}
+        code: {type: string}
+        source: {const: shark-ai-wallet}
+        timestamp: {type: string, format: date-time}
+        data: {type: [object, 'null']}
+        operation: {$ref: '#/components/schemas/WalletOperation'}
+    InvestmentRead:
+      type: object
+      additionalProperties: false
+      required: [status, code, source, timestamp, data, operation, mode, 'live_orders_enabled']
+      properties:
+        status: {enum: [ok, unavailable, blocked]}
+        code: {type: string}
+        source: {const: shark-ai-investments}
+        timestamp: {type: string, format: date-time}
+        data: {type: [object, 'null']}
+        operation: {$ref: '#/components/schemas/InvestmentOperation'}
+        mode: {const: 'READ_ONLY'}
+        live_orders_enabled: {const: false}
+    Probe:
+      type: object
+      additionalProperties: false
+      required: ['probe_id']
+      properties: {probe_id: {type: string, pattern: '^[A-Za-z0-9_-][A-Za-z0-9_.:-]{0,95}$'}}
+    DiagnosticReport:
+      type: object
+      additionalProperties: false
+      required: [contract, 'probe_id', 'checked_at', checks]
+      properties:
+        contract: {const: sharkai-module-diagnostics-v1}
+        probe_id: {type: string}
+        checked_at: {type: string, format: date-time}
+        checks:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, label, status, detail]
+            properties:
+              id: {type: string}
+              label: {type: string}
+              status: {enum: [passed, failed, unverified]}
+              detail: {type: string}
+    ForecastEvidence:
+      description: 'Provider-prefixed source, account, currency and strategy must match the private connector binding. Timestamps use UTC Z. Record identity is idempotent.'
+      type: object
+      additionalProperties: false
+      required: ['binding_id', provider, 'provider_account_key', 'snapshot_id', 'observed_at', 'provider_report_id', 'provider_evidence_sha256', currency, 'instrument_code', 'strategy_label', kind, data]
+      properties:
+        binding_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        provider: {enum: [ibkr, saxo]}
+        provider_account_key: {type: string, pattern: '^[A-Za-z0-9_+=/-]{1,128}$'}
+        snapshot_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        observed_at: {type: string, format: date-time}
+        provider_report_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        provider_evidence_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        instrument_code: {type: string, minLength: 1, maxLength: 128}
+        strategy_label: {type: string, minLength: 1, maxLength: 128}
+        kind: {enum: [funding, history, 'weekly_report']}
+        data: {type: object}
+      allOf:
+        - {if: {properties: {kind: {const: funding}}}, then: {properties: {data: {$ref: '#/components/schemas/FundingEvidence'}}}}
+        - {if: {properties: {kind: {const: history}}}, then: {properties: {data: {$ref: '#/components/schemas/HistoryEvidence'}}}}
+        - {if: {properties: {kind: {const: 'weekly_report'}}}, then: {properties: {data: {$ref: '#/components/schemas/WeeklyEvidence'}}}}
+    FundingEvidence:
+      type: object
+      additionalProperties: false
+      required: [source, 'cash_basis', 'available_minor', 'equity_minor']
+      properties:
+        source: {enum: ['ibkr_broker_settled_cash', 'saxo_broker_settled_cash']}
+        cash_basis: {const: 'settled_cash_no_margin'}
+        available_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,24})$'}
+        equity_minor: {type: [string, 'null'], pattern: '^(0|[1-9][0-9]{0,24})$'}
+    HistoryEvidence:
+      type: object
+      additionalProperties: false
+      required: [source, basis, coverage, 'valuation_basis', 'fee_coverage', 'applicable_capital_minor', closes]
+      properties:
+        strategy_version_sha256: {type: string, pattern: '^[a-f0-9]{64}$', description: Required to count a signed observation toward a prospective comparison.}
+        source: {enum: ['ibkr_portfolio_analyst_net_strategy', 'saxo_account_history_net_strategy']}
+        basis: {const: 'cash_flow_adjusted_after_fees'}
+        coverage: {const: 'complete_daily_calendar'}
+        valuation_basis: {const: 'unitized_strategy_nav'}
+        fee_coverage: {$ref: '#/components/schemas/FeeCoverage'}
+        applicable_capital_minor:
+          type: object
+          additionalProperties: false
+          required: [min, max]
+          properties:
+            min: {type: string, pattern: '^[1-9][0-9]{0,24}$'}
+            max: {type: string, pattern: '^[1-9][0-9]{0,24}$'}
+        closes:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [date, units, kind]
+            properties:
+              date: {type: string, format: date}
+              units: {type: string, pattern: '^(0|[1-9][0-9]{0,24})$'}
+              kind: {enum: [valued, 'confirmed_market_closed']}
+          minItems: 2
+          maxItems: 36600
+    WeeklyEvidence:
+      type: object
+      additionalProperties: false
+      required: [source, complete, 'window_start', 'window_end', 'realized_before_fees_minor', 'unrealized_open_minor', 'unrealized_close_minor', 'fees_minor', 'deposits_minor', 'withdrawals_minor']
+      properties:
+        source: {enum: ['ibkr_verified_weekly_report', 'saxo_verified_weekly_report']}
+        complete: {const: true}
+        window_start: {type: string, format: date-time}
+        window_end: {type: string, format: date-time}
+        realized_before_fees_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,20})$'}
+        unrealized_open_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,20})$'}
+        unrealized_close_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,20})$'}
+        fees_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,24})$'}
+        deposits_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,24})$'}
+        withdrawals_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,24})$'}
+    OrderTerms:
+      type: object
+      additionalProperties: false
+      required: ['consent_version', 'snapshot_id', 'asset_id', currency, 'provider_instrument_id', side, kind, units, 'limit_price_minor']
+      properties:
+        consent_version: {type: string, format: uuid}
+        snapshot_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        asset_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        provider_instrument_id: {type: integer, minimum: 1, maximum: 999999999999}
+        side: {enum: [BUY, SELL]}
+        kind: {const: LIMIT}
+        units: {type: integer, minimum: 1, maximum: 999999999999}
+        limit_price_minor: {type: integer, minimum: 1, maximum: 999999999999}
+    Signal:
+      type: object
+      additionalProperties: false
+      required: ['binding_id', provider, 'provider_account_key', 'signal_id', 'observed_at', 'evidence_sha256', terms]
+      properties:
+        binding_id: {type: string, format: uuid}
+        provider: {enum: [IBKR, SAXO]}
+        provider_account_key: {type: string, pattern: '^[A-Za-z0-9_+=/-]{1,128}$'}
+        signal_id: {type: string, format: uuid}
+        observed_at: {type: string, format: date-time}
+        evidence_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        terms: {$ref: '#/components/schemas/OrderTerms'}
+    Quote:
+      type: object
+      additionalProperties: false
+      required: ['binding_id', provider, 'provider_account_key', 'signal_id', 'observed_at', 'evidence_sha256', terms, 'expires_at', 'max_notional_minor', 'max_fee_minor', 'provider_enforced_no_short']
+      properties:
+        binding_id: {type: string, format: uuid}
+        provider: {enum: [IBKR, SAXO]}
+        provider_account_key: {type: string, pattern: '^[A-Za-z0-9_+=/-]{1,128}$'}
+        signal_id: {type: string, format: uuid}
+        observed_at: {type: string, format: date-time}
+        evidence_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        terms: {$ref: '#/components/schemas/OrderTerms'}
+        expires_at: {type: string, format: date-time}
+        max_notional_minor: {type: integer, minimum: 1, maximum: 999999999999}
+        max_fee_minor: {type: integer, minimum: 0, maximum: 999999999999}
+        provider_enforced_no_short: {type: boolean}
+    AccountSnapshot:
+      type: object
+      additionalProperties: false
+      required: ['binding_id', provider, 'provider_account_key', currency, 'snapshot_id', 'observed_at', 'report_ref', 'evidence_sha256', basis, 'settled_cash_minor', 'exposure_minor', 'held_units', 'closed_jobs', performance]
+      properties:
+        binding_id: {type: string, format: uuid}
+        provider: {enum: [IBKR, SAXO]}
+        provider_account_key: {type: string, pattern: '^[A-Za-z0-9_+=/-]{1,128}$'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        snapshot_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        observed_at: {type: string, format: date-time}
+        report_ref: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        evidence_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        basis: {const: 'verified_complete_settled_no_margin_after_fees'}
+        settled_cash_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        exposure_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        held_units:
+          type: object
+          propertyNames: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+          additionalProperties: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+          maxProperties: 128
+        closed_jobs: {type: array, items: {type: string, format: uuid}, maxItems: 128}
+        performance:
+          type: [object, 'null']
+          additionalProperties: false
+          required: ['consent_version', 'lifetime_net_minor', 'window_net_minor', 'window_start', 'window_end']
+          properties:
+            consent_version: {type: string, format: uuid}
+            lifetime_net_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,17})$'}
+            window_net_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,17})$'}
+            window_start: {type: string, format: date}
+            window_end: {type: string, format: date}
+    JobCommand:
+      type: object
+      additionalProperties: false
+      required: ['job_id', nonce]
+      properties: {job_id: {type: string, format: uuid}, nonce: {type: string, pattern: '^[A-Za-z0-9_-]{22,86}$'}}
+    ProfitBudget:
+      type: object
+      additionalProperties: false
+      required: [status, currency, 'protected_principal_minor', 'settled_realized_profit_minor', 'available_profit_minor', 'unrealized_loss_minor', 'performance_fee_hold_minor', 'observed_at']
+      properties:
+        status: {enum: [verified, unverified]}
+        currency: {type: [string, 'null'], pattern: '^[A-Z]{3}$'}
+        protected_principal_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        settled_realized_profit_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        available_profit_minor: {type: string, pattern: '^(0|[1-9][0-9]*)$'}
+        unrealized_loss_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        performance_fee_hold_minor: {type: [string, 'null'], pattern: '^-?(0|[1-9][0-9]*)$'}
+        observed_at: {type: [string, 'null'], format: date-time}
+      allOf: [{if: {properties: {status: {const: unverified}}}, then: {properties: {available_profit_minor: {const: '0'}}}}]
+    ProfitEvidence:
+      type: object
+      additionalProperties: false
+      required: ['policy_id', 'policy_digest', 'snapshot_id', 'evidence_sha256', 'report_ref', 'observed_at', provider, 'provider_account_key', currency, 'protected_principal_minor', 'gross_settled_gains_minor', 'gross_settled_losses_minor', 'total_costs_minor', 'distributed_minor', 'open_cost_basis_minor', 'unrealized_loss_minor', 'segregated_profit_cash_minor', 'mandate_closeout_minor', 'period_closeout_minor']
+      properties:
+        policy_id: {type: string, format: uuid}
+        policy_digest: {type: string, pattern: '^[a-f0-9]{64}$'}
+        snapshot_id: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        evidence_sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        report_ref: {type: string, pattern: '^[A-Za-z0-9_.:-]{1,128}$'}
+        observed_at: {type: string, format: date-time}
+        provider: {enum: [IBKR, SAXO]}
+        provider_account_key: {type: string, pattern: '^[A-Za-z0-9_+=/-]{1,128}$'}
+        currency: {type: string, pattern: '^[A-Z]{3}$'}
+        protected_principal_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        gross_settled_gains_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        gross_settled_losses_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        total_costs_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        distributed_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        open_cost_basis_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        unrealized_loss_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        segregated_profit_cash_minor: {type: string, pattern: '^(0|[1-9][0-9]{0,17})$'}
+        mandate_closeout_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,17})$'}
+        period_closeout_minor: {type: string, pattern: '^(0|-?[1-9][0-9]{0,17})$'}

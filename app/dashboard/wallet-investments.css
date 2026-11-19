@@ -1,0 +1,129 @@
+.module-wallet-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.module-panel.module-wallet-panel[data-ice-art] {
+  --ice-art-opacity: .13;
+  --ice-tint: #eefaffaa;
+}
+
+.module-wallet-panel h2 {
+  margin: 0;
+  font-size: clamp(1.1rem, 1.8vw, 1.4rem);
+}
+
+.module-wallet-panel p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.module-wallet-split,
+.module-wallet-metrics,
+.module-wallet-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: 0.8rem;
+}
+
+.module-wallet-split > *,
+.module-wallet-metrics > * {
+  min-width: 0;
+}
+
+.module-wallet-metrics {
+  margin: 0;
+}
+
+.module-wallet-metrics dt {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.module-wallet-metrics dd {
+  margin: 0.25rem 0 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.module-wallet-source dd {
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.module-wallet-broker-activity {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.module-wallet-broker-activity h3,
+.module-wallet-broker-activity h4,
+.module-wallet-broker-activity ul {
+  margin: 0;
+}
+
+.module-wallet-broker-activity li {
+  overflow-wrap: anywhere;
+}
+
+.module-wallet-broker-activity li span {
+  display: block;
+}
+
+.module-wallet-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.module-wallet-fields {
+  margin: 0;
+  padding: 0.85rem;
+  min-width: 0;
+  border: 1px solid rgba(43, 89, 121, 0.25);
+  border-radius: 0.8rem;
+}
+
+.module-wallet-fields legend {
+  padding: 0 0.3rem;
+  font-weight: 700;
+}
+
+.module-wallet-form label {
+  display: grid;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.module-wallet-form input,
+.module-wallet-form select,
+.module-wallet-form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.65rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #7994a8;
+  border-radius: 0.55rem;
+  color: #153449;
+  background: #fff;
+  font-size: 1rem;
+}
+
+.module-wallet-form textarea,
+.module-wallet-reply {
+  white-space: pre-wrap;
+}
+
+.module-wallet-panel .shark-action,
+.module-wallet-panel .shark-action-secondary {
+  justify-self: start;
+}
+
+.module-wallet-form input:focus-visible,
+.module-wallet-form select:focus-visible,
+.module-wallet-form textarea:focus-visible {
+  outline: 2px solid #1769aa;
+  outline-offset: 2px;
+}

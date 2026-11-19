@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Shark AI broker worker order intent",
+  "description": "The authenticated execution worker derives this limit-order intent from a registered broker job under an explicit owner mandate. A purchase consumes verified segregated profit. A sale reduces a settled long position.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["accountKey", "requestKey", "assetId", "side", "kind", "units", "limitPriceMinor"],
+  "properties": {
+    "accountKey": { "type": "string", "pattern": "^[A-Za-z0-9_.:/-]{1,128}$" },
+    "requestKey": { "type": "string", "pattern": "^[A-Za-z0-9_.:/-]{1,128}$" },
+    "assetId": { "type": "string", "pattern": "^[A-Za-z0-9_.:/-]{1,128}$" },
+    "side": { "enum": ["BUY", "SELL"] },
+    "kind": { "const": "LIMIT" },
+    "units": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "limitPriceMinor": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
+  }
+}
