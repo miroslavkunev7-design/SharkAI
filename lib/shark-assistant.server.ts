@@ -13,6 +13,7 @@ interface AgentRequest {
   requestId: string;
   message: string;
   scopes: string[];
+  attachments?: {attachment_id:string;media_type:string}[];
   financeGrant?: string | null;
   commerceGrant?: string | null;
   signal?: AbortSignal;
@@ -35,7 +36,7 @@ export async function sendSharkAgentRequest(request: AgentRequest, send = fetch)
     signal: signal ?? AbortSignal.timeout(45_000),
     body: JSON.stringify({
       user_id: userId, conversation_id: conversationId, channel: 'webhook', message,
-      attachments: [], locale: 'bg-BG', request_id: requestId, permission_context: { scopes },
+      attachments: request.attachments??[], locale: 'bg-BG', request_id: requestId, permission_context: { scopes },
     }),
   });
   if (!response.ok) return null;
@@ -72,7 +73,8 @@ function chatPrompt(message: string, history: readonly EarlierMessage[]) {
   return prompt;
 }
 
-type ChatAgentRequest = Pick<AgentRequest, 'userId' | 'conversationId' | 'requestId' | 'message'> & {
+type ChatAgentRequest = Pick<AgentRequest, 'userId' | 'conversationId' | 'requestId' | 'message' | 'attachments' | 'financeGrant' | 'commerceGrant'> & {
+  scopes?: string[];
   history: readonly EarlierMessage[];
   signal: AbortSignal;
 };
@@ -82,10 +84,10 @@ export async function sendSharkChatMessage(request: ChatAgentRequest, send = fet
   signal.throwIfAborted();
   if (!message.trim() || message.length > SHARK_ASSISTANT_TEXT_LIMIT) return null;
   const ownerConversation = createHash('sha256').update(JSON.stringify([userId, conversationId])).digest('hex');
-  const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(20_000)]);
+  const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(100_000)]);
   const reply = await sendSharkAgentRequest({
     userId, conversationId: 'chat-' + ownerConversation, requestId, message: chatPrompt(message, history),
-    scopes: ['module:read'], signal: requestSignal,
+    scopes: request.scopes??['module:read'], attachments:request.attachments, financeGrant:request.financeGrant, commerceGrant:request.commerceGrant, signal: requestSignal,
   }, send).catch(() => null);
   signal.throwIfAborted();
   return reply;

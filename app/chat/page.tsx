@@ -98,7 +98,6 @@ export default function ChatPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectError, setProjectError] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
-  const [models, setModels] = useState<Model[]>([]);
   const [sharkAssistant, setSharkAssistant] = useState(false);
   const [capabilityReason, setCapabilityReason] = useState('');
   const [tools, setTools] = useState<ChatTool[]>([]);
@@ -110,8 +109,6 @@ export default function ChatPage() {
   const [mode, setMode] = useState<Mode>('chat');
   const [modeSaving, setModeSaving] = useState(false);
   const [projectContext, setProjectContext] = useState<string | null>(null);
-  const [modelId, setModelId] = useState('');
-  const [reasoning, setReasoning] = useState('standard');
   const [branchFrom, setBranchFrom] = useState<BranchFrom | null>(null);
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
@@ -162,12 +159,8 @@ export default function ChatPage() {
   const canChooseTranscriptionLanguage = isTranscription && takesTranscriptionLanguage(input);
   const datasetExample = selectedTool?.id === 'dataset-analysis' ? 'Сумирай „Приход“ по „Град“' : null;
   const attachmentPreview = attachment ? attachmentInspection(attachment) : null;
-  const selectedModel = models.find((option) => option.id === modelId);
-  const model = selectedModel ?? models[0];
-  const offerShark = sharkAssistant && mode === 'chat' && !projectContext && !attachment && !selectedTool;
-  const useShark = offerShark && !selectedModel;
-  const modelLabel = useShark ? 'Шарк агент' : model?.label;
-  const voiceUnavailable = media.voiceReason || (!model ? 'Няма достъпен модел за гласов отговор.' : '');
+  const modelLabel = 'Шарк агент';
+  const voiceUnavailable = media.voiceReason || (!sharkAssistant ? 'Шарк агентът е недостъпен за гласов отговор.' : '');
   const dictationLabel = media.listening === 'dictation' ? (media.recordStage === 'recording' ? 'Приключи диктовката' : 'Отмени диктовката') : 'Диктовка';
   const conversationLabel = media.speaking ? 'Спри озвучаването' : media.listening === 'conversation'
     ? (media.recordStage === 'recording' ? 'Изпрати гласовия запис' : 'Отмени гласовия запис') : 'Гласов разговор';
@@ -177,7 +170,7 @@ export default function ChatPage() {
   const showStart = !loading && !loadProblem && messages.length === 0 && !optimistic;
   const { scrollRef, following, followLatest, onScroll } = useChatScroll(!showStart && !loading && !loadProblem);
   const signInHref = `/login?next=${encodeURIComponent(`/chat${typeof window === 'undefined' ? '' : window.location.search}`)}`;
-  const appliedReasoning = model?.reasoningLevels.includes(reasoning) ? reasoning : model?.reasoningLevels[0];
+
 
   const loadConversation = useCallback(async (id?: string, draftProjectId?: string) => {
     loadController.current?.abort();
@@ -204,7 +197,7 @@ export default function ChatPage() {
       setConversationId(draftProjectId || unsavedConversation ? null : data.conversationId ?? null);
       setMode(recovered?.request.mode ?? (draftProjectId ? 'work' : data.conversationMode ?? selected?.mode ?? 'chat'));
       setProjectContext(recovered?.request.projectId ?? (unsavedConversation ? null : draftProjectId || data.projectId || selected?.projectId || null));
-      setModels(data.capabilities?.models ?? []);
+
       setSharkAssistant(data.capabilities?.sharkAssistant === true);
       setCapabilityReason(data.capabilities?.reason || '');
       setAccount(data.user ?? null);
@@ -215,8 +208,7 @@ export default function ChatPage() {
         setAttachment(recovered.attachment);
         setSelectedTool(recovered.tool);
         setBranchFrom(recovered.request.branchFrom ?? null);
-        setModelId(recovered.request.model ?? '');
-        setReasoning(recovered.request.reasoning ?? 'standard');
+
         if (recovered.stopped) setNotice(recovered.problem);
         else setProblem(recovered.problem);
       }
@@ -688,9 +680,8 @@ export default function ChatPage() {
     if (media.listening) media.stopListening();
     const previous = failedRequest.current;
     const requestMode = repeat ? (tool ? 'work' : 'chat') : mode;
-    const agentReply = useShark && requestMode === 'chat' && !uploadId && !tool && !options.speak;
     const current = {
-      message, mode: requestMode, model: agentReply ? 'auto' : model?.id, reasoning: agentReply ? undefined : appliedReasoning, uploadId,
+      message, mode: requestMode, model: 'auto', reasoning: undefined, uploadId,
       toolId: tool?.id, projectId: projectContext ?? undefined, branchFrom: origin || undefined,
     };
     const equivalent = !!previous && previous.message === message && previous.uploadId === uploadId && previous.toolId === current.toolId
@@ -967,7 +958,7 @@ export default function ChatPage() {
             </div>
           ) : null}
           {canSend && !loadProblem ? <div className="shark-chat-compose-area" ref={composeAreaRef}>
-            {showStart && (model || useShark || (mode === 'work' && tools.some(({ available }) => available))) && <div className="shark-chat-suggestions" aria-label="Предложения">
+            {showStart && (sharkAssistant || (mode === 'work' && tools.some(({ available }) => available))) && <div className="shark-chat-suggestions" aria-label="Предложения">
               {mode === 'work' ? tools.filter(({ available }) => available).slice(0, 3).map((tool) => <button type="button" disabled={pending} key={tool.id} onClick={() => chooseTool(tool)}><ToolIcon tool={tool} /> {tool.label}</button>) : suggestions.map(({ label, text, icon: Icon }) => <button type="button" key={label} disabled={pending} onClick={() => { setInput(text); send(text); }}><Icon size={16} /> {label}</button>)}
             </div>}
             <form className="shark-chat-composer ice-section" data-ice-art={mode === 'work' ? 'studio' : 'agent'} onSubmit={formSubmit}>
@@ -1029,17 +1020,7 @@ export default function ChatPage() {
                 <input ref={fileRef} type="file" hidden onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void uploadFile(file); }} />
                 {selectedTool && INPUT_FILES[selectedTool.input] && <button type="button" title="Избери входен файл" aria-label="Избери входен файл" className="shark-chat-compose-icon" disabled={pending} onClick={() => chooseFile(selectedTool.input)}><Paperclip size={17} /></button>}
                 <div className="shark-chat-compose-spacer" />
-                {modelLabel && <div className="shark-chat-model-anchor">
-                  {popupButton('model', useShark ? modelLabel : `Модел ${modelLabel}`, <><span>{modelLabel}{!useShark && appliedReasoning === 'deep' && <small> · Дълбоко</small>}</span><ChevronDown size={14} /></>, 'shark-chat-model-button', pending)}
-                  {popup === 'model' && <div id="chat-popup-model" className="shark-chat-popup shark-chat-model-popup" ref={popupRef}>
-                    <section>
-                      <h2>{offerShark ? 'Агент или модел' : 'Модел'}</h2>
-                      {offerShark && <button type="button" aria-pressed={useShark} onClick={() => { setModelId('auto'); closePopup(true); }}>Шарк агент — Основен {useShark && <Check size={16} />}</button>}
-                      {models.map((item) => <button type="button" key={item.id} aria-pressed={!useShark && model?.id === item.id} onClick={() => setModelId(item.id)}>{item.label} {!useShark && model?.id === item.id && <Check size={16} />}</button>)}
-                    </section>
-                    {!useShark && !!model?.reasoningLevels.length && <section><h2>Разсъждение</h2>{model.reasoningLevels.map((item) => <button type="button" key={item} aria-pressed={appliedReasoning === item} onClick={() => { setReasoning(item); closePopup(true); }}>{item === 'deep' ? 'Дълбоко' : 'Стандартно'} {appliedReasoning === item && <Check size={16} />}</button>)}</section>}
-                  </div>}
-                </div>}
+                <span className="shark-chat-model-button" title="Основен агент в n8n">{modelLabel}</span>
                 <button type="button" className="shark-chat-compose-icon" aria-label={dictationLabel} aria-pressed={media.listening === 'dictation'} title={media.dictationReason || dictationLabel} disabled={!media.dictation || !canSend || pending} onClick={startDictation}><Mic size={20} /></button>
                 <button type="button" className="shark-chat-compose-icon shark-chat-voice" aria-label={conversationLabel} aria-pressed={media.listening === 'conversation' || media.speaking} title={voiceUnavailable || conversationLabel} disabled={!media.speaking && (!!voiceUnavailable || !canSend || pending)} onClick={startVoice}><AudioLines size={20} /></button>
                 {sending ? <button className="shark-chat-send" type="button" aria-label="Спри отговора" title="Спри отговора" onClick={() => sendController.current?.abort()}><Square size={16} fill="currentColor" /></button> :
@@ -1051,7 +1032,7 @@ export default function ChatPage() {
               {notice && <span>{notice}</span>}
               {!pending && (problem || notice) && failedRequest.current && <button type="button" className="shark-chat-new" onClick={() => { if (failedRequest.current) void submit(failedRequest.current); }}><RotateCcw size={15} /> Повтори изпращането</button>}
               {!problem && !notice && (media.recordStage || media.speechStage) && <span>{media.speechStage === 'playing' ? 'SharkAI отговаря на глас.' : media.speechStage === 'preparing' ? 'Подготвям звук…' : media.recordStage === 'transcribing' ? 'Разпознавам записа…' : media.recordStage === 'recording' ? 'Записвам. Натисни отново, за да приключиш.' : 'Включвам микрофона…'}</span>}
-              {!loading && account && !modelLabel && capabilityReason && <span>{capabilityReason}</span>}
+              {!loading && account && !sharkAssistant && capabilityReason && <span>{capabilityReason}</span>}
             </div>
           </div> : showStart && <div className="shark-chat-compose-area">
             <div className="shark-chat-sign-in ice-section" data-ice-art="agent">

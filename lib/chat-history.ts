@@ -150,6 +150,7 @@ interface CompletedTurn {
   attachmentMime?: string;
   toolResult?: ChatToolResult;
   tokens: number;
+  tokenLimit?: number;
 }
 
 export async function recordChatTurn(turn: CompletedTurn) {
@@ -181,7 +182,10 @@ export async function recordChatTurn(turn: CompletedTurn) {
         createdAt: new Date(now.getTime() + 1) },
       select: messageSelect,
     });
-    if (turn.tokens > 0) await tx.user.update({ where: { id: userId }, data: { tokensUsed: { increment: turn.tokens } } });
+    if (turn.tokens > 0) {
+      const charged=await tx.user.updateMany({where:{id:userId,...(turn.tokenLimit!==undefined && {tokensUsed:{lte:turn.tokenLimit-turn.tokens}})},data:{tokensUsed:{increment:turn.tokens}}});
+      if (!charged.count) throw new ChatError('Достигнат е лимитът на текущия план.',429);
+    }
     return { content, role: 'assistant', mode: toolResult ? 'tool' : 'ai', conversationId: turn.conversationId, conversationMode,
       title, messages: [user, reply], toolResult: reply.toolResult };
   });

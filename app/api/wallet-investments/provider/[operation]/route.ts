@@ -9,11 +9,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { operation } = await params;
   if (!['deposits','transactions','review','onboarding'].includes(operation)) return walletJson({status:'unsupported'},404);
   const reviewRedirect = () => new Response(null,{ status:303, headers:{
-<<<<<<< HEAD
-    Location:'/dashboard?view=investments&panel=account&section=manage&wallet_review=unavailable', 'Cache-Control':'private, no-store', 'Referrer-Policy':'no-referrer',
-=======
     Location:'/wallet?wallet_review=unavailable', 'Cache-Control':'private, no-store', 'Referrer-Policy':'no-referrer',
->>>>>>> 7d7cfed (Publish standalone Shark wallet and source-backed period forecasts)
   } });
   try {
     const account=await getSession();

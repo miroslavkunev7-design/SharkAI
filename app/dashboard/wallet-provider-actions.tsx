@@ -59,14 +59,10 @@ export function WalletProviderActions({ data, action }: {
     {review === 'WAITING_CUSTOMER_INPUT' && <form method="POST" action={api+'onboarding'}>
       <button className="shark-action-secondary" type="submit">{data.wallet.status === 'verified' ? 'Продължи проверката в Wise' : 'Създай портфейл в Wise'}</button>
     </form>}
-<<<<<<< HEAD
-    {!capable.hosted_kyc && data.wallet.status !== 'verified' && <button className="shark-action-secondary" type="button" disabled>Създай портфейл</button>}
+    {!capable.hosted_kyc && data.wallet.status !== 'verified' && <a className="shark-action-secondary" href="/wallet">Към портфейла</a>}
     {data.wallet.status === 'verified' && <a href="https://wise.com/home/" data-provider-action className="shark-action-secondary" target="_blank" rel="noopener noreferrer">
       {action ? actionLabel + ' в Wise' : 'Зареждане или теглене в Wise'}
     </a>}
-=======
-    {data.wallet.status === 'verified' && <a href="https://wise.com/home/" className="shark-action-secondary" target="_blank" rel="noopener noreferrer">Зареждане или теглене в Wise</a>}
->>>>>>> 7d7cfed (Publish standalone Shark wallet and source-backed period forecasts)
     {capable.deposit_statements && <button className="shark-action-secondary" type="button" onClick={()=>void checkDeposits()} disabled={busy}>
       {busy ? 'Проверка…' : 'Постъпления за последните 7 дни'}
     </button>}
