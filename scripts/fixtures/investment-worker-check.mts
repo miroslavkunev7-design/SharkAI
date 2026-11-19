@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import type { PrismaClient, Prisma } from '@prisma/client';
 import { handleBrokerWorker } from '../../lib/investments/order-worker.server';
 import { readForecastMandateCap } from '../../lib/investments/forecast-quote.server';
+import { readInvestmentProgress } from '../../lib/investments/investment-progress.server';
 import { makeProfitPacket, provisionProfitPolicy } from './profit-only-check.mts';
 
 type Query=(sql:string,values?:readonly unknown[])=>Promise<{rows:Record<string,any>[]}>;
@@ -35,6 +36,7 @@ export async function checkBrokerWorker(q:Query,db:PrismaClient) {
     const label='Exact strategy';
     await q(`INSERT INTO public."WalletInvestmentSettings"("userId","currency","authorizedAmountMinor","instrumentCode","strategyLabel",
       "targetPeriod","targetStartDate") VALUES ($1,'USD',800,'asset',$2,'DAY',current_date)`,[owner,label]);
+    if(broker==='IBKR')await q('UPDATE public."WalletInvestmentSettings" SET "targetAmountMinor"=100 WHERE "userId"=$1',[owner]);
     await q(`INSERT INTO public."Subscription" VALUES($1,$2,'PRO','active',current_timestamp-interval '1 day',current_timestamp+interval '1 day')`,['sub-'+owner,owner]);
     await q(`INSERT INTO sharkai_broker.account(id,user_id,provider,provider_key,currency,contractual_approval_at,ownership_verified_at,
       scope_verified_at,entitlement_cap_minor,snapshot_id,snapshot_at,exposure_minor,free_cash_minor,reconciled)
@@ -93,13 +95,19 @@ export async function checkBrokerWorker(q:Query,db:PrismaClient) {
     assert.equal(ready.offers.length,1);
     assert.equal((await q(`SELECT sharkai_broker.accept_owner_mandate($1,$2,$3,'public."WalletInvestmentSettings"'::regclass,$4) AS ok`,
       [owner,policy,ready.offers[0].digest,version])).rows[0].ok,true);
+    assert.equal((await readInvestmentProgress(owner,null,db)).status,'no_observations');
+    assert.equal((await readInvestmentProgress('foreign-owner',null,db)).status,'no_mandate');
     const performance={consent_version:version,lifetime_net_minor:'0',window_net_minor:'0',
       window_start:new Date().toISOString().slice(0,10),window_end:new Date(Date.now()+86_400_000).toISOString().slice(0,10)};
     // JSON dates have millisecond precision; advance past the database's microsecond consent timestamp.
     const brokerTime=async()=>((await q('SELECT clock_timestamp() AS t FROM pg_sleep(0.01)')).rows[0].t as Date).toISOString();
     const initial={...start,snapshot_id:'s1',observed_at:await brokerTime(),report_ref:'fixture-net',performance};
     assert.equal((await (await post('account-snapshot','broker-feed',quoteKey,initial)).json()).status,'recorded');
+    assert.equal((await readInvestmentProgress(owner,null,db)).points.length,0);
     assert.equal((await (await post('profit-evidence',auditor,profitKey,packet(initial,1000,0))).json()).status,'recorded');
+    const currentProgress=await readInvestmentProgress(owner,null,db);
+    assert.equal(currentProgress.status,'verified');assert.equal(currentProgress.points.length,1);
+    assert.equal(currentProgress.points[0].net_minor,'0');assert.equal(currentProgress.points[0].percent,broker==='IBKR'?'0.00':null);
     assert.equal(await readForecastMandateCap(owner,forecastBinding,db,env),BigInt(550));
     assert.equal(await readForecastMandateCap(owner,forecastBinding,db,{}),BigInt(0));
     assert.equal(await readForecastMandateCap('foreign-owner',forecastBinding,db,env),BigInt(0));
@@ -202,6 +210,9 @@ export async function checkBrokerWorker(q:Query,db:PrismaClient) {
     assert.equal((await (await post('account-snapshot','broker-feed',quoteKey,snapshot)).json()).status,'replayed');
     const lossReport={...packet(snapshot,699,300),total_costs_minor:'1',mandate_closeout_minor:'-1',period_closeout_minor:'-1'};
     assert.equal((await (await post('profit-evidence',auditor,profitKey,lossReport)).json()).status,'recorded');
+    const drawdown=await readInvestmentProgress(owner,null,db);
+    assert.equal(drawdown.points.at(-1)?.net_minor,'-1');
+    assert.equal(drawdown.points.at(-1)?.percent,broker==='IBKR'?'-1.00':null);
     assert.equal(await diagnostic(owner,diagnosticKeys),false);
     assert.equal((await q("SELECT reconciliation_required FROM sharkai_broker.order_ledger WHERE request_key=$1",['worker:'+job])).rows[0].reconciliation_required,false);
     const record=await q("SELECT * FROM sharkai_broker.worker_order WHERE id=$1",[job]);

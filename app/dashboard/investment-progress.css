@@ -1,0 +1,17 @@
+.investment-progress-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.investment-progress-heading h2{margin:0}
+.investment-progress-chart{margin:1rem 0;padding:1rem;border:1px solid #66879b66;border-radius:.75rem;background:#0c1a2459;color:inherit}
+.investment-progress-chart figcaption{font-weight:600;margin-bottom:.75rem}
+.investment-progress-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.investment-progress-chart svg text{font:12px system-ui,sans-serif;fill:currentColor}
+.investment-progress-chart .target{stroke:#f3c769;stroke-dasharray:5 4}
+.investment-progress-chart .grid{stroke:#8398a388}
+.investment-progress-chart .observed{stroke:#54cfe7;stroke-width:2.5;stroke-linejoin:round}
+.investment-progress-chart .point{fill:#8ae3f3;stroke:#11313f;stroke-width:1}
+.investment-chart-times{display:flex;justify-content:space-between;gap:.5rem;font-size:.75rem}
+.investment-progress-chart label{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin-top:1rem}
+.investment-progress-chart input[type=range]{min-width:8rem;max-width:100%;flex:1}
+.investment-idea{padding:1rem 0;border-top:1px solid #66879b66}
+.investment-idea h3{margin:0 0 .4rem}
+.investment-opportunities>label,.investment-progress>label{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;margin:1rem 0}
+@media(max-width:540px){.investment-progress-chart{padding:.6rem}.investment-chart-times{font-size:.65rem}}
