@@ -49,8 +49,14 @@ function SitePortfolio({ host, moduleBase }: SiteOptions) {
 export function mountPortfolio(element: HTMLElement, options: SiteOptions) {
   const root = createRoot(element);
   const base = new URL(options.moduleBase, document.baseURI);
-  const image = new URL('assets/investments.webp', base);
-  element.style.setProperty('--portfolio-hero-image', 'url("' + image.href + '")');
+  const artwork = [
+    ['--portfolio-hero-image', 'assets/investments.webp'],
+    ['--portfolio-market-image', 'assets/market-art.webp'],
+    ['--portfolio-ice-image', 'assets/ice.webp'],
+  ] as const;
+  for (const [property, path] of artwork) {
+    element.style.setProperty(property, 'url("' + new URL(path, base).href + '")');
+  }
   root.render(<SitePortfolio {...options}/>);
   return () => root.unmount();
 }

@@ -165,6 +165,7 @@
   padding: clamp(16px, 2vw, 25px);
   background: radial-gradient(ellipse at right top, #26355c58 0%, transparent 68%), linear-gradient(150deg, #14233a, #111c30 72%);
 }
+
 .pf-home-tabs {
   display: inline-flex;
   align-self: flex-start;
@@ -282,4 +283,123 @@
   .pf-home-account, .pf-home-history { padding: 14px 15px; }
   .pf-home-balances { gap: 9px 14px; }
   .pf-home-row-status { max-width: 10ch; }
+}
+/* The portfolio uses the same glacier-to-scene treatment as SharkAI's module cards. */
+.pf-home-hero, .pf-home-account, .pf-home-history {
+  position: relative;
+  isolation: isolate;
+  border-color: #c9f2ffbb;
+  box-shadow: inset 0 1px 1px #ffffffa6, inset 0 -1px 1px #95d5ff66, 0 12px 32px #03122b52;
+}
+.pf-home-hero::before, .pf-home-account::before, .pf-home-history::before,
+.pf-home-hero::after, .pf-home-account::after, .pf-home-history::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.pf-home-hero > *, .pf-home-account > *, .pf-home-history > * { position: relative; z-index: 1; }
+.pf-home-hero::before {
+  background: var(--portfolio-hero-image, url('/investment-lab/assets/investments.webp')) right center / cover no-repeat;
+}
+.pf-home-account::before, .pf-home-history::before {
+  background: var(--portfolio-market-image, url('/investment-lab/assets/market-art.webp')) right center / cover no-repeat;
+}
+.pf-home-hero::after, .pf-home-account::after, .pf-home-history::after {
+  background: linear-gradient(105deg, #e5fcff55, #a9d8ef24 58%, transparent 81%),
+    var(--portfolio-ice-image, url('/investment-lab/assets/ice.webp')) left center / 78% 100% no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, #000 0 45%, #000e 51%, #0009 59%, transparent 75%);
+  mask-image: linear-gradient(90deg, #000 0 45%, #000e 51%, #0009 59%, transparent 75%);
+}
+.pf-home-hero-content { min-height: 208px; }
+.pf-home h1#pf-home-title,
+.pf-home .pf-home-value,
+.pf-home-empty h2,
+.pf-home-rows b,
+.pf-home-history h2 { color: #0c2944; text-shadow: 0 1px #e9faff8c; }
+.pf-home h1#pf-home-title { max-width: 62%; font-weight: 795; }
+.pf-home-intro p, .pf-home-caption, .pf-home-subline,
+.pf-home-balances dt, .pf-home-empty p, .pf-home-list-note,
+.pf-home-rows small { color: #193d56; }
+.pf-home-intro p { max-width: 26ch; font-weight: 570; }
+.pf-home-balances dd { color: #082b46; }
+.pf-home .pf-home-value { max-width: 67%; }
+.pf-home .pf-home-tools button {
+  color: #d6eaff;
+  background: #122a53d9;
+  border-color: #d7eaff8f;
+  box-shadow: inset 0 1px #ffffff36, 0 2px 9px #061a3766;
+}
+.pf-home-actions {
+  border-top-color: #d6faff8f;
+  background: linear-gradient(100deg, #d9f6fc88 0%, #b8eaf892 34%, #1528538c 66%, #111a39c9 100%);
+  box-shadow: inset 0 1px #f6ffff8f;
+}
+.pf-home-action-icon {
+  color: #e9f8ff;
+  border-color: #c4ecff99;
+  background: linear-gradient(145deg, #58a9d6, #2162a5 74%, #3d50a3);
+  box-shadow: inset 0 1px 3px #ffffff83, 0 3px 9px #09254a5c;
+}
+.pf-home .pf-home-action:nth-child(-n+2) { color: #153955; }
+.pf-home .pf-home-action:nth-child(n+3) { color: #f0f6ff; text-shadow: 0 1px 3px #07132ca6; }
+.pf-home-account { background: #0c2145; }
+.pf-home-tabs {
+  border-color: #5988ad69;
+  background: #dcf8ffd1;
+  box-shadow: inset 0 1px #fff;
+}
+.pf-home .pf-home-tabs button { color: #194467; }
+.pf-home .pf-home-tabs button[aria-pressed='true'] {
+  background: linear-gradient(110deg, #2963a6, #6554a5);
+  border-color: #d9f9ffbc;
+  box-shadow: inset 0 1px #ffffff64, 0 3px 9px #204c8052;
+}
+.pf-home-empty-icon {
+  color: #e8faff;
+  border-color: #d9f9ffcf;
+  background: linear-gradient(140deg, #60b4d7, #246db2 62%, #6555ac);
+  box-shadow: inset 0 1px 4px #ffffff83, 0 3px 9px #285e9d55;
+}
+.pf-home-empty {
+  border-radius: 15px;
+  background: linear-gradient(90deg, #e0f8ffdf 0%, #d4f2f9c9 52%, #c1e3f299 78%, transparent 100%);
+}
+.pf-home-empty h2, .pf-home-empty p { max-width: 21ch; }
+.pf-home .pf-home-text-link, .pf-home .pf-home-list-more { color: #164a83; }
+.pf-home-rows li {
+  padding-inline: 8px;
+  border-radius: 10px;
+  border-bottom-color: #4b88ae59;
+  background: linear-gradient(90deg, #e5faff91 0%, #d5f1f971 45%, #132d554d 72%, #0c1c3980 100%);
+}
+.pf-home-rows strong, .pf-home-row-status { color: #f1f9ff; }
+.pf-home-row-icon { color: #e5f9ff; background: #3667a5; border-color: #cceeff85; }
+.pf-home-history { background: #122441; }
+.pf-home-history-legend { color: #173c5b; }
+.pf-home-history-legend > :last-child { color: #edf9ff; }
+.pf-home-history-canvas { border-radius: 12px; background: linear-gradient(90deg, #e0f8ff66 0%, #d0f2f729 48%, #0d1b3652 100%); }
+.pf-home .pf-home-ranges button { color: #dfeeff; background: #1526478c; }
+.pf-home .pf-home-ranges button[aria-pressed='true'] { color: #fff; }
+@media (max-width: 450px) {
+  .pf-home-hero-content { min-height: 183px; }
+  .pf-home-hero::before { background-position: 61% center; }
+  .pf-home-hero::after { background: linear-gradient(105deg, #e5fcff55, #a9d8ef24 58%, transparent 81%), var(--portfolio-ice-image, url('/investment-lab/assets/ice.webp')) left center / 90% 100% no-repeat; }
+  .pf-home-intro p { max-width: 22ch; }
+  .pf-home h1#pf-home-title { max-width: 73%; }
+  .pf-home .pf-home-value { max-width: 75%; font-size: clamp(1.8rem, 7vw, 2.6rem); }
+  .pf-home-empty { padding: 10px 8px; }
+  .pf-home .pf-home-action span:last-child { overflow-wrap: anywhere; text-align: center; }
+}
+@media (max-width: 360px) {
+  .pf-home-actions { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 2px; padding-block: 12px; }
+  .pf-home .pf-home-action { font-size: .8rem; }
+  .pf-home .pf-home-action:nth-child(odd) { color: #153955; text-shadow: none; }
+  .pf-home .pf-home-action:nth-child(even) { color: #f0f6ff; text-shadow: 0 1px 3px #07132ca6; }
+}
+@media (forced-colors: active) {
+  .pf-home-hero::before, .pf-home-account::before, .pf-home-history::before,
+  .pf-home-hero::after, .pf-home-account::after, .pf-home-history::after { display: none; }
+  .pf-home-hero, .pf-home-account, .pf-home-history { color: CanvasText; background: Canvas; border-color: ButtonText; }
 }

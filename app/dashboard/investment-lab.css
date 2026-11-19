@@ -24,3 +24,8 @@
   line-height: 1.12;
   letter-spacing: -.035em;
 }
+.portfolio-subpage .module-wallet-panel[data-ice-art] {
+  --ice-tint: #e8faff2e;
+  --ice-art-opacity: .8;
+  --ice-art-extent: 56%;
+}

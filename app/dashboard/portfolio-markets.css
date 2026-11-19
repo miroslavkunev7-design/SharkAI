@@ -125,6 +125,100 @@
 .pfm-trade a:hover { border-color: #c5d4ff; }
 .pfm-trade small { color: var(--pfm-dim); font-size: .82rem; }
 .pfm-notice { margin: 8px 0; font-size: .83rem; color: #ffcbb4; }
+
+/* Glacial left surface and investment artwork on the right match the SharkAI modules. */
+.pfm {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-color: #c9f2ffbf;
+  background: #0c2145;
+  box-shadow: inset 0 1px 1px #ffffff9a, inset 0 -1px #c6efff66, 0 12px 32px #03122b52;
+}
+.pfm::before, .pfm::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.pfm > * { position: relative; z-index: 1; }
+.pfm::before {
+  background: var(--portfolio-hero-image, url('/investment-lab/assets/investments.webp')) right center / cover no-repeat;
+}
+.pfm::after {
+  background: linear-gradient(105deg, #e7fcff45, #a2d6ef30 58%, transparent 81%),
+    var(--portfolio-ice-image, url('/investment-lab/assets/ice.webp')) left center / 78% 100% no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, #000 0 45%, #000e 51%, #0009 59%, transparent 75%);
+  mask-image: linear-gradient(90deg, #000 0 45%, #000e 51%, #0009 59%, transparent 75%);
+}
+.pfm h2 { color: #0b2944; text-shadow: 0 1px #e8faffad; }
+.pfm button.pfm-tool {
+  color: #f3f9ff;
+  background: #1b3c66d9;
+  border-color: #c2edffa6;
+  box-shadow: inset 0 1px #ffffff5c;
+}
+.pfm-tabs {
+  border-color: #6895b773;
+  background: #e4f9ffdd;
+  box-shadow: inset 0 1px #ffffffb3;
+}
+.pfm-tabs button { color: #164362; }
+.pfm-tabs button[aria-pressed='true'] {
+  color: #f5fbff;
+  background: linear-gradient(115deg, #2868ad, #6757b0);
+  box-shadow: inset 0 1px #ffffff59, 0 3px 9px #183b7866;
+}
+.pfm-search {
+  color: #d8e8ff;
+  background: #112a50d9;
+  border-color: #a2d0f58a;
+}
+.pfm .pfm-search input[type='search'] { color: #f6fbff; }
+.pfm-search input::placeholder { color: #cbdff1; }
+.pfm-list > li { border-bottom-color: #5f9abb65; }
+.pfm button.pfm-asset:hover { background: linear-gradient(90deg, #ffffff72, #ffffff0d); }
+.pfm-name strong { color: #0c2b44; text-shadow: 0 1px #ebfaff88; }
+.pfm-name small { color: #265673; }
+.pfm-quote {
+  padding: 4px 7px;
+  border-radius: 10px;
+  background: #0d1a36a8;
+  box-shadow: inset 0 1px #e9faff19;
+}
+.pfm-quote small { color: #c6d6ec; }
+.pfm button.pfm-star { color: #e6efff; filter: drop-shadow(0 1px 2px #07142e); }
+.pfm-empty { color: #194362; }
+.pfm-empty button { color: #124e91; }
+.pfm-reached button { color: #e7f4ff; background: #142d54c9; }
+
+.pfm-dialog {
+  border-color: #b4e8fbbc;
+  background-color: #121e36;
+  background-image: linear-gradient(180deg, transparent 0 128px, #121e36c9 195px, #121e36 285px),
+    linear-gradient(90deg, #ddf8ffd1 0%, #c6ebf8c1 44%, transparent 77%),
+    var(--portfolio-ice-image, url('/investment-lab/assets/ice.webp')),
+    var(--portfolio-hero-image, url('/investment-lab/assets/investments.webp'));
+  background-position: center, left top, left top, right center;
+  background-size: 100% 100%, 100% 220px, 80% 220px, cover;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 1px #fff8, 0 24px 100px #03061599;
+}
+.pfm-dialog .pfm-asset-id, .pfm-dialog .pfm-price, .pfm-dialog .pfm-since { color: #0b2e4a; }
+.pfm-dialog .pfm-since .pfm-negative { color: #a3275d; }
+.pfm-dialog .pfm-asset-id div > span { color: #275370; }
+.pfm-dialog .pfm-tools button { color: #e9f7ff; background: #18365bda; border-color: #c4eafa9c; }
+.pfm-dialog .pfm-readout, .pfm-dialog .pfm-axis, .pfm-dialog .pfm-attribution,
+.pfm-dialog .pfm-data, .pfm-dialog .pfm-alert { color: #ecf7ff; }
+.pfm-dialog .pfm-chart-head, .pfm-dialog .pfm-history, .pfm-dialog .pfm-alert,
+.pfm-dialog .pfm-data { padding: 10px; border-radius: 14px; background: #122648c9; }
+.pfm-dialog .pfm-data { margin-top: 9px; }
+.pfm-dialog .pfm-trade small { color: #d2e2f5; }
+@media (forced-colors: active) {
+  .pfm::before, .pfm::after { display: none; }
+  .pfm, .pfm-dialog { background: Canvas; color: CanvasText; border-color: ButtonText; }
+}
 @container pfm (max-width: 360px) {
   .pfm-controls { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: 7px; }
   .pfm-tabs { justify-self: start; }
