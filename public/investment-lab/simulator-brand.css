@@ -1,0 +1,11 @@
+:root { --bg:#09101e; --line-soft:#314362; --surface:#111c30; --radius:18px; }
+body { background:radial-gradient(ellipse at 18% 0,#152742,transparent 58%),#09101e; }
+.hero { background:linear-gradient(90deg,#091329fa 3%,#0a1635d9 44%,#0a123034 76%),url('./assets/investments.webp') 70% 48%/cover; border-radius:21px; }
+.button.primary,.send { color:white; border-color:#91acff85; background:linear-gradient(108deg,#385ee2,#6553dc 68%,#844cce); }
+.button.primary:not(:disabled):hover,.send:hover { color:white; background:linear-gradient(108deg,#486eea,#755fe3 68%,#9359d9); }
+.trail a { color:#bae5ff; text-underline-offset:3px; }
+.panel { background:linear-gradient(145deg,#17253b,#111a2c 55%,#161b33); }
+.navigation .active { background:linear-gradient(105deg,#263d6d,#302c57); border-color:#657fbb; }
+.embed .shell { min-height:0; }
+.embed .sidebar { height:auto; align-self:start; }
+.embed dialog { max-height:min(88svh,660px); }

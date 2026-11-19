@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#09101e">
+  <meta name="description" content="Дневни пазарни котировки на Bitcoin, Ethereum и Solana в евро и инвестиционен симулатор на SharkAI.">
+  <title>Инвестиции · SharkAI</title>
+  <link rel="icon" href="./assets/logo.png">
+  <link rel="preload" href="./assets/investments.webp" as="image">
+  <link rel="stylesheet" href="./market.css">
+  <script type="module" src="./embed-tools.mjs"></script>
+  <script type="module" src="./market-view.mjs"></script>
+</head>
+<body>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-lab" viewBox="0 0 24 24"><path d="M9 3h6m-5 0v6l-6 9.4A1.7 1.7 0 0 0 5.5 21h13a1.7 1.7 0 0 0 1.5-2.6L14 9V3M7.7 13.5h8.6"/></symbol>
+    <symbol id="i-bars" viewBox="0 0 24 24"><path d="M5 19V10m7 9V5m7 14v-6"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20.5 10a8.5 8.5 0 1 0-1.5 7m1.5-13v6.2h-6.2"/></symbol>
+    <symbol id="i-time" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M8 5h11v11m0-11L5 19"/></symbol>
+  </svg>
+  <a class="skip" href="#chart-panel">Към графиката</a>
+  <header class="mast">
+    <div class="mast-inner">
+      <div class="brand"><img src="./assets/logo.png" width="42" height="42" alt=""><strong>Shark<span>AI</span></strong></div>
+      <nav class="main-tabs" aria-label="Инвестиционен модул">
+        <a class="active" href="./index.html" data-embed-link aria-current="page"><svg aria-hidden="true"><use href="#i-bars"></use></svg>Пазари</a>
+        <a href="./simulator.html" data-embed-link><svg aria-hidden="true"><use href="#i-lab"></use></svg>Симулатор</a>
+      </nav>
+    </div>
+  </header>
+  <main class="workspace">
+    <section class="hero" aria-labelledby="page-title">
+      <div class="hero-content">
+        <h1 id="page-title">Инвестиционна лаборатория</h1>
+        <p>Проследи цените в евро и тествай стратегия с виртуален портфейл.</p>
+        <a href="./simulator.html" data-embed-link class="hero-action"><svg aria-hidden="true"><use href="#i-lab"></use></svg>Отвори симулатора</a>
+      </div>
+    </section>
+    <div class="main-grid">
+      <section id="chart-panel" class="card chart-card" aria-labelledby="instrument-title">
+        <div class="chart-head">
+          <div class="instrument"><span class="coin big" data-coin="BTC" id="asset-mark" aria-hidden="true">₿</span><div><h2 id="instrument-title">Bitcoin</h2><span class="subtle" id="instrument-pair">BTC / EUR</span></div></div>
+          <div class="range" role="group" aria-label="Период на графиката">
+            <button type="button" data-range="7" aria-pressed="false" aria-label="7 дни">7д</button>
+            <button type="button" data-range="30" aria-pressed="true" aria-label="30 дни">30д</button>
+            <button type="button" data-range="90" aria-pressed="false" aria-label="90 дни">90д</button>
+          </div>
+        </div>
+        <div class="price-line"><strong id="close-price">—</strong><span id="price-change"></span></div>
+        <p class="price-label" id="price-label">Последна дневна цена на затваряне</p>
+        <div class="plot" id="plot">
+          <svg id="chart" role="img" aria-label="Дневни пазарни свещи в евро" hidden></svg>
+          <div class="plot-notice" id="plot-notice" role="status"><svg aria-hidden="true"><use href="#i-bars"></use></svg><p>Зареждане на котировките…</p></div>
+          <div id="hover-card" class="hover-card" hidden></div>
+        </div>
+        <div class="chart-foot">
+          <span><svg aria-hidden="true"><use href="#i-time"></use></svg><span id="series-span">Дневни свещи · UTC</span></span>
+          <span class="legend"><i></i>Ръст <i></i>Спад</span>
+        </div>
+        <details class="values"><summary>Таблица с котировките</summary><div class="table-wrap" tabindex="0" role="region" aria-label="Дневни котировки"><table><caption>Дневни свещи в евро, най-новите първи</caption><thead><tr><th>Дата</th><th>Отваряне</th><th>Максимум</th><th>Минимум</th><th>Затваряне</th></tr></thead><tbody id="bar-table"></tbody></table></div></details>
+      </section>
+      <aside class="rail" aria-label="Избор на пазар и източник">
+        <section class="card market-list">
+          <h2>Пазари в евро</h2>
+          <div role="group" aria-label="Избери актив">
+            <button class="asset-option" type="button" data-symbol="BTC" aria-pressed="true"><span class="coin" data-coin="BTC" aria-hidden="true">₿</span><span><b>Bitcoin</b><small>BTC / EUR</small></span><span class="selection" aria-hidden="true"></span></button>
+            <button class="asset-option" type="button" data-symbol="ETH" aria-pressed="false"><span class="coin" data-coin="ETH" aria-hidden="true">Ξ</span><span><b>Ethereum</b><small>ETH / EUR</small></span><span class="selection" aria-hidden="true"></span></button>
+            <button class="asset-option" type="button" data-symbol="SOL" aria-pressed="false"><span class="coin" data-coin="SOL" aria-hidden="true">◎</span><span><b>Solana</b><small>SOL / EUR</small></span><span class="selection" aria-hidden="true"></span></button>
+          </div>
+        </section>
+        <section class="card source-card">
+          <div class="source-head"><svg aria-hidden="true"><use href="#i-globe"></use></svg><h2>Данни за пазара</h2></div>
+          <dl><div><dt>Източник</dt><dd id="source-name">—</dd></div><div><dt>Последна свещ</dt><dd id="last-bar">—</dd></div></dl>
+          <p id="freshness" class="feedback" role="status">Свързване с източника…</p>
+          <button class="refresh" id="refresh" type="button"><svg aria-hidden="true"><use href="#i-refresh"></use></svg>Обнови данните</button>
+        </section>
+      </aside>
+      <section class="card statistics" aria-labelledby="statistics-title">
+        <div class="stat-title"><h2 id="statistics-title">За периода</h2><span id="period-caption">30 дни</span></div>
+        <dl class="stat-grid"><div><dt>Максимум</dt><dd id="stat-high">—</dd></div><div><dt>Минимум</dt><dd id="stat-low">—</dd></div><div><dt>Промяна</dt><dd id="stat-change">—</dd></div></dl>
+      </section>
+    </div>
+    <noscript><p class="noscript">Разреши JavaScript, за да заредиш котировките и графиката.</p></noscript>
+  </main>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="bg">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0a0e1a">
+  <meta name="description" content="SharkAI — инвестиционна лаборатория с виртуален портфейл и изпълнение на стратегии.">
+  <title>Симулатор · SharkAI Инвестиции</title>
+  <link rel="icon" href="./assets/logo.png">
+  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./weekly.css">
+  <link rel="stylesheet" href="./simulator-brand.css">
+  <script type="module" src="./embed-tools.mjs"></script>
+  <script type="module" src="./app.mjs"></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><img src="./assets/logo.png" alt="" width="42" height="42"><strong>Shark<span>AI</span></strong></div>
+      <nav class="navigation" aria-label="Инвестиционен модул">
+        <button data-view="overview" class="nav-button active" aria-current="page"><i data-icon="overview"></i><span>Обзор</span></button>
+        <button data-view="portfolio" class="nav-button"><i data-icon="wallet"></i><span>Портфейл</span></button>
+        <button data-view="strategy" class="nav-button"><i data-icon="strategy"></i><span>Стратегии</span></button>
+        <button data-view="weekly" class="nav-button weekly-nav"><i data-icon="target"></i><span>Седмична цел</span></button>
+        <button data-view="journal" class="nav-button"><i data-icon="journal"></i><span>Дневник</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <button data-action="data" class="nav-button data-nav"><i data-icon="database"></i><span>Пазарни данни</span></button>
+        <div class="side-account"><i data-icon="shield"></i><div><b>Виртуална сметка</b><small id="sidebar-capital">Виртуален капитал</small></div></div>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="trail"><a href="./index.html" data-embed-link>Пазари</a><i data-icon="chevron"></i><b>Симулатор</b></div>
+        <div class="top-actions">
+          <span class="mode"><span></span>Симулация</span>
+          <button class="icon-button" data-action="export" aria-label="Изтегли дневника като CSV" title="Изтегли дневника"><i data-icon="download"></i></button>
+        </div>
+      </header>
+      <main id="main">
+        <section class="hero">
+          <div class="hero-content">
+            <h1>Инвестиционен симулатор</h1>
+            <p>Тествай стратегия, следи риска и виж резултата след разходите.</p>
+          </div>
+          <button class="button primary" data-action="new-order"><i data-icon="plus"></i> Нова поръчка</button>
+        </section>
+        <section class="metrics" aria-label="Състояние на сметката">
+          <article class="metric panel"><div><span>Стойност на портфейла</span><i data-icon="wallet"></i></div><strong id="metric-equity">—</strong><small id="metric-free">Свободни средства</small></article>
+          <article class="metric panel"><div><span>Нетен резултат</span><i data-icon="activity"></i></div><strong id="metric-pnl">—</strong><small id="metric-realized">Реализиран резултат</small></article>
+          <article class="metric panel"><div><span>Цел на плана</span><i data-icon="target"></i></div><strong id="metric-target">—</strong><small id="metric-age">Период</small></article>
+          <article class="metric panel"><div><span>Спад от върха</span><i data-icon="shield"></i></div><strong id="metric-drawdown">—</strong><small id="metric-risk">Праг за спиране</small></article>
+        </section>
+        <div id="risk-notice" class="risk-notice" role="status" hidden></div>
+        <section data-pane="overview">
+          <div class="dashboard-grid">
+            <article class="panel chart-panel">
+              <div class="chart-top">
+                <div class="instrument"><div id="asset-monogram" class="asset-mark" aria-hidden="true">₿</div>
+                  <div><label class="sr-only" for="market">Пазар</label><select id="market"></select><span id="asset-name"></span></div>
+                </div>
+                <div class="segmented range" aria-label="Период на графиката">
+                  <button data-range="30" class="selected" aria-pressed="true">30</button>
+                  <button data-range="60" aria-pressed="false">60</button>
+                  <button data-range="90" aria-pressed="false">90</button>
+                </div>
+              </div>
+              <div class="price-row"><strong id="chart-price">—</strong><span id="chart-change"></span><span class="chart-source" id="chart-source"></span></div>
+              <div id="chart-wrap" class="chart-wrap">
+                <canvas id="market-chart" role="img" aria-label="Графика на пазарните свещи"></canvas>
+                <div class="chart-tooltip" id="chart-tooltip" hidden></div>
+              </div>
+              <div class="chart-control">
+                <div class="clock"><i data-icon="clock"></i><div><b id="paper-date"></b><small id="clock-status"></small></div></div>
+                <div class="clock-actions">
+                  <button class="button ghost" data-action="step"><i data-icon="next"></i> <span id="step-text">Следващ ден</span></button>
+                  <button class="button secondary" data-action="play"><i id="play-icon" data-icon="play"></i> <span id="play-text">Старт</span></button>
+                </div>
+              </div>
+            </article>
+            <article class="panel agent-panel">
+              <div class="panel-head agent-head"><div class="agent-icon"><i data-icon="spark"></i></div><div><h2>Инвестиционен агент</h2><p>Локални команди към симулацията</p></div></div>
+              <div class="chat-body" id="chat-log" role="log" aria-label="Разговор с инвестиционния агент" aria-live="polite"></div>
+              <div class="quick-commands" aria-label="Бързи команди">
+                <button data-command="Анализ на пазара">Анализ</button><button data-command="Покажи риска">Риск</button><button data-command="Купи за 100 евро">Купи за €100</button><button data-command="Пусни бек-тест">Тест</button>
+              </div>
+              <form id="chat-form" class="chat-form">
+                <label class="sr-only" for="chat-input">Команда към агента</label>
+                <input id="chat-input" placeholder="Напиши „портфейл“ или „купи за 100 евро“" maxlength="300" autocomplete="off" required>
+                <button class="send" type="submit" aria-label="Изпрати командата"><i data-icon="send"></i></button>
+              </form>
+            </article>
+          </div>
+          <div class="lower-grid">
+            <article class="panel compact-panel">
+              <div class="panel-head between"><h2>Позиции</h2><button class="text-button" data-view="portfolio">Портфейл <i data-icon="arrow"></i></button></div>
+              <div id="overview-positions"></div>
+            </article>
+            <article class="panel compact-panel">
+              <div class="panel-head between"><h2>Последни операции</h2><button class="text-button" data-view="journal">Дневник <i data-icon="arrow"></i></button></div>
+              <div id="overview-events"></div>
+            </article>
+          </div>
+        </section>
+        <section data-pane="portfolio" hidden>
+          <div class="wide-panel panel">
+            <div class="panel-head between"><div><h2>Отворени позиции</h2><p>Нетната оценка включва прогнозните разходи за изход.</p></div><button class="button secondary" data-action="new-order"><i data-icon="plus"></i> Нова поръчка</button></div>
+            <div id="position-table"></div>
+          </div>
+          <div class="wide-panel panel">
+            <div class="panel-head between"><div><h2>Поръчки</h2><p>Чакащите покупки резервират виртуални средства.</p></div><label class="inline-field">Покажи <select id="order-filter"><option value="all">Всички</option><option value="pending">Чакащи</option><option value="filled">Изпълнени</option><option value="cancelled">Отменени</option><option value="rejected">Отхвърлени</option></select></label></div>
+            <div id="order-table"></div>
+          </div>
+        </section>
+        <section data-pane="strategy" hidden>
+          <div class="strategy-grid">
+            <article class="panel settings-panel">
+              <div class="panel-head"><div><h2>План и лимити</h2><p>Прагът за спад и срокът спират новите входове. Целта се отчита по реализирана печалба.</p></div></div>
+              <form id="plan-form" class="plan-form">
+                <label>Цел (% от началния капитал)<input name="target" type="number" min="0.01" max="100" step="0.01" required></label>
+                <label>Праг за спад от върха (%)<input name="drawdown" type="number" min="0.01" max="100" step="0.01" required></label>
+                <label>Хоризонт (дни)<input name="days" type="number" min="1" max="365" step="1" required></label>
+                <label>Лимит на покупка (€)<input name="entryMax" type="number" min="5" max="10000000" step="0.01" required></label>
+                <label>Лимит на покупки за ден (€)<input name="dailyMax" type="number" min="5" max="10000000" step="0.01" required></label>
+                <label>Такса на изпълнение (%)<input name="fee" type="number" min="0" max="5" step="0.01" required></label>
+                <label>Ценово отклонение (%)<input name="slippage" type="number" min="0" max="5" step="0.01" required></label>
+                <label>Стратегия<select name="strategy"><option value="manual">Ръчна</option><option value="sma">Пресичане на SMA</option></select></label>
+                <label>Пазар за стратегията<select name="strategySymbol"></select></label>
+                <label>Период на SMA (свещи)<input name="window" type="number" min="3" max="80" step="1" required></label>
+                <label>Размер на вход от стратегия (€)<input name="strategySize" type="number" min="5" max="10000000" step="0.01" required></label>
+                <div class="form-foot"><button class="button primary" type="submit"><i data-icon="check"></i> Запази плана</button><output id="plan-status" aria-live="polite"></output></div>
+              </form>
+            </article>
+            <article class="panel settings-panel backtest-panel">
+              <div class="panel-head"><div><h2>Исторически тест</h2><p>SMA сравнява затворени свещи и изпълнява на следващото отваряне. Използва текущите такси и лимити.</p></div></div>
+              <form id="backtest-form" class="backtest-form"><label>Прозорец<select id="backtest-window"><option value="30">30 стъпки</option><option value="60" selected>60 стъпки</option><option value="90">90 стъпки</option></select></label><button class="button secondary" type="submit"><i data-icon="play"></i> Пусни тест</button></form>
+              <div id="backtest-result" aria-live="polite"><p class="empty">Избери прозорец, за да сравниш стратегията със задържане и кеш.</p></div>
+            </article>
+          </div>
+        </section>
+        <section data-pane="weekly" class="week-workspace" hidden>
+          <div class="panel week-heading">
+            <div><h2>Седмична цел от инвестиции</h2><p>Един бюджет за 7 дни. Сравни търговия, препродажба и реклама по нетен резултат.</p></div>
+            <span class="mode"><span></span>Симулация</span>
+          </div>
+          <form id="week-model-form">
+            <div class="panel week-params">
+              <div class="week-inputs">
+                <label>Бюджет (€)<input name="budget" type="number" min="0.01" max="10000000" step="0.01" value="200" required></label>
+                <label>Праг за целта (€)<input name="minimum" type="number" min="0.01" max="10000000" step="0.01" value="60" required></label>
+                <label>Желана сума (€)<input name="goal" type="number" min="0.01" max="10000000" step="0.01" value="70" required></label>
+                <label>Резерв в кеш (€)<input name="reserve" type="number" min="0" max="10000000" step="0.01" value="0" required></label>
+              </div>
+              <div class="week-required"><span>Доходност за достигане на целта</span><b id="week-required">30% – 35%</b></div>
+            </div>
+            <div class="week-ideas">
+              <article class="panel week-idea">
+                <div class="week-idea-head"><i data-icon="activity"></i><h3>Търговия</h3><input name="useMarket" type="checkbox" checked aria-label="Включи търговията"></div>
+                <p>SMA и покупка със задържане до края на седмия ден. Таксите и ценовото отклонение идват от „Стратегии“.</p>
+                <p id="week-market-source" class="week-source"></p>
+                <button class="text-button" type="button" data-action="data">Промени пазарните данни <i data-icon="arrow"></i></button>
+              </article>
+              <article class="panel week-idea">
+                <div class="week-idea-head"><i data-icon="wallet"></i><h3>Препродажба</h3><input name="useResale" type="checkbox" aria-label="Включи препродажбата"></div>
+                <p>Сметка за конкретна покупка и продажба до края на седмицата.</p>
+                <fieldset id="week-resale-fields" class="week-inputs" disabled>
+                  <label>Цена на покупка (€)<input name="resalePurchase" type="number" min="0.01" step="0.01" max="10000000" value="100" required></label>
+                  <label>Доставка и такси (€)<input name="resaleFees" type="number" min="0" step="0.01" max="10000000" value="10" required></label>
+                  <label>Плащане от купувач (€)<input name="resalePaid" type="number" min="0.01" step="0.01" max="10000000" value="155" required></label>
+                  <label>Шанс за продажба (%)<input name="resaleChance" type="number" min="0" step="0.01" max="100" value="65" required></label>
+                </fieldset>
+              </article>
+              <article class="panel week-idea">
+                <div class="week-idea-head"><i data-icon="target"></i><h3>Реклама</h3><input name="useAds" type="checkbox" aria-label="Включи рекламата"></div>
+                <p>Въведи маржа на платена продажба след разходите по изпълнението.</p>
+                <fieldset id="week-ads-fields" class="week-inputs" disabled>
+                  <label>Разход за реклама (€)<input name="adsSpend" type="number" min="0.01" step="0.01" max="10000000" value="20" required></label>
+                  <label>Марж от продажба (€)<input name="adsMargin" type="number" min="0.01" step="0.01" max="10000000" value="30" required></label>
+                  <label>Платени продажби при успех<input name="adsSales" type="number" min="1" max="10000" step="1" value="2" required></label>
+                  <label>Шанс за успех (%)<input name="adsChance" type="number" min="0" step="0.01" max="100" value="50" required></label>
+                </fieldset>
+              </article>
+            </div>
+            <div class="week-run"><button class="button primary" type="submit"><i data-icon="play"></i> Сравни плановете</button><output id="week-model-status" class="form-message" aria-live="polite"></output></div>
+          </form>
+          <article id="week-results" class="panel week-results" aria-live="polite"></article>
+          <p class="week-explain">За търговията делът на успешните сценарии идва от тестваните седемдневни периоди. За препродажба и реклама той идва от въведените допускания, моделирани като независими. Непродадената стока остава блокирана в края на седмицата. Резултатите са сценарни оценки.</p>
+          <article class="panel week-cash">
+            <div><h3>Седмичен отчет на парите</h3><p>Въведи получените приходи и платените разходи и такси за същите 7 дни. Депозитът е бюджет.</p></div>
+            <form id="week-cash-form" class="week-inputs">
+              <label>Начало на седмицата<input name="period" type="date" required></label>
+              <label>Получени приходи (€)<input name="received" type="number" min="0" step="0.01" max="10000000" value="0" required></label>
+              <label>Платени разходи и такси (€)<input name="spent" type="number" min="0" step="0.01" max="10000000" value="0" required></label>
+              <button class="button secondary" type="submit"><i data-icon="check"></i> Запази отчета</button>
+            </form>
+            <div class="week-cash-result"><b id="week-net">—</b><span id="week-net-note"></span><output id="week-cash-status" class="form-message" aria-live="polite"></output></div>
+          </article>
+        </section>
+        <section data-pane="journal" hidden>
+          <article class="panel wide-panel">
+            <div class="panel-head between"><div><h2>Дневник</h2><p>Изпълнения, такси, отмени и решения на риска.</p></div><button class="button secondary" data-action="export"><i data-icon="download"></i> CSV</button></div>
+            <div class="journal-toolbar"><label class="inline-field">Вид събитие <select id="journal-filter"><option value="all">Всички</option><option value="fill">Изпълнения</option><option value="risk">Риск</option><option value="order">Поръчки</option><option value="cancelled">Отмени</option><option value="settings">Настройки</option></select></label></div>
+            <div id="journal-table"></div>
+          </article>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <dialog id="order-dialog" aria-labelledby="order-heading">
+    <div class="dialog-head"><div><h2 id="order-heading">Нова виртуална поръчка</h2><p id="order-market"></p></div><button class="icon-button" data-close="order-dialog" aria-label="Затвори поръчката"><i data-icon="x"></i></button></div>
+    <form id="order-form" class="dialog-form">
+      <div class="two-fields"><label>Посока<select name="side"><option value="buy">Купи</option><option value="sell">Продай</option></select></label><label>Тип<select name="type"><option value="market">Пазарна</option><option value="limit">Лимитирана</option></select></label></div>
+      <div class="two-fields"><label id="order-amount-wrap">Бюджет с такса (€)<input name="amount" type="number" min="5" step="0.01" value="100"></label><label id="limit-wrap" hidden>Лимит цена (€)<input name="limit" type="number" min="0.0001" step="any"></label></div>
+      <label class="check-label" id="all-position-wrap" hidden><input name="all" type="checkbox"> Цялата свободна позиция</label>
+      <div class="order-preview" id="order-preview" hidden></div>
+      <output class="form-message" id="order-message" aria-live="polite"></output>
+      <div class="dialog-actions"><button class="button secondary" type="submit"><i data-icon="eye"></i> Преглед</button><button class="button primary" id="confirm-order" type="button" disabled><i data-icon="check"></i> Потвърди</button></div>
+    </form>
+  </dialog>
+  <dialog id="data-dialog" aria-labelledby="data-heading">
+    <div class="dialog-head"><div><h2 id="data-heading">Данни и виртуална сметка</h2><p id="data-description"></p></div><button class="icon-button" data-close="data-dialog" aria-label="Затвори данните"><i data-icon="x"></i></button></div>
+    <div class="dialog-form">
+      <div class="source-panel"><div><b>Котировка от Kraken</b><p id="live-status">Публичен поток само за котировки.</p></div><button class="button secondary" data-action="live">Свържи</button></div>
+      <form id="session-form" class="session-form">
+        <h3>Нова виртуална сметка</h3>
+        <p>Стартирането заменя локалните позиции и дневника на тази симулация.</p>
+        <div class="two-fields"><label>Начален капитал (€)<input name="capital" type="number" min="50" max="10000000" step="0.01" required></label><label>Пазар<select name="symbol"></select></label></div>
+        <label>Източник<select name="dataset"><option value="market" selected>Борсова история · дневни свещи</option><option value="base">Сценарий · умерени движения</option><option value="volatile">Сценарий · волатилност</option><option value="down">Сценарий · спад</option><option value="csv">Исторически CSV</option></select></label>
+        <label id="csv-wrap" hidden>CSV с минимум 24 свещи<input type="file" name="csv" accept=".csv,text/csv"><small>date,open,high,low,close,volume</small></label>
+        <div class="dialog-actions"><button class="button ghost" data-action="sample" type="button"><i data-icon="download"></i> Примерен CSV</button><button class="button secondary" data-action="check-source" type="button" hidden><i data-icon="eye"></i> Провери данните</button><button class="button primary" type="submit"><i data-icon="plus"></i> Създай сметка</button></div>
+        <output id="session-status" class="form-message" aria-live="polite"></output>
+      </form>
+    </div>
+  </dialog>
+  <div id="toast" class="toast" hidden role="status"></div>
+</body>
+</html>
