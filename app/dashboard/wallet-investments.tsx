@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { portfolioOrderLabels } from './portfolio-account';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { displayMinor, minorToInput, type WalletSettingsInput } from '@/lib/wallet-investments-contract';
 import type { WalletInvestmentsDashboard, WalletInvestmentsOwnerDashboard } from '@/lib/wallet-investments-server';
 import { WalletInvestmentsForm } from './wallet-investments-form';
@@ -11,6 +11,12 @@ import { WalletProviderActions } from './wallet-provider-actions';
 import { TradingConsent } from './trading-consent';
 import { ResearchPanel } from './research';
 import {isWalletOwnerDashboard} from './wallet-dashboard-shape';
+import {InvestmentNavigation,type InvestmentTab} from './investment-navigation';
+import {InvestmentFeeCalculator} from './investment-fee-calculator';
+import {InvestmentProgress,InvestmentOpportunities} from './investment-progress';
+import {CryptoMarketPanel} from './crypto-market';
+import {SharkStrategyChat} from './shark-strategy-chat';
+import WalletForecast from './wallet-forecast';
 import './wallet-investments.css';
 
 const API = '/api/wallet-investments';
@@ -140,49 +146,25 @@ function Forecast({ data }: { data: WalletInvestmentsDashboard }) {
         <div><dt>Актив</dt><dd>{forecast.instrument_code ?? settings.instrument_code ?? 'Няма потвърден актив'}</dd></div>
         <div><dt>Стратегия</dt><dd>{forecast.strategy_label ?? settings.strategy_label ?? 'Няма потвърдена стратегия'}</dd></div>
         {settings.horizon && <div><dt>Избран период</dt><dd>{settings.horizon.horizon_days} {settings.horizon.horizon_days === 1 ? 'ден' : 'дни'}, до {dateLabel(settings.horizon.target_date)}</dd></div>}
+        {settings.target && <div><dt>Зададена цел за печалба</dt><dd>{settings.target.amount_minor!==null
+          ?displayMinor(settings.target.amount_minor,settings.currency):minorToInput(settings.target.return_bps?.toString()??null,2)+' %'}</dd></div>}
       </dl>
     </section>
   );
 }
 
-function AskSharkAi({ access }: { access: WalletInvestmentsDashboard['settings']['ai_access'] }) {
-  const [message, setMessage] = useState('');
-  const [reply, setReply] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  async function ask(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!message.trim() || busy) return;
-    setBusy(true);
-    setError('');
-    setReply('');
-    try {
-      const { response, body } = await request('/agent', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }),
-      });
-      if (!response.ok || typeof body?.reply !== 'string') throw new Error('Agent unavailable');
-      setReply(body.reply);
-    } catch {
-      setError('Shark AI временно е недостъпен за тази заявка.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <section className="ice-section module-panel module-wallet-panel" data-ice-art="agent" aria-labelledby="wallet-agent-title">
-      <h2 id="wallet-agent-title">Shark AI</h2>
-      {access === 'off' && <p>Включи „Само анализ“, за да разрешиш четене на данните от профила.</p>}
-      <form className="module-wallet-form" onSubmit={(event) => void ask(event)} aria-busy={busy}>
-        <label htmlFor="wallet-agent-message">Въпрос към Shark AI</label>
-        <textarea id="wallet-agent-message" value={message} maxLength={16000} rows={3} onChange={(event) => setMessage(event.target.value)} disabled={busy} required />
-        <button type="submit" className="shark-action" disabled={busy || !message.trim()}>{busy ? 'Изпращане…' : 'Попитай Shark AI'}</button>
-      </form>
-      {error && <p className="module-error" role="alert">{error}</p>}
-      {reply && <p className="module-wallet-reply" role="status">{reply}</p>}
-    </section>
-  );
+function StrategyWorkspace({data}:{data:WalletInvestmentsOwnerDashboard}) {
+  const [selected,setSelected]=useState<{id:string;label:string}|null>(null);
+  const choose=(id:string,label:string)=>{
+    setSelected({id,label});
+    requestAnimationFrame(()=>document.getElementById('investment-strategy-conversation')?.focus());
+  };
+  return <>
+    <ResearchPanel domain="investments" currency={data.settings.currency} horizonDays={data.settings.horizon?.horizon_days} onStrategy={choose}/>
+    <div id="investment-strategy-conversation" tabIndex={-1}>
+      <SharkStrategyChat key={selected?.id??'general'} strategyId={selected?.id??null} strategyLabel={selected?.label??null} currency={data.settings.currency??undefined} horizonDays={data.settings.horizon?.horizon_days}/>
+    </div>
+  </>;
 }
 
 export function WalletInvestments({ signInHref }: { signInHref: string }) {
@@ -200,15 +182,17 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
       const { response, body } = await request('', { signal });
       if (signal?.aborted) return;
       if (response.status === 401) {
+        setData(null);
         setState('signed_out');
       } else if (response.ok && isWalletOwnerDashboard(body)) {
         setData(body);
         setState('ready');
       } else {
+        setData(null);
         setState('unavailable');
       }
     } catch {
-      if (!signal?.aborted) setState('unavailable');
+      if (!signal?.aborted) {setData(null);setState('unavailable');}
     }
   }, []);
 
@@ -245,108 +229,123 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
     }
   }
 
-  if (state === 'loading') return <><Link className="shark-action" href="/wallet">Отвори портфейла</Link>
-    <p role="status">Зареждане на портфейла и инвестициите…</p></>;
-  if (state === 'signed_out') return (
-    <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
-      <h2>Достъп до профила</h2>
-      <Link className="shark-action" href="/wallet">Създай портфейл</Link>
-      <Link className="shark-action" href={signInHref}>Вход</Link>
-    </section>
-  );
-  if (state === 'unavailable' || !data) return (
-    <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
-      <p role="alert">Данните временно са недостъпни.</p>
-      <Link className="shark-action" href="/wallet">Отвори портфейла</Link>
-      <button className="shark-action-secondary" type="button" onClick={() => void load()}>Опитай отново</button>
-    </section>
-  );
+  function renderTab(tab:InvestmentTab) {
+    const owner=state==='ready'?data:null;
+    const authHref=tab==='overview'?signInHref:'/login?next='+encodeURIComponent('/dashboard?view=investments&tab='+tab);
+    if(tab==='crypto')return <CryptoMarketPanel/>;
+    if(tab==='calculator')return <>
+      <WalletForecast currency={owner?.settings.currency??'EUR'} initialAmountMinor={owner?.wallet.status==='verified'?owner.wallet.balance_minor:null}/>
+      {owner&&<Forecast data={owner}/>}
+      <InvestmentFeeCalculator data={owner}/>
+      {owner&&<FeeReport fee={owner.performance_fee}/>}
+    </>;
+    if (state === 'loading') return <><Link className="shark-action" href="/wallet">Отвори портфейла</Link>
+      <p role="status">Зареждане на портфейла и инвестициите…</p></>;
+    if (state === 'signed_out') return (
+      <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
+        <h2>Достъп до профила</h2>
+        <Link className="shark-action" href="/wallet">Създай портфейл</Link>
+        <Link className="shark-action" href={authHref}>Вход</Link>
+      </section>
+    );
+    if (state === 'unavailable' || !data) return (
+      <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
+        <p role="alert">Данните временно са недостъпни.</p>
+        <Link className="shark-action" href="/wallet">Отвори портфейла</Link>
+        <button className="shark-action-secondary" type="button" onClick={() => void load()}>Опитай отново</button>
+      </section>
+    );
 
-  const { settings, wallet, investments, performance_fee:fee } = data;
-  const brokerCashStatus = investments.status === 'provider_unlinked' && (!settings.currency || !settings.instrument_code || !settings.strategy_label)
-    ? 'При една свързана стратегия за валутата тя се избира автоматично. При няколко избери актив и стратегия в настройките.'
-    : brokerProviderCopy[investments.status];
-  const canRevoke = settings.ai_access === 'analysis_only' || data.broker_activity.status === 'unavailable'
-    || data.broker_activity.accounts.some((account) => !account.halted_at);
-  const target = settings.target;
-  const targetAmount = target && (target.amount_minor !== null
-    ? displayMinor(target.amount_minor, settings.currency)
-    : minorToInput(target.return_bps?.toString() ?? null, 2) + ' %');
-  return (
-    <>
-      <Forecast data={data} />
-      <div className="module-wallet-split">
-        <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-account-title">
-          <h2 id="wallet-account-title">Портфейл</h2>
-          <Link className="shark-action" href="/wallet">{wallet.status==='verified'?'Отвори портфейла':'Създай портфейл'}</Link>
-          <p>{walletProviderCopy[wallet.status]}</p>
-          <dl className="module-wallet-metrics">
-            <div><dt>Баланс</dt><dd>{displayMinor(wallet.balance_minor, wallet.currency)}</dd></div>
-            {wallet.source && <div><dt>Източник</dt><dd>{sourceName(wallet.source)}</dd></div>}
-            {wallet.observed_at && <div><dt>Проверено към</dt><dd>{dateLabel(wallet.observed_at, true)}</dd></div>}
-          </dl>
-          <WalletProviderActions data={data} action={walletAction} key={settings.currency ?? ''} />
+    const { settings, wallet, investments } = data;
+    if(tab==='opportunities')return <InvestmentOpportunities currency={settings.currency}/>;
+    if(tab==='strategies')return <StrategyWorkspace key={settings.currency??'unknown'} data={data}/>;
+    const brokerCashStatus = investments.status === 'provider_unlinked' && (!settings.currency || !settings.instrument_code || !settings.strategy_label)
+      ? 'При една свързана стратегия за валутата тя се избира автоматично. При няколко избери актив и стратегия в настройките.'
+      : brokerProviderCopy[investments.status];
+    const canRevoke = settings.ai_access === 'analysis_only' || data.broker_activity.status === 'unavailable'
+      || data.broker_activity.accounts.some((account) => !account.halted_at);
+    const target = settings.target;
+    const targetAmount = target && (target.amount_minor !== null
+      ? displayMinor(target.amount_minor, settings.currency)
+      : minorToInput(target.return_bps?.toString() ?? null, 2) + ' %');
+    return (
+      <>
+        <InvestmentProgress/>
+        <div className="module-wallet-split">
+          <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-account-title">
+            <h2 id="wallet-account-title">Портфейл</h2>
+            <Link className="shark-action" href="/wallet">{wallet.status==='verified'?'Отвори портфейла':'Създай портфейл'}</Link>
+            <p>{walletProviderCopy[wallet.status]}</p>
+            <dl className="module-wallet-metrics">
+              <div><dt>Баланс</dt><dd>{displayMinor(wallet.balance_minor, wallet.currency)}</dd></div>
+              {wallet.source && <div><dt>Източник</dt><dd>{sourceName(wallet.source)}</dd></div>}
+              {wallet.observed_at && <div><dt>Проверено към</dt><dd>{dateLabel(wallet.observed_at, true)}</dd></div>}
+            </dl>
+            <WalletProviderActions data={data} action={walletAction} key={settings.currency ?? ''} />
+          </section>
+          <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="broker-account-title">
+            <h2 id="broker-account-title">Инвестиции</h2>
+            <p>{brokerCashStatus}</p>
+            <dl className="module-wallet-metrics">
+              <div><dt>Налични средства</dt><dd>{displayMinor(investments.cash_available_minor, investments.currency)}</dd></div>
+              <div><dt>Стойност на брокерската сметка</dt><dd>{displayMinor(investments.equity_minor, investments.currency)}</dd></div>
+              {investments.source && <div><dt>Източник</dt><dd>{sourceName(investments.source)}</dd></div>}
+              {investments.observed_at && <div><dt>Проверено към</dt><dd>{dateLabel(investments.observed_at, true)}</dd></div>}
+              {target && <div><dt>Целева печалба</dt><dd>{targetAmount} до {dateLabel(target.target_date)}</dd></div>}
+            </dl>
+            <BrokerActivityPanel activity={data.broker_activity} />
+          </section>
+        </div>
+        <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-settings-title">
+          <h2 id="wallet-settings-title">Настройки</h2>
+          <WalletInvestmentsForm key={JSON.stringify(settings)} settings={settings} busy={saving} onSave={change} />
+          {canRevoke && <>
+            <p id="wallet-revoke-description">Изключва AI достъпа и спира нови автоматични поръчки.</p>
+            <button className="shark-action-secondary" type="button" aria-describedby="wallet-revoke-description" disabled={saving} onClick={() => void change()}>Прекрати автоматичния достъп</button>
+          </>}
+          {notice && <p role="status">{notice}</p>}
+          {error && <p className="module-error" role="alert">{error}</p>}
         </section>
-        <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="broker-account-title">
-          <h2 id="broker-account-title">Инвестиции</h2>
-          <p>{brokerCashStatus}</p>
-          <dl className="module-wallet-metrics">
-            <div><dt>Налични средства</dt><dd>{displayMinor(investments.cash_available_minor, investments.currency)}</dd></div>
-            <div><dt>Стойност на брокерската сметка</dt><dd>{displayMinor(investments.equity_minor, investments.currency)}</dd></div>
-            {investments.source && <div><dt>Източник</dt><dd>{sourceName(investments.source)}</dd></div>}
-            {investments.observed_at && <div><dt>Проверено към</dt><dd>{dateLabel(investments.observed_at, true)}</dd></div>}
-            {target && <div><dt>Целева печалба</dt><dd>{targetAmount} до {dateLabel(target.target_date)}</dd></div>}
-          </dl>
-          <BrokerActivityPanel activity={data.broker_activity} />
+        <TradingConsent key={JSON.stringify(settings)} />
+        <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-weekly-title">
+          <h2 id="wallet-weekly-title">Резултат за последната завършена седмица</h2>
+          {data.weekly_report.status === 'available' ? <>
+            <p>Период от {dateLabel(data.weekly_report.window_start)} до {dateLabel(new Date(Date.parse(data.weekly_report.window_end)-1).toISOString())} (UTC)</p>
+            <dl className="module-wallet-metrics">
+              <div><dt>Нетен резултат</dt><dd>{displayMinor(data.weekly_report.net_minor,data.weekly_report.currency)}</dd></div>
+              <div><dt>Реализиран резултат след такси</dt><dd>{displayMinor(data.weekly_report.realized_after_fees_minor,data.weekly_report.currency)}</dd></div>
+              <div><dt>Промяна в нереализирания резултат</dt><dd>{displayMinor(data.weekly_report.unrealized_minor,data.weekly_report.currency)}</dd></div>
+              <div><dt>Нереализиран резултат в края на периода</dt><dd>{displayMinor(data.weekly_report.unrealized_closing_minor,data.weekly_report.currency)}</dd></div>
+              <div><dt>Такси</dt><dd>{displayMinor(data.weekly_report.fees_minor,data.weekly_report.currency)}</dd></div>
+              <div><dt>Постъпления</dt><dd>{displayMinor(data.weekly_report.deposits_minor,data.weekly_report.currency)}</dd></div>
+              <div><dt>Тегления</dt><dd>{displayMinor(data.weekly_report.withdrawals_minor,data.weekly_report.currency)}</dd></div>
+              <div><dt>Източник</dt><dd>{sourceName(data.weekly_report.source)}</dd></div>
+              <div><dt>Проверено към</dt><dd>{dateLabel(data.weekly_report.reported_as_of,true)}</dd></div>
+            </dl>
+            <p>Нетният резултат е сумата на реализирания резултат и промяната в нереализирания резултат след приспадане на таксите.</p>
+          </> : <p>Няма потвърден седмичен отчет от брокера.</p>}
         </section>
-      </div>
-      <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-settings-title">
-        <h2 id="wallet-settings-title">Настройки</h2>
-        <WalletInvestmentsForm key={JSON.stringify(settings)} settings={settings} busy={saving} onSave={change} />
-        {canRevoke && <>
-          <p id="wallet-revoke-description">Изключва AI достъпа и спира нови автоматични поръчки.</p>
-          <button className="shark-action-secondary" type="button" aria-describedby="wallet-revoke-description" disabled={saving} onClick={() => void change()}>Прекрати автоматичния достъп</button>
-        </>}
-        {notice && <p role="status">{notice}</p>}
-        {error && <p className="module-error" role="alert">{error}</p>}
-      </section>
-      <TradingConsent key={JSON.stringify(settings)} />
-      <ResearchPanel domain="investments" currency={settings.currency} horizonDays={settings.horizon?.horizon_days} />
-      <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-fee-title">
-        <h2 id="wallet-fee-title">Такса върху печалбата</h2>
-        {fee.status==='available' ? <>
-          <p>{fee.fee_minor==='0' ? 'Периодът е приключен с нулева такса.'
-            : fee.settlement==='reversed' ? 'Брокерът потвърди анулиране на заверката по административната сметка.'
-            : fee.settlement==='credited' ? 'Брокерът потвърди заверяването на таксата по административната сметка.'
-            : 'Таксата е начислена. Очаква се потвърждение от брокера за заверяване по административната сметка.'}</p>
-          <dl className="module-wallet-metrics">
-            <div><dt>Край на периода</dt><dd>{dateLabel(fee.period_end)}</dd></div>
-            <div><dt>Реализиран резултат за периода</dt><dd>{displayMinor(fee.period_result_minor,fee.currency)}</dd></div>
-            <div><dt>Нова допустима нетна печалба</dt><dd>{displayMinor(fee.eligible_profit_minor,fee.currency)}</dd></div>
-            <div><dt>Такса 10%</dt><dd>{displayMinor(fee.fee_minor,fee.currency)}</dd></div>
-            <div><dt>Печалба за собственика след таксата</dt><dd>{displayMinor(fee.client_net_minor,fee.currency)}</dd></div>
-          </dl>
-        </> : <p>Няма потвърдено приключване на период с отчет за такса.</p>}
-      </section>
-      <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-weekly-title">
-        <h2 id="wallet-weekly-title">Резултат за последната завършена седмица</h2>
-        {data.weekly_report.status === 'available' ? <>
-          <p>Период от {dateLabel(data.weekly_report.window_start)} до {dateLabel(new Date(Date.parse(data.weekly_report.window_end)-1).toISOString())} (UTC)</p>
-          <dl className="module-wallet-metrics">
-            <div><dt>Нетен резултат</dt><dd>{displayMinor(data.weekly_report.net_minor,data.weekly_report.currency)}</dd></div>
-            <div><dt>Реализиран резултат след такси</dt><dd>{displayMinor(data.weekly_report.realized_after_fees_minor,data.weekly_report.currency)}</dd></div>
-            <div><dt>Промяна в нереализирания резултат</dt><dd>{displayMinor(data.weekly_report.unrealized_minor,data.weekly_report.currency)}</dd></div>
-            <div><dt>Нереализиран резултат в края на периода</dt><dd>{displayMinor(data.weekly_report.unrealized_closing_minor,data.weekly_report.currency)}</dd></div>
-            <div><dt>Такси</dt><dd>{displayMinor(data.weekly_report.fees_minor,data.weekly_report.currency)}</dd></div>
-            <div><dt>Постъпления</dt><dd>{displayMinor(data.weekly_report.deposits_minor,data.weekly_report.currency)}</dd></div>
-            <div><dt>Тегления</dt><dd>{displayMinor(data.weekly_report.withdrawals_minor,data.weekly_report.currency)}</dd></div>
-            <div><dt>Източник</dt><dd>{sourceName(data.weekly_report.source)}</dd></div>
-            <div><dt>Проверено към</dt><dd>{dateLabel(data.weekly_report.reported_as_of,true)}</dd></div>
-          </dl>
-          <p>Нетният резултат е сумата на реализирания резултат и промяната в нереализирания резултат след приспадане на таксите.</p>
-        </> : <p>Няма потвърден седмичен отчет от брокера.</p>}
-      </section>
-      <AskSharkAi access={settings.ai_access} />
-    </>
-  );
+      </>
+    );
+  }
+  return <InvestmentNavigation>{renderTab}</InvestmentNavigation>;
+}
+
+function FeeReport({fee}:{fee:WalletInvestmentsOwnerDashboard['performance_fee']}) {
+  return <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-fee-title">
+    <h2 id="wallet-fee-title">Последна отчетена такса върху печалбата</h2>
+    {fee.status==='available' ? <>
+      <p>{fee.fee_minor==='0' ? 'Периодът е приключен с нулева такса.'
+        : fee.settlement==='reversed' ? 'Брокерът потвърди анулиране на заверката по административната сметка.'
+        : fee.settlement==='credited' ? 'Брокерът потвърди заверяването на таксата по административната сметка.'
+        : 'Таксата е начислена. Очаква се потвърждение от брокера за заверяване по административната сметка.'}</p>
+      <dl className="module-wallet-metrics">
+        <div><dt>Край на периода</dt><dd>{dateLabel(fee.period_end)}</dd></div>
+        <div><dt>Реализиран резултат за периода</dt><dd>{displayMinor(fee.period_result_minor,fee.currency)}</dd></div>
+        <div><dt>Нова допустима нетна печалба</dt><dd>{displayMinor(fee.eligible_profit_minor,fee.currency)}</dd></div>
+        <div><dt>Такса 10%</dt><dd>{displayMinor(fee.fee_minor,fee.currency)}</dd></div>
+        <div><dt>Печалба за собственика след таксата</dt><dd>{displayMinor(fee.client_net_minor,fee.currency)}</dd></div>
+      </dl>
+    </> : <p>Няма потвърдено приключване на период с отчет за такса.</p>}
+  </section>;
 }

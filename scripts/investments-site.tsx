@@ -42,7 +42,7 @@ function SitePortfolio({ host, moduleBase }: SiteOptions) {
     market={<PortfolioMarkets feedUrl={feedUrl}/>}
     onOpenMarkets={() => { location.hash = marketHash; }}
     onOpenAccount={() => location.assign(loginFor(portfolioRoute + '&panel=account&section=manage'))}
-    onOpenSimulator={() => location.assign(new URL('simulator.html', base).href)}
+    onOpenCalculator={() => location.assign(productOrigin + portfolioRoute + '&tab=calculator')}
     onAction={startAction} signInHref={loginFor(portfolioRoute)}/>;
 }
 

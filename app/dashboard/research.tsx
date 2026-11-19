@@ -29,7 +29,7 @@ function metricValue(name:string,value:Metric,currency:string|null) {
   if(name.endsWith('_bps')) return (Number(value)/100).toLocaleString('bg-BG',{maximumFractionDigits:2})+'%';
   return typeof value==='number'?value.toLocaleString('bg-BG'):value;
 }
-export function ResearchPanel({domain,currency,horizonDays}:{domain:Domain;currency:string|null;horizonDays?:number|null}) {
+export function ResearchPanel({domain,currency,horizonDays,onStrategy}:{domain:Domain;currency:string|null;horizonDays?:number|null;onStrategy?:(id:string,label:string)=>void}) {
   const [revision,setRevision]=useState(0);
   const [horizonOverride,setHorizonOverride]=useState<number|null>(null);
   const horizon=horizonOverride??horizonDays??7;
@@ -73,6 +73,8 @@ export function ResearchPanel({domain,currency,horizonDays}:{domain:Domain;curre
           <dl className="module-wallet-metrics">{Object.entries(metricNames).filter(([key])=>key in candidate.metrics).map(([key,title])=>
             <div key={key}><dt>{title}</dt><dd>{metricValue(key,candidate.metrics[key],report.currency)}</dd></div>)}</dl>
           {candidate.reasons.length>0 && <ul>{candidate.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul>}
+          {investment&&onStrategy&&<button type="button" className="shark-action-secondary"
+            onClick={()=>onStrategy(candidate.id,candidate.label)}>Обсъди стратегията с Shark AI</button>}
         </details>)}
       </>}
     <button type="button" className="shark-action-secondary" onClick={()=>setRevision(n=>n+1)}>Обнови сравнението</button>

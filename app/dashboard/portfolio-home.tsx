@@ -3,7 +3,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import {
   ArrowDownLeft, ArrowUpRight, BarChart3, ChartCandlestick, ChevronDown,
-  Eye, EyeOff, FlaskConical, History, Layers3, Settings2,
+  Eye, EyeOff, Calculator, History, Layers3, Settings2,
   type LucideIcon,
 } from 'lucide-react';
 import type { PortfolioAccount } from './portfolio-account';
@@ -16,7 +16,7 @@ type PortfolioHomeProps = {
   market: ReactNode;
   onOpenMarkets: () => void;
   onOpenAccount: () => void;
-  onOpenSimulator: () => void;
+  onOpenCalculator: () => void;
   onAction: (action: PortfolioAction) => void;
   signInHref?: string;
 };
@@ -145,7 +145,7 @@ function AccountLists({ account, hidden, onOpenAccount }: {
   </section>;
 }
 
-export function PortfolioHome({ account, market, onOpenMarkets, onOpenAccount, onOpenSimulator, onAction, signInHref }: PortfolioHomeProps) {
+export function PortfolioHome({ account, market, onOpenMarkets, onOpenAccount, onOpenCalculator, onAction, signInHref }: PortfolioHomeProps) {
   const [hidden, setHidden] = useState(false);
   const guest = account.status === 'guest';
   const ready = account.status === 'ready';
@@ -196,7 +196,7 @@ export function PortfolioHome({ account, market, onOpenMarkets, onOpenAccount, o
             description={guest ? 'Вход за теглене от портфейла' : account.canWithdraw ? 'Теглене от портфейла' : 'Условия за теглене от сметката'}
             onClick={() => onAction('withdrawal')}/>
           <ActionButton label="Пазари" icon={BarChart3} onClick={onOpenMarkets}/>
-          <ActionButton label="Симулатор" icon={FlaskConical} onClick={onOpenSimulator}/>
+          <ActionButton label="Калкулатор" icon={Calculator} onClick={onOpenCalculator}/>
         </div>
       </section>
       <AccountLists account={account} hidden={hidden} onOpenAccount={onOpenAccount}/>

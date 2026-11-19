@@ -24,10 +24,6 @@ if (embedded) {
   }
 }
 
-// Preserve bookmarks to the original seven-day simulation.
 if (livePage && location.hash === '#weekly') {
-  const simulator = new URL('./simulator.html', location.href);
-  simulator.search = location.search;
-  simulator.hash = 'weekly';
-  location.replace(simulator);
+  location.replace('/dashboard?view=investments&tab=calculator');
 }
