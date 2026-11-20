@@ -113,60 +113,121 @@ function WalletSettings({account,update}:{account:Account;update:(next:Account)=
 }
 
 export function WalletHome({section}:{section:Section}){
-  const [account,setAccount]=useState<Account>({state:'loading',data:null}),[refresh,setRefresh]=useState(0);
-  const [hideBalance,setHideBalance]=useState(false),[payment,setPayment]=useState<Payment|null>(null);
-  useEffect(()=>{
-    const controller=new AbortController();
-    setAccount({state:'loading',data:null});
-    void fetch('/api/wallet-investments',{cache:'no-store',signal:controller.signal}).then(async res=>{
-      if(res.status===401){if(!controller.signal.aborted)setAccount({state:'guest',data:null});return;}
-      const body=await res.json();if(!res.ok||!isWalletOwnerDashboard(body))throw Error();
-      if(!controller.signal.aborted)setAccount({state:'ready',data:body});
-    }).catch(()=>{if(!controller.signal.aborted)setAccount({state:'unavailable',data:null});});
-    return ()=>controller.abort();
-  },[refresh]);
-  const data=account.data,wallet=data?.wallet,verified=wallet?.status==='verified';
-  const currency=wallet?.currency??data?.settings.currency??'EUR';
-  const source=wallet?providerStatus[wallet.status]:account.state==='loading'?'Зареждане на сметката…':account.state==='guest'?'Влез, за да видиш наличността си.':'Връзката със сметката е временно недостъпна.';
-  const visible=verified?displayMinor(wallet.balance_minor,wallet.currency):'—';
-  const paymentState=payment?payments[payment]:null;
-  return <div className="sw-root"><div className="sw-shell">
-    <header className="sw-header"><Link href="/wallet" className="sw-wordmark" aria-label="Shark AI Портфейл"><Logo size="sm"/><span>Shark<strong>AI</strong></span><i/>Портфейл</Link>
-      <Link href="/dashboard?view=investments" className="sw-return"><ArrowLeft/>Към Shark AI</Link></header>
-    <nav className="sw-navigation" aria-label="Навигация в портфейла">{(Object.keys(tabs) as Section[]).map(id=>{
-      const {label,icon:Icon}=tabs[id];return <Link key={id} className="sw-nav-item" href={tabLink(id)} aria-current={section===id?'page':undefined}><Icon/>{label}</Link>;
-    })}</nav>
-    <main className="sw-main">
-      {section==='overview'?<>
-        <section className="sw-hero"><div className="sw-hero-copy"><div className="sw-account-label"><Wallet/> Личен портфейл</div>
-          <h1>Моята наличност</h1>
-          <div className="sw-balance"><strong>{hideBalance?'••••':visible}</strong>{verified&&<button type="button"
-            onClick={()=>setHideBalance(v=>!v)} aria-label={hideBalance?'Покажи баланса':'Скрий баланса'}>{hideBalance?<EyeOff/>:<Eye/>}</button>}</div>
-          <p aria-live="polite">{source}{verified&&' · '+dateLabel(wallet.observed_at,true)+' (София)'}</p>
-          {account.state==='guest'?<Link className="sw-btn" href={login('overview')}>Вход в портфейла <ArrowRight/></Link>:
-            account.state==='ready'&&!verified?<Link className="sw-btn" href={tabLink('settings')}>Свържи сметка <ArrowRight/></Link>:
-            account.state==='unavailable'?<button className="sw-btn" onClick={()=>setRefresh(n=>n+1)}>Провери отново <RefreshCw/></button>:null}
-        </div></section>
-        <div className="sw-grid"><div className="sw-stack">
-          <div className="sw-actions" aria-label="Операции с пари">{(Object.keys(payments) as Payment[]).map(id=>{
-            const {icon:Icon,label}=payments[id];return <button key={id} type="button" aria-pressed={payment===id}
-              onClick={()=>setPayment(current=>current===id?null:id)}><span><Icon/></span>{label}</button>;
-          })}</div>
-          {paymentState&&<section className="sw-panel sw-pay-state" aria-live="polite"><h2>{paymentState.title}</h2>
-            {verified?<><p>{paymentState.body}</p><a href={wise} target="_blank" rel="noopener noreferrer" className="sw-btn">Продължи в Wise <ArrowUpRight/></a></>:
-              <><p>{account.state==='guest'?'Влез и свържи платежна сметка, за да използваш тази операция.':'Тази операция изисква потвърдена сметка при доставчика.'}</p>
-                <Link href={account.state==='guest'?login('settings'):tabLink('settings')} className="sw-btn sw-btn-secondary">{account.state==='guest'?'Вход в Shark AI':'Към настройките'} <ChevronRight/></Link></>}
-          </section>}
-          <Transactions account={account} compact/>
-        </div>
-        <Link href={tabLink('forecast')} className="sw-forecast-card"><span className="sw-tile-icon"><ChartNoAxesCombined/></span>
-          <h2>Прогноза</h2><p>Въведи сума и сравни възможните резултати за избран период.</p><span className="sw-tile-link">Изчисли диапазон <ArrowRight/></span></Link></div>
-      </>:<>
-        <div className="sw-page-heading"><span>{section==='transactions'?<Activity/>:section==='settings'?<Settings2/>:<Waypoints/>} Личен портфейл</span>
-          <h1>{tabs[section].label}</h1></div>
-        {section==='transactions'?<Transactions account={account}/>:section==='forecast'?<WalletForecast currency={currency} initialAmountMinor={verified?wallet.balance_minor:null}/>:
-          <WalletSettings account={account} update={setAccount}/>}
-      </>}
-    </main>
-  </div></div>;
+ const [account,setAccount]=useState<Account>({state:'loading',data:null}),[refresh,setRefresh]=useState(0);
+ const [hideBalance,setHideBalance]=useState(false),[payment,setPayment]=useState<Payment|null>(null);
+ const [showAccounts,setShowAccounts]=useState(false);
+ useEffect(()=>{
+   const controller=new AbortController();
+   setAccount({state:'loading',data:null});
+   void fetch('/api/wallet-investments',{cache:'no-store',signal:controller.signal}).then(async res=>{
+     if(res.status===401){if(!controller.signal.aborted)setAccount({state:'guest',data:null});return;}
+     const body=await res.json();if(!res.ok||!isWalletOwnerDashboard(body))throw Error();
+     if(!controller.signal.aborted)setAccount({state:'ready',data:body});
+   }).catch(()=>{if(!controller.signal.aborted)setAccount({state:'unavailable',data:null});});
+   return ()=>controller.abort();
+ },[refresh]);
+ const data=account.data,wallet=data?.wallet,verified=wallet?.status==='verified';
+ const currency=wallet?.currency??data?.settings.currency??'EUR';
+ const source=wallet?providerStatus[wallet.status]:account.state==='loading'?'Зареждане на сметката…':account.state==='guest'?'Влез, за да видиш наличността си.':'Връзката със сметката е временно недостъпна.';
+ const visible=verified?displayMinor(wallet.balance_minor,wallet.currency).replace(/ EUR$/,' €'):'—';
+ const paymentState=payment?payments[payment]:null;
+ return <div className="sw-root"><div className="sw-shell">
+   <header className="sw-header">
+     <img className="sw-header-muscular-shark" src="/sharkai/chat/header-shark-muscular.webp" alt="" aria-hidden="true"/>
+     <Link href="/wallet" className="sw-wordmark" aria-label="SharkAI Портфейл">
+       <img className="sw-header-avatar" src="/sharkai/chat/shark-avatar.webp" alt="Акула SharkAI"/>
+       <Logo size="sm"/><span>Shark<strong>AI</strong></span><i/>Портфейл
+     </Link>
+     <div className="sw-mobile-tools">
+       <Link className="sw-mobile-search" href={tabLink('transactions')} aria-label="Търси в движенията"><Search/><span>Търси</span></Link>
+       <Link href="/dashboard?view=investments" aria-label="Инвестиции"><ChartNoAxesCombined/></Link>
+       <Link href={tabLink('cards')} aria-label="Карти"><CreditCard/></Link>
+     </div>
+     <div className="sw-desktop-tools">
+       <Link href="/dashboard?view=investments"><ChartNoAxesCombined/> Инвестиции</Link>
+       <Link href="/dashboard?view=settings"><Settings2/> Профил</Link>
+       <Link href="/dashboard?view=investments" className="sw-return"><ArrowLeft/>Към Shark AI</Link>
+     </div>
+   </header>
+   <nav className="sw-navigation" aria-label="Десктоп навигация в портфейла">{desktopTabs.map(id=>{
+     const {label,icon:Icon}=tabs[id];return <Link key={id} className="sw-nav-item" href={tabLink(id)}
+     aria-current={section===id?'page':undefined}><Icon/>{label}</Link>;
+   })}</nav>
+   <main className="sw-main">
+     {section==='overview'?<>
+       <section className="sw-hero"><div className="sw-hero-copy">
+         <h1>Достъпни средства</h1>
+         <div className="sw-account-label"><Wallet/> Основна · {currency}</div>
+         <div className={'sw-provider-chip '+(verified?'is-connected':'')} aria-live="polite">
+           <ShieldCheck/>{verified?'Wise · Свързан':account.state==='loading'?'Проверка на Wise…':'Wise · Непотвърден'}
+         </div>
+         <div className="sw-balance"><strong>{hideBalance?'••••':visible}</strong>
+           {verified&&<button type="button" onClick={()=>setHideBalance(v=>!v)}
+             aria-label={hideBalance?'Покажи баланса':'Скрий баланса'}>{hideBalance?<EyeOff/>:<Eye/>}</button>}
+         </div>
+         <button type="button" className="sw-btn sw-account-toggle" aria-expanded={showAccounts}
+           aria-controls="sw-account-options" onClick={()=>setShowAccounts(v=>!v)}>Сметки <ChevronDown/></button>
+         {showAccounts&&<div className="sw-account-options" id="sw-account-options">
+           <div className="sw-account-option"><Wallet/> Основна · {currency}<span>{verified?'✓':'—'}</span></div>
+           <button type="button" className="sw-account-option" onClick={()=>setHideBalance(v=>!v)}>
+             {hideBalance?<Eye/>:<EyeOff/>}{hideBalance?'Покажи наличността':'Скрий наличността'}<small>Локално</small>
+           </button>
+           <div className="sw-account-option is-unavailable"><LockKeyhole/> Джобове / касички <small>Няма потвърдени данни</small></div>
+           <Link className="sw-account-option" href={tabLink('settings')}><Settings2/> Управление на Wise <ArrowRight/></Link>
+         </div>}
+         <p className="sw-balance-status" aria-live="polite">{source}{verified&&' · '+dateLabel(wallet.observed_at,true)+' (София)'}</p>
+         {account.state==='guest'?<Link className="sw-btn sw-auth-link" href={login('overview')}>Вход в портфейла <ArrowRight/></Link>:
+           account.state==='ready'&&!verified?<Link className="sw-btn sw-auth-link" href={tabLink('settings')}>Свържи сметка <ArrowRight/></Link>:
+           account.state==='unavailable'?<button type="button" className="sw-btn sw-auth-link" onClick={()=>setRefresh(n=>n+1)}>Провери отново <RefreshCw/></button>:null}
+       </div></section>
+       <div className="sw-grid">
+         <div className="sw-stack">
+           <div className="sw-actions" aria-label="Операции с пари">
+             <button type="button" aria-pressed={payment==='fund'} onClick={()=>setPayment(p=>p==='fund'?null:'fund')}><span><Plus/></span>Захрани</button>
+             <button type="button" aria-pressed={payment==='send'} onClick={()=>setPayment(p=>p==='send'?null:'send')}><span><ArrowLeftRight/></span>Прехвърли</button>
+             <button type="button" className="sw-desktop-action" aria-pressed={payment==='withdraw'} onClick={()=>setPayment(p=>p==='withdraw'?null:'withdraw')}><span><ArrowUpFromLine/></span>Изтегли</button>
+             <Link className="sw-mobile-action" href={tabLink('details')}><span><Wallet/></span>Детайли</Link>
+             <Link className="sw-mobile-action" href={tabLink('settings')}><span><MoreHorizontal/></span>Още</Link>
+           </div>
+           {paymentState&&<section className="sw-panel sw-pay-state" aria-live="polite"><h2>{paymentState.title}</h2>
+             {verified?<><p>{paymentState.body}</p><a href={wise} target="_blank" rel="noopener noreferrer" className="sw-btn">Продължи в Wise <ArrowUpRight/></a></>:
+               <><p>{account.state==='guest'?'Влез и свържи платежна сметка, за да използваш тази операция.':'Тази операция изисква потвърдена сметка при доставчика.'}</p>
+                 <Link href={account.state==='guest'?login('settings'):tabLink('settings')} className="sw-btn sw-btn-secondary">{account.state==='guest'?'Вход в SharkAI':'Към настройките'} <ChevronRight/></Link></>}
+           </section>}
+           <Transactions account={account} compact/>
+         </div>
+         <WalletReferenceConverter compact/>
+       </div>
+     </>:section==='transactions'?<>
+       <div className="sw-page-heading"><span><Activity/> Личен портфейл</span><h1>Движения</h1></div>
+       <Transactions account={account}/>
+     </>:section==='currencies'?<>
+       <div className="sw-page-heading"><span><ArrowLeftRight/> Личен портфейл</span><h1>Валути</h1></div>
+       <WalletReferenceConverter/>
+     </>:section==='cards'?<>
+       <div className="sw-page-heading"><span><CreditCard/> Личен портфейл</span><h1>Карти</h1></div>
+       <WalletCardsReadOnly/>
+     </>:section==='details'?<>
+       <div className="sw-page-heading"><span><Wallet/> Личен портфейл</span><h1>Детайли</h1></div>
+       <section className="sw-panel sw-account-details"><h2>Основна сметка · {currency}</h2>
+         <p>{source}</p><strong>{hideBalance?'••••':visible}</strong>
+         <p>{verified?'Данните са потвърдени към '+dateLabel(wallet.observed_at,true):'Няма потвърдена наличност.'}</p>
+         <Link className="sw-btn" href={tabLink('settings')}>Управление на Wise <ArrowRight/></Link>
+       </section>
+     </>:section==='forecast'?<>
+       <div className="sw-page-heading"><span><Waypoints/> Личен портфейл</span><h1>Прогноза</h1></div>
+       <WalletForecast currency={currency} initialAmountMinor={verified?wallet.balance_minor:null}/>
+     </>:<>
+       <div className="sw-page-heading"><span><Settings2/> Личен портфейл</span><h1>Настройки</h1></div>
+       <WalletSettings account={account} update={setAccount}/>
+     </>}
+   </main>
+   <nav className="sw-mobile-navigation" aria-label="Главна мобилна навигация">
+     <Link className={section==='overview'?'is-active':''} aria-current={section==='overview'?'page':undefined} href="/wallet"><House/>Начало</Link>
+     <Link href="/dashboard?view=investments"><ChartNoAxesCombined/>Инвестиции</Link>
+     <Link className={section==='transactions'?'is-active':''} href={tabLink('transactions')}><ArrowLeftRight/>Плащания</Link>
+     <Link className={section==='currencies'?'is-active':''} href={tabLink('currencies')}><span className="sw-crypto-symbol">₿</span>Крипто</Link>
+     <Link className={section==='settings'?'is-active':''} href={tabLink('settings')}><MoreHorizontal/>Още</Link>
+   </nav>
+ </div></div>;
 }
