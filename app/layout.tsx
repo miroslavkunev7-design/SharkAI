@@ -4,6 +4,7 @@ import { desktopWebRevision } from '@/lib/build-revision';
 import { DesktopWebUpdate } from './desktop-web-update';
 import { QuickChatWidget } from './quick-chat-widget';
 import './quick-chat.css';
+import './sharkai-ultra.css';
 
 export const metadata: Metadata = {
   title: 'SharkAI — AI чат и работно пространство',
