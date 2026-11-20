@@ -1,0 +1,146 @@
+/* SharkAI Wallet: APPROVED presentation only, no Wise/API/payment logic.
+ * Full-bleed glacier texture and photographic blends from supplied asset package.
+ * DO NOT regenerate approved images; installer places files in public/sharkai/wallet/.
+ */
+.sw-root {
+  --sw-violet:#6b29d2; --sw-purple:#4317a2; --sw-sapphire:#073ca2;
+  --sw-cyan:#22dcff; --sw-ice-ink:#0b2450;
+  --sw-halo:0 0 0 1px #e3f8ffd0 inset,0 0 14px #2bdcff70,0 0 28px #6c28c34b;
+  --sw-glass:linear-gradient(121deg,#430e9bda 0%,#252fa6dd 47%,#05bce0d8 100%);
+  background:
+    linear-gradient(180deg,#071c39b8 0%,#075b8270 36%,#e4f7ff20 80%,#071c39a1 100%),
+    url('/sharkai/wallet/coast-day.webp') center 42% / cover fixed no-repeat,
+    #10365c;
+  color:#eef8ff;
+}
+.sw-root :is(button,a){-webkit-tap-highlight-color:transparent;}
+.sw-shell {max-width:1550px; padding-inline:clamp(15px,2.4vw,38px);}
+.sw-header {
+  position:relative; isolation:isolate; min-height:90px;
+  padding:16px clamp(12px,2vw,30px);
+  border:1px solid #baeeff7a; border-bottom:0; border-radius:0 0 25px 25px;
+  background:radial-gradient(ellipse 60% 100% at 83% 3%,#447cf66d,transparent 68%),
+    linear-gradient(115deg,#22136fe8,#3e1b9ded 42%,#034cbeed 77%,#18a9d6e0 100%);
+  box-shadow:inset 0 1px 0 #fff8,0 7px 28px #170d6477,0 0 11px #39d8ff8c;
+  overflow:hidden;
+}
+.sw-header::after {
+  content:''; position:absolute; left:0; right:0; bottom:0; height:3px; pointer-events:none;
+  background:linear-gradient(90deg,#f4e9ff 0%,#9dc6ff 32%,#00ebff 74%,#e8dfff 100%);
+  box-shadow:0 0 8px 2px #b748fb73;
+}
+.sw-wordmark,.sw-return {color:#fff; text-shadow:0 1px 3px #0009; position:relative;z-index:1;}
+.sw-wordmark span strong{color:#15f0ff;}
+.sw-navigation {
+  justify-content:flex-end; gap:clamp(5px,1vw,14px);padding:12px 10px 16px;
+  margin:0 0 2px; border-bottom:1px solid #a9e9fc5e;
+}
+.sw-nav-item {
+  background:linear-gradient(122deg,#311b85de 0%,#143e99d5 68%,#105fabba);
+  border:1px solid #c6eaff75;
+  box-shadow:inset 0 1px 0 #fff6,0 0 6px #08deff59;
+  color:#f6fcff;backdrop-filter:blur(10px) saturate(145%);
+  transition:box-shadow .18s ease,transform .18s ease;
+}
+.sw-nav-item[aria-current=page],.sw-nav-item:hover {
+  background:linear-gradient(122deg,#204de9e6,#6e1ce0ec 76%);
+  box-shadow:0 0 0 1px #d9f8ff9b inset,0 0 10px #09e0ffac,0 0 16px #a327eb75;
+}
+.sw-nav-item:hover{transform:translateY(-1px);}
+.sw-main{min-width:0;}
+/* The full-bleed crystalline material occupies every pixel of the card.
+ * Rounded clipping and borders belong to the container, not the image. */
+.sw-hero,.sw-actions,.sw-panel,.sw-forecast-card {
+  position:relative; isolation:isolate; overflow:hidden;
+  border:1px solid #d6f8ffc7;
+  box-shadow:var(--sw-halo),0 7px 28px #021d526e;
+  backdrop-filter:blur(12px) saturate(126%);
+}
+.sw-hero::before,.sw-actions::before,.sw-panel::before,.sw-forecast-card::before {
+  content:'';position:absolute;inset:0;z-index:-2;pointer-events:none;
+  border-radius:inherit;
+  background:linear-gradient(120deg,#effcffdf 0%,#c4eafdbe 57%,#d7deffa8 100%),
+    url('/sharkai/wallet/ice-fullbleed.webp') center/cover no-repeat,
+    url('/sharkai/ice-surface.webp') center/cover no-repeat;
+  background-blend-mode:screen,normal,normal;
+}
+.sw-hero::after,.sw-panel:has(.sw-movements)::after,.sw-forecast-card::after {
+  content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;
+  background-size:cover;background-repeat:no-repeat;background-position:right center;
+  -webkit-mask-image:linear-gradient(to right,transparent 18%,#0009 55%,#000 100%);
+  mask-image:linear-gradient(to right,transparent 18%,#0009 55%,#000 100%);
+}
+.sw-hero::after {background-image:url('/sharkai/wallet/euro-cash.webp');}
+.sw-panel:has(.sw-movements)::after {background-image:url('/sharkai/wallet/transactions.webp');opacity:.72;}
+.sw-forecast-card::after {background-image:url('/sharkai/wallet/investments.webp');opacity:.66;}
+.sw-hero {min-height:340px;padding:clamp(22px,2.9vw,45px);border-radius:24px;background:transparent;}
+.sw-hero-copy{max-width:62%;position:relative;z-index:2;}
+.sw-root :is(.sw-account-label,.sw-hero h1,.sw-balance strong,.sw-hero p,.sw-panel h2,.sw-panel p,
+  .sw-panel small,.sw-forecast-card h2,.sw-forecast-card p,.sw-movements strong,.sw-movements li) {color:var(--sw-ice-ink);}
+.sw-root .sw-hero .sw-balance strong {color:#071e4b;text-shadow:0 1px #fff9;}
+.sw-hero p{font-weight:550;}
+.sw-btn,.sw-actions button span,.sw-movement-icon,.sw-tile-icon {
+  color:#fff;border:1px solid #b2f4ffd9;
+  background:linear-gradient(127deg,#177af6 0%,#1a4de6 39%,#7b26d8 75%,#9126dc 100%);
+  box-shadow:inset 0 1px 0 #ffffffbc,0 0 9px #0adfff88,0 0 17px #7434e19e;
+  backdrop-filter:blur(10px);
+}
+.sw-btn:hover,.sw-actions button:hover span{color:#fff;background:linear-gradient(123deg,#268cfb,#7832dd);}
+.sw-actions{padding:15px 9px;background:transparent;}
+.sw-actions button{color:#09234c;}
+.sw-actions button+button{border-color:#165ee45f;}
+.sw-panel,.sw-forecast-card{background:transparent;}
+.sw-panel h2,.sw-forecast-card h2{font-weight:750;}
+.sw-panel p,.sw-panel small,.sw-forecast-card p{color:#213b69;}
+.sw-panel :is(.sw-section-head>a,.sw-section-head>button){color:#114ed7;background:#d9f0ffcc;}
+.sw-forecast-card .sw-tile-link{color:#054ec9;font-weight:760;}
+.sw-movements li{border-color:#11447838;}
+.sw-movement-icon{width:38px;height:38px;}
+.sw-movement-icon.is-credit{color:#fff;background:linear-gradient(115deg,#13a16b,#25daac);}
+.sw-page-heading>span{color:#e9faff;}
+.sw-page-heading h1{color:#f8fcff;text-shadow:0 2px 6px #07162dbd;}
+.sw-root :focus-visible{outline:3px solid #d7f8ff;outline-offset:3px;}
+@media(min-width:900px) {
+  .sw-main:has(>.sw-hero) {display:grid;grid-template-columns:minmax(0,1.9fr) minmax(330px,.94fr);grid-template-rows:minmax(340px,auto) auto;gap:18px;align-items:stretch;}
+  .sw-main>.sw-hero{grid-column:1;grid-row:1;}
+  .sw-main>.sw-grid{display:contents;}
+  .sw-main>.sw-grid>.sw-stack{grid-column:1;grid-row:2;gap:14px;}
+  .sw-main>.sw-grid>.sw-forecast-card{grid-column:2;grid-row:1/3;min-height:100%;}
+  .sw-forecast-card::after{background-position:right bottom;opacity:.56;}
+  .sw-grid>.sw-stack>.sw-actions{margin-top:-80px;width:54%;justify-self:end;z-index:3;background:transparent;border-color:transparent;box-shadow:none;}
+  .sw-grid>.sw-stack>.sw-panel:has(.sw-movements){min-height:140px;}
+}
+@media(max-width:699px) {
+  .sw-root{background:linear-gradient(180deg,#1023668e 0%,#004f7778 48%,#02245171 100%),
+    url('/sharkai/wallet/coast-day.webp') center/auto 100% fixed no-repeat,#123f6a;}
+  .sw-shell{padding:0 12px calc(104px + env(safe-area-inset-bottom));}
+  .sw-header{min-height:82px;margin-inline:-12px;padding-inline:19px;border-radius:0 0 33px 33px;}
+  .sw-navigation{position:fixed;bottom:calc(9px + env(safe-area-inset-bottom));left:12px;right:12px;z-index:10;
+    margin:0;padding:7px;gap:2px;border-radius:36px;
+    background:linear-gradient(122deg,#235fe6db 0%,#5114bcea 51%,#8f1ac8e8 100%);
+    border:1px solid #d7eaffc9;box-shadow:0 0 0 1px #fdfaff4a inset,0 0 15px #a52bea8a,0 0 12px #00c5fe93;
+    backdrop-filter:blur(20px) saturate(140%);}
+  .sw-nav-item{background:transparent;border-color:transparent;box-shadow:none;min-height:55px;color:white;padding:5px 1px;font-size:10px;}
+  .sw-nav-item[aria-current=page]{background:linear-gradient(129deg,#126fe4d7,#8323dcdd);border-color:#c5ebffc0;
+    border-radius:28px;box-shadow:0 0 9px #35f5ffc7,inset 0 1px #fff8;}
+  .sw-main{padding-top:15px;}
+  .sw-hero{min-height:300px;border:none;box-shadow:none;background:transparent;display:grid;place-items:center;text-align:center;padding:29px 8px 12px;}
+  .sw-hero::before,.sw-hero::after{display:none;}
+  .sw-hero-copy{max-width:100%;justify-items:center;}
+  .sw-account-label,.sw-root .sw-hero h1,.sw-root .sw-hero p{color:#ecf7ff;text-shadow:0 2px 6px #071636cc;}
+  .sw-root .sw-hero .sw-balance strong{font-size:clamp(2.7rem,12vw,4.7rem);color:#fff;text-shadow:0 2px 10px #0c183f;}
+  .sw-grid{grid-template-columns:1fr;gap:15px;margin-top:10px;}
+  .sw-actions{padding:5px 0;background:transparent;border:none;box-shadow:none;backdrop-filter:none;}
+  .sw-actions::before{display:none;}
+  .sw-actions button{color:#f4fbff;text-shadow:0 2px 5px #002657;}
+  .sw-actions button+button{border-color:transparent;}
+  .sw-actions button span{width:52px;height:52px;border-radius:50%;}
+  .sw-panel,.sw-forecast-card{border-radius:27px;}
+  .sw-panel:has(.sw-movements){padding:14px 13px;}
+  .sw-panel h2{font-size:1.2rem;}
+  .sw-movements li{padding:8px 0;}
+  .sw-movements li strong{font-size:.81rem;}
+  .sw-forecast-card{min-height:145px;}
+}
+@media(prefers-reduced-motion:reduce){.sw-nav-item{transition:none;}}
+@media(forced-colors:active){.sw-hero::before,.sw-actions::before,.sw-panel::before,.sw-forecast-card::before{display:none;}}
