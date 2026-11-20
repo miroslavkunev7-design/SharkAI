@@ -104,16 +104,22 @@
 }
 
 :root {
-  --shark-violet: #6e48aa;
+  --shark-violet: #7353b3;
   --shark-ice-border: #7299c94d;
   --shark-muted: #b0bfd9;
   --shark-ice-texture: url('/sharkai/ice-surface.webp');
-  --shark-panel-dark: linear-gradient(112deg, #0b1d32df, #0a182bed 44%, #142642de 75%, #1b2a48c9),
+  --shark-icon-ice: #bdeeff;
+  --shark-icon-lilac: #d4c6ff;
+  --shark-icon-edge: #91b5f48a;
+  --shark-icon-surface: linear-gradient(133deg, #315e85, #293a65 47%, #4e386f);
+  --shark-page-backdrop: radial-gradient(ellipse at 13% 0%, #15385994, transparent 53%),
+    radial-gradient(ellipse at 96% 15%, #34265b8a, transparent 52%), #090f20;
+  --shark-panel-dark: linear-gradient(113deg, #0c2c4bdb, #151c3aeb 47%, #28214add 77%, #352b58ce),
     var(--shark-ice-texture) center / 100% 100% no-repeat, #102038;
-  --shark-panel-light: linear-gradient(109deg, #f1fbffda, #e4f4ffbd 56%, #daeaff87),
+  --shark-panel-light: linear-gradient(109deg, #effbffdc, #e0ecffc6 54%, #e2ddfabe),
     var(--shark-ice-texture) center / 100% 100% no-repeat, #d9effc;
-  --shark-scene-shade: linear-gradient(100deg, #0c1c30f5 3%, #0c1a30e6 35%, #10213ab8 62%, #101c3269);
-  --shark-action-gradient: linear-gradient(115deg, #095ccc, #5152d3 57%, #8144a5);
+  --shark-scene-shade: linear-gradient(103deg, #0c2340f5 3%, #121d38e6 36%, #232345b8 64%, #37244d75);
+  --shark-action-gradient: linear-gradient(114deg, #145bbc, #4655bf 49%, #77449e);
   color-scheme: dark;
 }
 
@@ -152,7 +158,7 @@
 }
 
 .shark-action-secondary {
-  background: linear-gradient(140deg, #c4e6ff19, #3e4d8a21), #0c162bee;
+  background: linear-gradient(125deg, #1f4668e8, #222b51ed 55%, #362946e8), #111b31;
   border-color: var(--shark-ice-border);
   box-shadow: inset 0 1px #cee4ff26;
 }
@@ -495,7 +501,7 @@
   isolation: isolate;
   color: var(--ice-ink);
   background-color: #b9e8fb;
-  background-image: linear-gradient(109deg, #effbff72, transparent 65%), linear-gradient(var(--ice-tint), var(--ice-tint)), var(--shark-ice-texture);
+  background-image: linear-gradient(109deg, #eefaff80, transparent 52%, #c9bdff70), linear-gradient(var(--ice-tint), var(--ice-tint)), var(--shark-ice-texture);
   background-repeat: no-repeat;
   background-position: center;
   background-size: 100% 100%;
@@ -509,7 +515,7 @@
   --ice-focus: #9ce8ff;
   --ice-edge: #7299c977;
   --ice-tint: #09162edc;
-  background-image: linear-gradient(115deg, #10253ce0, var(--ice-tint) 64%, #192c49c7), var(--shark-ice-texture);
+  background-image: linear-gradient(115deg, #0f2a49dc, var(--ice-tint) 54%, #322950cb), var(--shark-ice-texture);
   --ice-art-opacity: .56;
   background-color: #101c32;
   box-shadow: inset 0 1px #dff4ff2e, inset 0 -1px #82bef533, 0 4px 18px #02071961;
@@ -531,9 +537,11 @@
   width: var(--ice-art-extent, 56%);
   border-radius: inherit;
   background-color: #101a42;
-  background-image: var(--ice-art);
-  background-size: var(--ice-art-size, cover);
-  background-position: var(--ice-art-position, center);
+  background-image: linear-gradient(105deg, #23548a29, transparent 49%, #60458c38),
+    var(--shark-ice-texture), var(--ice-art);
+  background-blend-mode: normal, soft-light, normal;
+  background-size: cover, 116% 116%, var(--ice-art-size, cover);
+  background-position: center, 58% 54%, var(--ice-art-position, center);
   background-repeat: no-repeat;
   opacity: var(--ice-art-opacity, 1);
   mask-image: var(--ice-art-mask, linear-gradient(to right, transparent, #0006 20%, #000 55%));

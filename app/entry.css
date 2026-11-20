@@ -1,6 +1,6 @@
 .shark-entry-home,
 .shark-entry-page {
-  background: radial-gradient(ellipse at 72% 0%, #122544 0, transparent 56%), #070e1c;
+  background: var(--shark-page-backdrop);
 }
 
 .shark-entry-home .shark-header {
@@ -357,7 +357,8 @@
 }
 
 .shark-entry-plan h2 svg {
-  color: #274b89;
+  color: #3e4383;
+  stroke-width: 1.8;
   flex: none;
 }
 

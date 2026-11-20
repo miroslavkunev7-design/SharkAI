@@ -8,10 +8,10 @@
   grid-template-areas: 'brand plan chat refresh';
   gap: 8px;
   padding: 6px;
-  border: 1px solid #7199cf46;
+  border: 1px solid #8e9bd966;
   border-radius: 14px;
   background: var(--shark-panel-dark);
-  box-shadow: inset 0 1px #e2f7ff18;
+  box-shadow: inset 0 1px #e2e8ff36, 0 5px 18px #17102a33;
 }
 
 .shark-admin-brand {
@@ -36,7 +36,8 @@
   border-color: #b5c4ff81;
   border-radius: 999px;
   color: #edf1ff;
-  background: linear-gradient(120deg, #28396c, #492c66);
+  background: var(--shark-icon-surface);
+  box-shadow: inset 0 1px #dbe9ff4d;
   font-size: .74rem;
 }
 
@@ -62,8 +63,8 @@
 
 .shark-admin-metric :is(dt, dd) { position: relative; max-width: 78%; overflow-wrap: anywhere; text-shadow: 0 0 14px #e5f8ffe6; }
 .shark-admin-metric dt { display: flex; align-items: flex-start; gap: 6px; color: #103056; font-size: clamp(.73rem, 1.75vw, .89rem); font-weight: 750; line-height: 1.24; }
-.shark-admin-metric dt svg { flex: none; color: #174f80; }
-.shark-admin-metric:nth-child(even) dt svg { color: #63368a; }
+.shark-admin-metric dt svg { flex: none; color: #294c8e; stroke-width: 1.7; }
+.shark-admin-metric:nth-child(even) dt svg { color: #6a3c91; }
 .shark-admin-metric dd { margin: 4px 0 0 23px; color: #0b2141; font-size: clamp(1.14rem, 3vw, 1.63rem); font-weight: 820; line-height: 1.21; }
 .shark-admin-metric dd[data-unavailable='true'] { color: #243b63; font-size: .82rem; }
 .shark-admin-metrics-note { padding-inline: 3px; color: #cbdff9; font-size: .81rem; }
@@ -87,7 +88,7 @@
 }
 
 .shark-admin-section-heading h2 { max-width: 75%; overflow-wrap: anywhere; text-shadow: 0 0 12px #edf9ff; }
-.shark-admin-count { flex: none; padding: 3px 9px; border: 1px solid #a8cef5ab; border-radius: 999px; color: #edf7ff; background: #172954; font-size: .75rem; font-weight: 750; }
+.shark-admin-count { flex: none; padding: 3px 9px; border: 1px solid #bac7ffab; border-radius: 999px; color: #edf7ff; background: var(--shark-icon-surface); box-shadow: inset 0 1px #e6efff4d; font-size: .75rem; font-weight: 750; }
 
 .shark-admin-table table { width: 100%; table-layout: fixed; border-collapse: collapse; text-align: left; font-size: .82rem; }
 .shark-admin-table :is(th, td) { padding: 8px 9px; overflow-wrap: anywhere; vertical-align: top; }

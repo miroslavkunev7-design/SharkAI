@@ -1,7 +1,7 @@
 .shark-launch-home {
   --launch-width: min(calc(100% - clamp(20px, 4vw, 64px)), 1380px);
   min-height: 100svh;
-  background: radial-gradient(ellipse at 83% 0%, #122b47, transparent 51%), #060b15;
+  background: var(--shark-page-backdrop);
   color: #edf5ff;
 }
 
@@ -38,16 +38,26 @@
   box-shadow: 0 19px 55px #02050cb8, inset 0 1px #b7deff36;
 }
 
-.shark-launch-art { position: absolute; z-index: -2; inset: 0 0 0 22%; background: #081325; }
+.shark-launch-art { position: absolute; z-index: -2; inset: 0 0 0 22%; isolation: isolate; background: #081325; }
 .shark-launch-art img { object-fit: cover; object-position: 87% center; }
+.shark-launch-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url('/sharkai/team.webp') 76% 54% / cover no-repeat;
+  mix-blend-mode: screen;
+  opacity: .25;
+  mask-image: linear-gradient(112deg, transparent 5%, #0008 38%, #000 70%);
+}
 .shark-launch-hero::after {
   position: absolute;
   z-index: -1;
   inset: 0;
   pointer-events: none;
   content: '';
-  background: linear-gradient(90deg, #081120 6%, #081120ed 27%, #0811203d 56%, transparent 75%),
-    linear-gradient(0deg, #081120 0, transparent 25%);
+  background: linear-gradient(97deg, #0c1a2d 4%, #0a1728f0 26%, #101a352e 57%, transparent 74%),
+    linear-gradient(0deg, #12142bda 0, transparent 30%);
 }
 
 .shark-launch-content {
@@ -76,12 +86,18 @@
   font-weight: 650;
   transition: border-color .17s ease, background-color .17s ease;
 }
-.shark-launch-tiles button svg { color: #83dfff; }
+.shark-launch-tiles button svg {
+  border-radius: 6px;
+  background: var(--shark-icon-surface);
+  box-shadow: 0 0 0 3px #2a395a, 0 0 0 4px var(--shark-icon-edge);
+  color: var(--shark-icon-ice);
+  stroke-width: 1.75;
+}
 .shark-launch-tiles button:nth-child(2) svg { color: #a6b5ff; }
-.shark-launch-tiles button:nth-child(3) svg { color: #ccb2ff; }
+.shark-launch-tiles button:nth-child(3) svg { color: var(--shark-icon-lilac); }
 .shark-launch-tiles button:nth-child(4) svg { color: #a4e6ff; }
 .shark-launch-tiles button:hover { border-color: #b5e4ffad; }
-.shark-launch-tiles button[aria-pressed='true'] { border-color: #9adbffd9; background: linear-gradient(145deg, #174772dc, #2d2962db), var(--shark-ice-texture) center / 100% 100%; color: #fff; box-shadow: inset 0 1px #ecfaff51, 0 0 22px #409dd754; }
+.shark-launch-tiles button[aria-pressed='true'] { border-color: #9adbffd9; background: linear-gradient(127deg, #215584db, #423376dc), var(--shark-ice-texture) center / 100% 100%; color: #fff; box-shadow: inset 0 1px #ecfaff51, 0 0 22px #409dd754; }
 
 .shark-launch-copy { min-width: 0; max-width: min(47%, 550px); margin-top: clamp(30px, 5vw, 72px); }
 .shark-launch-copy h1 { margin: 0; color: #f4f9ff; font-size: var(--launch-heading-size); font-weight: 820; line-height: 1.04; letter-spacing: -.052em; text-wrap: balance; }
@@ -106,7 +122,11 @@
 }
 
 .shark-launch-summary a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-width: 0; min-height: 82px; padding: 10px clamp(8px, 1.4vw, 20px); }
-.shark-launch-summary a { background: var(--shark-scene-shade), var(--module-art) right center / cover no-repeat, #112037; }
+.shark-launch-summary a {
+  background: var(--shark-scene-shade), var(--shark-ice-texture) center / 120% 120% no-repeat,
+    var(--module-art) right center / cover no-repeat, #112037;
+  background-blend-mode: normal, soft-light, normal;
+}
 .shark-launch-summary #investments { --module-art: url('/sharkai/markets.webp'); }
 .shark-launch-summary #loop { --module-art: url('/sharkai/studio.webp'); }
 .shark-launch-summary #wallet { --module-art: url('/sharkai/shark-hero.webp'); }
@@ -114,8 +134,8 @@
 .shark-launch-summary a + a { border-inline-start: 1px solid #8fbcea2c; }
 .shark-launch-summary a:is(:hover, :focus-visible) { box-shadow: inset 0 0 0 2px #87c6ff80; }
 .shark-launch-summary a:focus-visible { outline-offset: -3px; }
-.shark-launch-summary-icon { color: #74d8ff; }
-.shark-launch-summary a:nth-child(even) .shark-launch-summary-icon { color: #c2a7ff; }
+.shark-launch-summary-icon { color: var(--shark-icon-ice); stroke-width: 1.75; }
+.shark-launch-summary a:nth-child(even) .shark-launch-summary-icon { color: var(--shark-icon-lilac); }
 .shark-launch-summary-arrow { color: #9bb8da; }
 .shark-launch-summary strong { display: block; color: #ecf5ff; font-size: .9rem; line-height: 1.2; }
 .shark-launch-summary small { display: block; margin-top: 4px; color: #b6c9e3; font-size: .76rem; line-height: 1.28; }
@@ -158,7 +178,7 @@
   .shark-launch-hero { min-height: 0; }
   .shark-launch-art { inset: 88px 0 auto; height: clamp(224px, 72vw, 420px); }
   .shark-launch-art img { object-position: 87% center; }
-  .shark-launch-hero::after { background: linear-gradient(0deg, #081120 9%, #081120e8 26%, #08112085 43%, transparent 63%, transparent 78%, #081120 94%); }
+  .shark-launch-hero::after { background: linear-gradient(0deg, #10172d 9%, #10172de8 26%, #10172d83 43%, transparent 63% 78%, #10182c 94%); }
   .shark-launch-content { padding: 12px 13px 0; }
   .shark-launch-tiles { grid-template-columns: repeat(4, minmax(0, 86px)); gap: 7px; }
   .shark-launch-tiles button { min-height: 59px; border-radius: 10px; }

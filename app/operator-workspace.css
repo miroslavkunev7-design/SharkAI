@@ -75,9 +75,9 @@
   display: grid;
   gap: 1px;
   overflow: hidden;
-  border: 1px solid #c4f3ffe0;
+  border: 1px solid #c5d7ffe0;
   border-radius: 18px;
-  background: #b8e4fa var(--ice-texture, url('/sharkai/ice-surface.webp')) center / 100% 100% no-repeat;
+  background: var(--shark-panel-light);
   box-shadow: 0 5px 20px #041329a8, 0 0 17px #47a9ff23;
 }
 
@@ -90,7 +90,7 @@
   justify-content: center;
   padding: 10px 8px 10px clamp(41px, 7.8vw, 65px);
   color: #071e38;
-  background: linear-gradient(106deg, #e1f9ff3b, #d7f1ff29 52%, #cde2ff22);
+  background: linear-gradient(106deg, #e1f9ff4d, #d7e6ff38 52%, #ded2ff32);
   box-shadow: inset 0 1px #ffffffeb, inset 0 -1px #dff8ffa0, inset 0 0 13px #b4f3ffaf;
 }
 
@@ -118,16 +118,19 @@
   transform: translateY(-50%);
   display: grid;
   place-items: center;
-  border: 1px solid #f2faffb0;
+  border: 1px solid var(--shark-icon-edge);
   border-radius: 9px;
-  color: #ffffff;
-  background: linear-gradient(140deg, #178adc, #4753b2);
-  box-shadow: inset 0 0 10px #c7f4ff77, 0 4px 9px #104e7e5e;
+  color: var(--shark-icon-ice);
+  background: var(--shark-icon-surface);
+  box-shadow: inset 0 1px #eef8ff85, inset 0 -1px #28396780, 0 4px 9px #142b6352;
 }
 
 .operator-metric:nth-child(even) .operator-metric-icon {
-  background: linear-gradient(140deg, #6945c9, #84359c);
+  color: var(--shark-icon-lilac);
+  background: linear-gradient(140deg, #5c4c99, #5a396f);
 }
+
+.operator-metric-icon svg { stroke-width: 1.7; }
 
 .operator-panel {
   --ice-radius: 18px;
@@ -148,7 +151,11 @@
 
 .operator-panel-title svg {
   flex: none;
-  color: #175084;
+  color: #344b8e;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #b9e5ff70, #d5c4f56b);
+  box-shadow: 0 0 0 4px #c9dbfb6b, inset 0 1px #ffffffc4;
+  stroke-width: 1.7;
 }
 
 .operator-input {
