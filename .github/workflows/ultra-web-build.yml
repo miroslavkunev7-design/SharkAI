@@ -12,6 +12,8 @@ on:
       - 'scripts/test-ultra-visual-clarity.mjs'
       - 'scripts/test-ultra-route-regressions.mjs'
       - 'scripts/test-ultra-route-smoke.mjs'
+      - 'scripts/test-ultra-live-rates.mts'
+      - 'app/wallet/crypto-reference.ts'
       - 'scripts/verify-original-assets.mjs'
       - '.github/workflows/ultra-web-build.yml'
   workflow_dispatch:
@@ -41,6 +43,7 @@ jobs:
           SHARKAI_REQUIRE_LOCKED_ASSETS=1 node --test scripts/test-sharkai-ultra.mjs
           node --test scripts/test-ultra-visual-clarity.mjs
           node --test scripts/test-ultra-route-regressions.mjs
+          node --import tsx --test scripts/test-ultra-live-rates.mts
       - name: Build production Next.js app (no live credentials)
         run: npm run build
       - name: Verify ten public and Wallet routes in a running production build
