@@ -133,7 +133,7 @@ export function WalletHome({section}:{section:Section}){
  const paymentState=payment?payments[payment]:null;
  return <div className="sw-root"><div className="sw-shell">
    <header className="sw-header">
-     <img className="sw-header-muscular-shark" src="/sharkai/chat/header-shark-muscular.webp" alt="" aria-hidden="true"/>
+     <img className="sw-header-muscular-shark" src="/sharkai/chat/shark-avatar.webp" alt="" aria-hidden="true"/>
      <Link href="/wallet" className="sw-wordmark" aria-label="SharkAI Портфейл">
        <img className="sw-header-avatar" src="/sharkai/chat/shark-avatar.webp" alt="Акула SharkAI"/>
        <Logo size="sm"/><span>Shark<strong>AI</strong></span><i/>Портфейл
