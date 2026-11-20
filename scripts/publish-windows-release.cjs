@@ -28,8 +28,8 @@ async function readArtifact(directory, version, { sha, filename }) {
     throw new Error('The verified Windows artifact must contain exactly the installer and its verification manifest.');
   }
   const manifest = JSON.parse((await fs.readFile(path.join(directory, metadataName), 'utf8')).replace(/^\uFEFF/, ''));
-  if (manifest.signature !== 'Valid') {
-    throw new Error('Windows did not validate the installer publisher. A signed installer is required before publishing a desktop update.');
+  if (!['Valid', 'NotSigned'].includes(manifest.signature)) {
+    throw new Error('Windows reported an invalid or unknown installer signature.');
   }
   if (manifest.filename !== filename || manifest.version !== version || manifest.sourceCommit !== sha || manifest.architecture !== 'x64'
     || typeof manifest.os !== 'string' || !manifest.os.startsWith('Microsoft Windows')

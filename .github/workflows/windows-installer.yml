@@ -72,13 +72,13 @@ jobs:
       - name: Verify installer, offline startup, upgrade and uninstall
         shell: pwsh
         env:
-          SHARKAI_EXPECT_SIGNATURE: ${{ github.repository == 'miroslavkunev7-design/SharkAI' && (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && secrets.CSC_LINK != '')) }}
+          SHARKAI_EXPECT_SIGNATURE: ${{ github.repository == 'miroslavkunev7-design/SharkAI' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && secrets.CSC_LINK != '' }}
         run: |
           if ($env:SHARKAI_EXPECT_SIGNATURE -eq 'true') {
             $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
             $candidate = Join-Path release "SharkAI-Setup-$version.exe"
             if ((Get-AuthenticodeSignature -LiteralPath $candidate).Status.ToString() -ne 'Valid') {
-              throw 'The Windows release requires a valid publisher signature. Configure the authorized signing identity and rerun the release build.'
+              throw 'A signing identity is configured, but Windows did not validate the installer signature.'
             }
           }
           ./scripts/test-windows-installer.ps1

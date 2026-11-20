@@ -6,10 +6,19 @@ const repository = 'SharkAI';
 const interval = 4 * 60 * 60 * 1000;
 
 function trustedFeed(config) {
-  const names = Array.isArray(config?.publisherName) ? config.publisherName : [config?.publisherName];
+  const publisher = config?.publisherName;
+  const names = Array.isArray(publisher) ? publisher : [publisher];
   return config?.provider === 'github' && config.owner === project && config.repo === repository
-    && config.verifyUpdateCodeSignature !== false && names.length > 0
-    && names.every((value) => typeof value === 'string' && value.trim().length > 0);
+    && (config.host == null || config.host === 'github.com') && (config.protocol == null || config.protocol === 'https')
+    && (config.channel == null || config.channel === 'latest') && config.verifyUpdateCodeSignature !== false
+    && (publisher == null || (names.length > 0 && names.every((value) => typeof value === 'string' && value.trim().length > 0)));
+}
+
+function officialInstaller(info) {
+  if (!info || !/^\d+\.\d+\.\d+$/.test(info.version) || info.tag !== `v${info.version}` || info.files?.length !== 1) return false;
+  const file = info.files[0];
+  return file?.url === `SharkAI-Setup-${info.version}.exe` && Number.isSafeInteger(file.size) && file.size > 0
+    && typeof file.sha512 === 'string' && /^[A-Za-z0-9+/]{86}==$/.test(file.sha512);
 }
 
 function watchWindowsUpdates(window, app, dialog) {
@@ -31,7 +40,7 @@ function configureUpdater(window, dialog, autoUpdater) {
   autoUpdater.allowPrerelease = false;
   autoUpdater.allowDowngrade = false;
   autoUpdater.disableDifferentialDownload = true;
-  autoUpdater.autoDownload = true;
+  autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   let lastCheck = 0;
   let checking = false;
@@ -41,7 +50,9 @@ function configureUpdater(window, dialog, autoUpdater) {
     if (checking || pending || Date.now() - lastCheck < interval) return;
     lastCheck = Date.now();
     checking = true;
-    void autoUpdater.checkForUpdates().then((result) => result?.downloadPromise)
+    void autoUpdater.checkForUpdates().then((result) => {
+      if (result?.isUpdateAvailable && officialInstaller(result.updateInfo)) return autoUpdater.downloadUpdate();
+    })
       .catch(() => {}).finally(() => { checking = false; });
   }
 
@@ -82,4 +93,4 @@ function configureUpdater(window, dialog, autoUpdater) {
   check();
 }
 
-module.exports = { configureUpdater, trustedFeed, watchWindowsUpdates };
+module.exports = { configureUpdater, officialInstaller, trustedFeed, watchWindowsUpdates };
