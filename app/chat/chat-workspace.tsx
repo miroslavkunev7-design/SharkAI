@@ -958,7 +958,7 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
 
       <div className="shark-chat-workspace" data-mode={mode} inert={(small && !!inspector) || (small && drawerOpen)}>
         {compact ? <header className="shark-quick-header">
-          <div className="shark-quick-heading"><Logo size="sm" /><h2>Шарк агент</h2></div>
+          <div className="shark-quick-heading"><Logo size="sm" /><h2>Shark Assistant</h2></div>
           <div className="shark-quick-actions">
             {!input && !attachment && !pending && <Link href={conversationId ? '/chat?conversationId=' + encodeURIComponent(conversationId) : '/chat'}
               aria-label="Отвори пълния чат" title="Отвори пълния чат"><ExternalLink size={17} /></Link>}
