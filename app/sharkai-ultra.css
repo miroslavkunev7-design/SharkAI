@@ -213,3 +213,52 @@
 @media (max-width:760px) {
   .module-workspace .module-main::before {opacity:.11;background-attachment:scroll;}
 }
+
+
+/* Approved full-page Shark Assistant presentation.
+ * The existing ChatWorkspace and all backend tools remain unchanged.
+ * Share the same approved coast/wave artwork with the floating chat.
+ */
+.shark-chat-shell .shark-chat-workspace::before {
+  background:
+    linear-gradient(116deg,rgba(6,26,63,.66) 0%,rgba(8,38,78,.39) 55%,rgba(7,39,82,.25) 100%),
+    url('/sharkai/chat/approved-coast.webp') center 45% / cover no-repeat;
+  background-blend-mode:normal;
+}
+.shark-chat-shell .shark-chat-topbar {
+  border-bottom:1px solid rgba(216,248,255,.83);
+  background:
+    linear-gradient(116deg,rgba(53,14,125,.46),rgba(10,76,171,.42) 68%,rgba(5,166,218,.27)),
+    url('/sharkai/chat/approved-wave-header.webp') center / 100% 100% no-repeat;
+  box-shadow:inset 0 1px rgba(255,255,255,.43),0 0 16px rgba(43,208,255,.23);
+  backdrop-filter:blur(15px) saturate(145%);
+}
+.shark-chat-shell .shark-chat-composer {
+  border:1px solid rgba(211,244,255,.80);
+  background:linear-gradient(128deg,rgba(65,28,158,.90),rgba(22,84,177,.87) 67%,rgba(9,150,201,.80));
+  box-shadow:inset 0 1px rgba(255,255,255,.49),0 0 14px rgba(34,220,255,.28),0 0 18px rgba(116,39,218,.22);
+  backdrop-filter:blur(13px) saturate(136%);
+}
+.shark-chat-shell .shark-chat-rail {
+  border-color:rgba(187,238,255,.70);
+  background:
+    linear-gradient(118deg,rgba(14,30,74,.96),rgba(36,28,91,.93)),
+    url('/sharkai/wallet/ice-fullbleed.webp') center / cover no-repeat;
+}
+.shark-chat-shell .shark-chat-welcome {
+  border-radius:26px;
+  background:linear-gradient(115deg,rgba(14,42,87,.18),rgba(91,49,169,.09));
+}
+.shark-chat-shell .shark-chat-message-user {
+  color:#14283c;
+}
+.shark-chat-shell .shark-chat-message-assistant .shark-chat-message-text {color:#102851;}
+@media (max-width:820px) {
+  .shark-chat-shell .shark-chat-topbar {
+    border-radius:0 0 23px 23px;
+  }
+}
+@media (forced-colors:active) {
+  .shark-chat-shell .shark-chat-workspace::before {display:none;}
+  .shark-chat-shell .shark-chat-topbar {background:Canvas;color:CanvasText;}
+}
