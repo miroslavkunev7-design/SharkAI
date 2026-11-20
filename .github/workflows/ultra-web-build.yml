@@ -9,6 +9,7 @@ on:
       - 'public/sharkai/**'
       - 'assets-sha256.json'
       - 'scripts/test-sharkai-ultra.mjs'
+      - 'scripts/test-ultra-visual-clarity.mjs'
       - 'scripts/verify-original-assets.mjs'
       - '.github/workflows/ultra-web-build.yml'
   workflow_dispatch:
@@ -36,5 +37,6 @@ jobs:
         run: |
           node scripts/verify-original-assets.mjs
           SHARKAI_REQUIRE_LOCKED_ASSETS=1 node --test scripts/test-sharkai-ultra.mjs
+          node --test scripts/test-ultra-visual-clarity.mjs
       - name: Build production Next.js app (no live credentials)
         run: npm run build
