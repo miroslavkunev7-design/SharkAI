@@ -151,6 +151,7 @@ function createWindow() {
     if (isServiceURL(webContents.getURL())) clearServiceLoadTimer();
   });
   loadService(landingURL);
+  require('./updates.cjs').watchWindowsUpdates(window, app, dialog);
 
   function clearServiceLoadTimer() {
     clearTimeout(serviceLoadTimer);

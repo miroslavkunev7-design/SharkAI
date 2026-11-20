@@ -88,6 +88,16 @@ function Get-Registration {
 }
 
 function Assert-Installed($ExpectedVersion) {
+  if ($ExpectedVersion -eq $version -and $signature.Status.ToString() -eq 'Valid') {
+    $applicationSignature = Get-AuthenticodeSignature -LiteralPath $executable
+    if ($applicationSignature.Status.ToString() -ne 'Valid' -or
+        $applicationSignature.SignerCertificate.Subject -ne $signature.SignerCertificate.Subject) {
+      throw 'The desktop application and the installer must have the same verified publisher.'
+    }
+    $feedPath = Join-Path $target 'resources/app-update.yml'
+    node -e "const fs=require('node:fs'),yaml=require('js-yaml'); const {trustedFeed}=require('./electron/updates.cjs'); process.exitCode=trustedFeed(yaml.load(fs.readFileSync(process.argv[1],'utf8')))?0:1" $feedPath
+    if ($LASTEXITCODE -ne 0) { throw 'The installed desktop update feed is missing its verified publisher or official release repository.' }
+  }
   if (!(Test-Path -LiteralPath $executable -PathType Leaf)) { throw 'SharkAI.exe is missing from the requested installation directory containing spaces.' }
   if (!(Test-Path -LiteralPath $uninstaller -PathType Leaf)) { throw 'The uninstaller is missing from the requested installation directory containing spaces.' }
   $registered = Get-Registration

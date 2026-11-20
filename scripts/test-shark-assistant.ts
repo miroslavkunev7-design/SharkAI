@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { SHARK_ASSISTANT_TEXT_LIMIT, sendSharkChatMessage } from '../lib/shark-assistant.server';
+import { sharkChatModels, sharkChatModelSchema, sharkModelPrefix } from '../lib/shark-chat-models';
 
 async function main() {
   process.env.SHARKAI_N8N_AGENT_KEY = 'synthetic-shark-key';
@@ -64,6 +65,25 @@ async function main() {
   assert.equal(await sendSharkChatMessage({ ...request, history: [] }, async () => { throw new TypeError('transport'); }), null);
   await assert.rejects(() => sendSharkChatMessage({ ...request, signal: AbortSignal.abort(), history: [] }, send), { name: 'AbortError' });
   assert.equal(calls.length, 8);
+  mismatch = false;
+  for (const legacy of [undefined, 'auto', 'standard', 'advanced']) {
+    assert.equal(sharkChatModelSchema.parse(legacy), 'auto');
+  }
+  assert.equal(sharkChatModelSchema.safeParse('gpt-6.2').success, false);
+  assert.equal(sharkChatModelSchema.safeParse('gpt-6-luna\nextra').success, false);
+  for (const { id } of sharkChatModels) {
+    await sendSharkChatMessage({ ...request, model: sharkChatModelSchema.parse(id), history: [] }, send);
+    assert.equal(calls.at(-1)?.message, id === 'auto' ? request.message : `Модел: ${id}\n${request.message}`);
+  }
+  const model = 'gpt-6.1-sol';
+  const prefix = sharkModelPrefix(model);
+  await sendSharkChatMessage({ ...request, model, history: previous }, send);
+  assert(calls.at(-1)?.message.startsWith(prefix));
+  assert.equal(JSON.parse(calls.at(-1)!.message.split('\n').at(-1)!).current_message, request.message);
+  const atLimit = long.slice(prefix.length);
+  await sendSharkChatMessage({ ...request, model, message: atLimit, history: previous }, send);
+  assert.equal(calls.at(-1)?.message, prefix + atLimit);
+  assert.equal(await sendSharkChatMessage({ ...request, model, message: atLimit + 'x', history: [] }, send), null);
   console.log('Shark Assistant transport, context bounds, owner isolation, fallback and cancellation passed.');
 }
 

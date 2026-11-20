@@ -26,6 +26,7 @@ import { MemoryError, readChatMemory } from '@/lib/personal-memory.server';
 import { reminderInputSchema } from '@/lib/reminder-input';
 import { requestHasSameOrigin } from '@/lib/request-origin';
 import { sendSharkChatMessage, sharkAssistantConfigured, SHARK_ASSISTANT_TEXT_LIMIT } from '@/lib/shark-assistant.server';
+import { sharkChatModels, sharkChatModelSchema, sharkModelPrefix } from '@/lib/shark-chat-models';
 import { getWalletSettings } from '@/lib/wallet-investments-server';
 import { FINANCE_STATUS_SCOPE, signWalletStatusGrant } from '@/lib/wallet-investments-grants';
 import { commerceScope, issueCommerceGrant } from '@/lib/commerce/agent-access.server';
@@ -42,7 +43,7 @@ const inputSchema = z.object({
   conversationId: conversationKey.default(LEGACY_CHAT),
   requestId: z.string().uuid().optional(),
   projectId: z.string().min(1).max(80).nullish(),
-  model: z.enum(['auto', 'standard', 'advanced']).default('auto'),
+  model: sharkChatModelSchema,
   reasoning: z.enum(['standard', 'deep']).default('standard'),
   mode: z.enum(['chat', 'work']).default('chat'),
   strategy: z.string().regex(/^[a-f0-9]{64}$/i).optional(),
@@ -86,7 +87,7 @@ export async function GET(req: NextRequest) {
     const reason = !account ? 'Влез в профила си за разговор.' : !remaining ? 'Достигнат е лимитът на текущия план.' : !sharkAssistant ? 'Връзката към Шарк агента в n8n още не е активна.' : null;
     const user = account ? { name: account.name, email: account.email, role: account.role, plan: account.plan,
       ...(account.lifetime && { lifetime: true }) } : null;
-    return NextResponse.json({ ...history, user, capabilities: { models: [], reason, sharkAssistant } }, {
+    return NextResponse.json({ ...history, user, capabilities: { models: sharkAssistant ? sharkChatModels : [], reason, sharkAssistant } }, {
       headers: { 'Cache-Control': 'private, no-store' },
     });
   } catch (error) {
@@ -228,11 +229,11 @@ async function completeTurn(account: AccountSession, input: Turn, signal: AbortS
         report:reportText||undefined, strategy:strategyEvidence,
         attachmentText:upload?.mimeType.startsWith('text/') ? Buffer.from(upload.data).toString('utf8') : undefined};
       const prompt = Object.values(details).some(value=>value!==undefined) ? JSON.stringify({current_message:message,reference_data:details}) : message;
-      if (prompt.length>SHARK_ASSISTANT_TEXT_LIMIT) throw new ChatError('Контекстът надхвърля 16 000 знака. Избери по-кратък откъс.',413);
+      if (prompt.length + sharkModelPrefix(input.model).length > SHARK_ASSISTANT_TEXT_LIMIT) throw new ChatError('Контекстът надхвърля 16 000 знака. Избери по-кратък откъс.',413);
       const inputUnits=Number.isFinite(remaining)?countChatTextTokens(prompt):0;
       if (inputUnits>=remaining) throw new ChatError('Оставащите токени са недостатъчни за тази заявка.',429);
       const shark=await sendSharkChatMessage({userId,conversationId,requestId,message:prompt||'Прегледай прикачения файл.',history:context.recent,signal,
-        attachments:uploadId && upload ? [{attachment_id:uploadId,media_type:upload.mimeType}]:[],
+        model:input.model, attachments:uploadId && upload ? [{attachment_id:uploadId,media_type:upload.mimeType}]:[],
         scopes:['module:read',...(financeGrant?[FINANCE_STATUS_SCOPE]:[]),...(commerceGrant?[commerceScope]:[])],financeGrant,commerceGrant},
         fetch);
       if (!shark) throw new ChatError('Шарк агентът в n8n не върна отговор. Опитай отново.',503);

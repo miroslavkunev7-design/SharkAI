@@ -28,10 +28,13 @@ async function readArtifact(directory, version, { sha, filename }) {
     throw new Error('The verified Windows artifact must contain exactly the installer and its verification manifest.');
   }
   const manifest = JSON.parse((await fs.readFile(path.join(directory, metadataName), 'utf8')).replace(/^\uFEFF/, ''));
+  if (manifest.signature !== 'Valid') {
+    throw new Error('Windows did not validate the installer publisher. A signed installer is required before publishing a desktop update.');
+  }
   if (manifest.filename !== filename || manifest.version !== version || manifest.sourceCommit !== sha || manifest.architecture !== 'x64'
     || typeof manifest.os !== 'string' || !manifest.os.startsWith('Microsoft Windows')
     || !['offlineStartup', 'restartAndOccupiedPort', 'upgradeAndProfile', 'uninstall'].every((check) => manifest[check] === 'passed')
-    || !['Valid', 'NotSigned'].includes(manifest.signature) || !/^[0-9a-f]{64}$/.test(manifest.sha256 ?? '')) {
+    || !/^[0-9a-f]{64}$/.test(manifest.sha256 ?? '')) {
     throw new Error('The manifest does not confirm a verified Windows x64 build of the pushed commit.');
   }
   const assets = await Promise.all([filename, metadataName].map(async (name) => {
@@ -43,6 +46,14 @@ async function readArtifact(directory, version, { sha, filename }) {
   if (assets[0].size !== manifest.sizeBytes || assets[0].sha256 !== manifest.sha256) {
     throw new Error('The installer bytes do not match the verified Windows size and SHA-256.');
   }
+  const hash = createHash('sha512');
+  for await (const chunk of createReadStream(assets[0].file)) hash.update(chunk);
+  const sha512 = hash.digest('base64');
+  // JSON is valid YAML. Use only verified installer bytes and deterministic release metadata.
+  const buffer = Buffer.from(JSON.stringify({
+    version, files: [{ url: filename, sha512, size: manifest.sizeBytes }], path: filename, sha512,
+  }, null, 2));
+  assets.push({ name: 'latest.yml', buffer, size: buffer.length, sha256: createHash('sha256').update(buffer).digest('hex') });
   return { assets, manifest };
 }
 
@@ -59,7 +70,7 @@ function githubClient(token, fetchImpl) {
         ...(asset ? { 'content-type': 'application/octet-stream', 'content-length': String(asset.size) } : {}),
         ...(json ? { 'content-type': 'application/json' } : {}),
       },
-      ...(asset ? { body: createReadStream(asset.file), duplex: 'half' } : json ? { body: JSON.stringify(json) } : {}),
+      ...(asset ? { body: asset.buffer ?? createReadStream(asset.file), duplex: 'half' } : json ? { body: JSON.stringify(json) } : {}),
     });
     if (response.status === 404 && missing) return null;
     if (!response.ok) throw new Error(`GitHub ${method} ${route} returned HTTP ${response.status}.`);
@@ -138,7 +149,9 @@ async function publishWindowsRelease({ version, env, directory, fetchImpl = fetc
   if (verified.tag_name !== tag) throw new Error(`GitHub changed the draft tag for ${tag}.`);
   for (const asset of assets) await requireExactAsset(request, verified.assets.find(({ name }) => name === asset.name), asset);
   if (!verified.draft) return { url: verified.html_url, unchanged: true };
-  const published = await request(`/releases/${release.id}`, { method: 'PATCH', json: { draft: false } });
+  const published = await request(`/releases/${release.id}`, {
+    method: 'PATCH', json: { draft: false, make_latest: 'true' },
+  });
   if (published.draft || published.tag_name !== tag) throw new Error(`GitHub did not publish the verified release ${tag}.`);
   return { url: published.html_url, unchanged: false };
 }
@@ -152,4 +165,4 @@ if (require.main === module) {
     .catch((error) => { console.error(error.message); process.exitCode = 1; });
 }
 
-module.exports = { publishWindowsRelease };
+module.exports = { publishWindowsRelease, readArtifact };

@@ -15,7 +15,7 @@ function prepareElectron(staging = path.join(root, '.desktop-app')) {
   const electron = path.join(staging, 'electron');
   const assets = path.join(electron, 'assets');
   fs.mkdirSync(assets, { recursive: true });
-  for (const name of ['main.cjs', 'offline.html', 'offline.css', 'offline.js']) {
+  for (const name of ['main.cjs', 'updates.cjs', 'offline.html', 'offline.css', 'offline.js']) {
     fs.copyFileSync(path.join(root, 'electron', name), path.join(electron, name));
   }
   fs.copyFileSync(path.join(root, 'public', 'logo-icon.png'), path.join(assets, 'logo-icon.png'));
@@ -23,8 +23,11 @@ function prepareElectron(staging = path.join(root, '.desktop-app')) {
     fs.copyFileSync(path.join(root, 'public', 'sharkai', name), path.join(assets, name));
   }
   fs.writeFileSync(path.join(electron, 'service.json'), JSON.stringify({ origin: service.origin }));
+  const runtime = path.join(root, 'electron', 'runtime');
+  const { dependencies } = require(path.join(runtime, 'package.json'));
+  fs.copyFileSync(path.join(runtime, 'package-lock.json'), path.join(staging, 'package-lock.json'));
   fs.writeFileSync(path.join(staging, 'package.json'), JSON.stringify({
-    name: 'sharkai', version, description: 'SharkAI for Windows', author: 'SharkAI', main: 'electron/main.cjs',
+    name: 'sharkai', version, description: 'SharkAI for Windows', author: 'SharkAI', main: 'electron/main.cjs', dependencies,
   }));
   console.log('Prepared the SharkAI desktop application.');
 }

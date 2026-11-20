@@ -186,6 +186,7 @@ async function run() {
   await json('/api/chat', { body: { message: 'unauthenticated' } }, 401);
   await json('/api/projects', { body: { description: 'unauthenticated' } }, 401);
   const [a, b] = await Promise.all(accounts.map(signIn));
+  await json('/api/chat', { cookie: a.cookie, body: { message: 'Проверка', model: 'unsupported-model' } }, 400);
   const legacy = await prisma.chatMessage.create({ data: { userId: a.id, role: 'user', content: 'Historical fixture' } });
   const legacyHistory = await json('/api/chat?conversationId=legacy', { cookie: a.cookie });
   assert(legacyHistory.messages.some(({ id }) => id === legacy.id));
@@ -260,7 +261,8 @@ async function run() {
   assert.equal(Buffer.from(await archive.arrayBuffer()).toString('ascii', 0, 2), 'PK');
 
   if (process.env.SHARKAI_TEST_CHAT_PROVIDER === '1') {
-    assert(loaded.capabilities.models.some(({ id }) => id === 'standard'));
+    assert(loaded.capabilities.models.some(({ id }) => id === 'auto'));
+    assert(loaded.capabilities.models.some(({ id }) => id === 'gpt-6-luna'));
     const response = await request('/api/chat', { cookie: a.cookie, headers: { Accept: 'application/x-ndjson' },
       body: { conversationId: randomUUID(), requestId: randomUUID(), message: 'What animal says meow? Answer in one short sentence.' } });
     assert.match(response.headers.get('content-type'), /application\/x-ndjson/);

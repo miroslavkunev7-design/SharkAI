@@ -1,0 +1,9 @@
+{
+  "name": "sharkai",
+  "version": "1.0.4",
+  "private": true,
+  "dependencies": {
+    "electron-updater": "6.8.11",
+    "js-yaml": "4.1.1"
+  }
+}

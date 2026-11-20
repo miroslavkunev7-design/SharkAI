@@ -9,7 +9,7 @@ import {
   AppWindow, ArrowDown, ArrowUp, AudioLines, Bell, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, Download, ExternalLink,
   FileText, Folder, Globe2, Image as ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare,
   Mic, PanelLeftClose, PanelLeftOpen, Paperclip, Pencil, Plus, RotateCcw, ScanLine, ScreenShare,
-  Search, Settings, Shield, Sparkles, Square, Table2, X,
+  Search, Settings, Shield, Sparkles, Square, SquarePen, Table2, X,
 } from 'lucide-react';
 import { captureFrame, useChatMedia } from './chat-media';
 import { readChatResponse } from './chat-response';
@@ -99,6 +99,8 @@ export default function ChatPage() {
   const [projectError, setProjectError] = useState(false);
   const [account, setAccount] = useState<Account | null>(null);
   const [sharkAssistant, setSharkAssistant] = useState(false);
+  const [models, setModels] = useState<Model[]>([]);
+  const [model, setModel] = useState('auto');
   const [capabilityReason, setCapabilityReason] = useState('');
   const [tools, setTools] = useState<ChatTool[]>([]);
   const [toolsPending, setToolsPending] = useState(true);
@@ -159,12 +161,17 @@ export default function ChatPage() {
   const canChooseTranscriptionLanguage = isTranscription && takesTranscriptionLanguage(input);
   const datasetExample = selectedTool?.id === 'dataset-analysis' ? 'Сумирай „Приход“ по „Град“' : null;
   const attachmentPreview = attachment ? attachmentInspection(attachment) : null;
-  const modelLabel = 'Шарк агент';
   const voiceUnavailable = media.voiceReason || (!sharkAssistant ? 'Шарк агентът е недостъпен за гласов отговор.' : '');
   const dictationLabel = media.listening === 'dictation' ? (media.recordStage === 'recording' ? 'Приключи диктовката' : 'Отмени диктовката') : 'Диктовка';
   const conversationLabel = media.speaking ? 'Спри озвучаването' : media.listening === 'conversation'
     ? (media.recordStage === 'recording' ? 'Изпрати гласовия запис' : 'Отмени гласовия запис') : 'Гласов разговор';
   const canSend = !!account;
+  useEffect(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    field.style.height = 'auto';
+    field.style.height = field.scrollHeight + 'px';
+  }, [input, canSend, loading, small]);
   const pending = loading || sending || uploading || mediaPending || modeSaving;
   const awaitingProjects = projects.some(projectInProgress);
   const showStart = !loading && !loadProblem && messages.length === 0 && !optimistic;
@@ -199,6 +206,12 @@ export default function ChatPage() {
       setProjectContext(recovered?.request.projectId ?? (unsavedConversation ? null : draftProjectId || data.projectId || selected?.projectId || null));
 
       setSharkAssistant(data.capabilities?.sharkAssistant === true);
+      const availableModels = data.capabilities?.models ?? [];
+      setModels(availableModels);
+      setModel((current) => {
+        const candidate = recovered?.request.model ?? current;
+        return availableModels.some(({ id }) => id === candidate) ? candidate : 'auto';
+      });
       setCapabilityReason(data.capabilities?.reason || '');
       setAccount(data.user ?? null);
       if (recovered) {
@@ -681,7 +694,7 @@ export default function ChatPage() {
     const previous = failedRequest.current;
     const requestMode = repeat ? (tool ? 'work' : 'chat') : mode;
     const current = {
-      message, mode: requestMode, model: 'auto', reasoning: undefined, uploadId,
+      message, mode: requestMode, model, reasoning: undefined, uploadId,
       toolId: tool?.id, projectId: projectContext ?? undefined, branchFrom: origin || undefined,
     };
     const equivalent = !!previous && previous.message === message && previous.uploadId === uploadId && previous.toolId === current.toolId
@@ -872,13 +885,13 @@ export default function ChatPage() {
     <div className="shark-chat-shell" ref={shellRef} data-rail={railVisible} data-drawer={drawerOpen}>
       <a href="#chat-main" className="shark-chat-skip">Към разговора</a>
       {small && drawerOpen && <button type="button" tabIndex={-1} className="shark-chat-drawer-backdrop" aria-label="Затвори историята" onClick={closeDrawer} />}
-      <aside ref={railRef} className="shark-chat-rail" id="chat-rail" aria-label="История и проекти" aria-hidden={!railOpen} inert={!railOpen}>
+      <aside ref={railRef} className="shark-chat-rail" id="chat-rail" aria-label="История и проекти" role={small && drawerOpen ? 'dialog' : undefined} aria-modal={small && drawerOpen ? true : undefined} aria-hidden={!railOpen} inert={!railOpen}>
         <header className="shark-chat-brand">
           <Link href="/"><Logo size="md" /><span>Shark<span>AI</span></span></Link>
           <button data-close-rail type="button" className="shark-chat-icon" title="Прибери историята" aria-label="Прибери историята" onClick={railAction}>{small ? <X size={20} /> : <PanelLeftClose size={19} />}</button>
         </header>
-        {account && <div className="shark-chat-rail-actions ice-section">
-          <button type="button" className="shark-chat-new" onClick={() => newConversation()} disabled={pending}><Plus size={18} /> Нов чат</button>
+        {account && <div className="shark-chat-rail-actions">
+          <button type="button" className="shark-chat-new" onClick={() => newConversation()} disabled={pending}><SquarePen size={17} /> Нов чат</button>
           <label className="shark-chat-search"><Search size={17} /><span className="shark-chat-sr">Търси в заглавията на разговори и проекти</span><input type="search" value={search} placeholder="Търси в историята" onChange={(event) => setSearch(event.target.value)} /></label>
         </div>}
         <div className="shark-chat-rail-content">
@@ -896,9 +909,9 @@ export default function ChatPage() {
           </section>}
         </div>
         <nav className="shark-chat-rail-modules" aria-label="Работно пространство">
-          <Link href="/dashboard" className="shark-chat-rail-row ice-section" data-ice-art="shark"><LayoutDashboard size={17} /><span>Обзор</span></Link>
-          <Link href="/dashboard?view=studio" className="shark-chat-rail-row ice-section" data-ice-art="studio"><AppWindow size={17} /><span>Студио</span></Link>
-          <Link href="/dashboard?view=investments&tab=strategies" className="shark-chat-rail-row ice-section" data-ice-art="markets"><Sparkles size={17} /><span>Инвестиционни стратегии</span></Link>
+          <Link href="/dashboard" className="shark-chat-rail-row"><LayoutDashboard size={17} /><span>Обзор</span></Link>
+          <Link href="/dashboard?view=studio" className="shark-chat-rail-row"><AppWindow size={17} /><span>Студио</span></Link>
+          <Link href="/dashboard?view=investments&tab=strategies" className="shark-chat-rail-row"><Sparkles size={17} /><span>Инвестиционни стратегии</span></Link>
         </nav>
         <div className="shark-chat-profile">
           {account ? popupButton('profile', 'Меню на профила', <>
@@ -919,25 +932,35 @@ export default function ChatPage() {
             <button ref={railTrigger} className="shark-chat-icon shark-chat-rail-trigger" type="button" aria-label={railOpen ? 'Скрий историята' : 'Отвори историята'} title="История и проекти" aria-controls="chat-rail" aria-expanded={railOpen} onClick={railAction}>
               {small ? <Menu size={21} /> : railOpen ? <PanelLeftClose size={19} /> : <PanelLeftOpen size={19} />}
             </button>
+            {models.length > 0 ? <label className="shark-chat-model-picker">
+              <span>Модел</span>
+              <select className="shark-chat-model-button" aria-label="Модел на Шарк агента" value={model}
+                disabled={pending || !!selectedTool} onChange={(event) => setModel(event.currentTarget.value)}>
+                {models.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+              </select>
+              <ChevronDown size={14} aria-hidden="true" />
+            </label> : <strong className="shark-chat-topbar-name">SharkAI</strong>}
+          </div>
+          <div className="shark-chat-topbar-actions">
             {account && <div className="shark-chat-mobile-mode">
               {popupButton('mode', `Режим ${modeLabel(mode)}`, <>{modeLabel(mode)} <ChevronDown size={15} /></>, 'shark-chat-mode-trigger', pending)}
               {popup === 'mode' && <div id="chat-popup-mode" className="shark-chat-popup shark-chat-mode-popup" ref={popupRef}>
                 {(['chat', 'work'] as const).map((item) => <button type="button" key={item} onClick={() => changeMode(item)} aria-pressed={mode === item}>{modeLabel(item)} {mode === item && <Check size={16} />}</button>)}
               </div>}
             </div>}
-          </div>
-          {account && <div className="shark-chat-mode-switch" role="group" aria-label="Режим на разговора">
-            {(['chat', 'work'] as const).map((item) => <button type="button" key={item} aria-pressed={mode === item} disabled={pending} onClick={() => changeMode(item)}>{item === 'chat' ? <MessageSquare size={15} /> : <BriefcaseBusiness size={15} />}{modeLabel(item)}</button>)}
-          </div>}
-          <div className="shark-chat-topbar-actions">
+            {account && <div className="shark-chat-mode-switch" role="group" aria-label="Режим на разговора">
+              {(['chat', 'work'] as const).map((item) => <button type="button" key={item} aria-pressed={mode === item} disabled={pending} onClick={() => changeMode(item)}>{item === 'chat' ? <MessageSquare size={15} /> : <BriefcaseBusiness size={15} />}{modeLabel(item)}</button>)}
+            </div>}
+            {account && (small || !railOpen) && <button type="button" className="shark-chat-icon" aria-label="Нов чат" title="Нов чат" disabled={pending}
+              onClick={() => newConversation()}><SquarePen size={18} /></button>}
             {account && <button type="button" className="shark-chat-icon shark-chat-reminder-trigger" aria-label={reminders.notifications.length ? `Напомняния, ${reminders.notifications.length} непрочетени` : 'Напомняния'} title="Напомняния" aria-haspopup={small ? 'dialog' : undefined} aria-expanded={inspector?.type === 'reminders'} aria-controls="chat-reminders-panel" onClick={() => openInspector({ type: 'reminders', title: 'Напомняния' })}><Bell size={18} />{reminders.notifications.length > 0 && <span aria-hidden="true">{reminders.notifications.length}</span>}</button>}
-            <Link className="shark-chat-topbar-studio" href="/dashboard?view=studio" aria-label="Студио" title="Студио"><AppWindow size={17} /><span>Студио</span></Link>
+            {!small && !railOpen && <Link className="shark-chat-topbar-studio" href="/dashboard?view=studio" aria-label="Студио" title="Студио"><AppWindow size={17} /><span>Студио</span></Link>}
           </div>
         </header>
         <main id="chat-main" tabIndex={-1} className="shark-chat-main" data-start={showStart}>
           {loading && <p className="shark-chat-center-state" role="status"><LoaderCircle size={19} className="shark-chat-spinner" /> Зареждане на разговора…</p>}
           {loadProblem && <div className="shark-chat-center-state" role="alert">{loadProblem} {loginRequired ? <Link className="shark-chat-new" href={signInHref}>Вход за чат</Link> : <button type="button" onClick={() => void loadConversation(new URLSearchParams(window.location.search).get('conversationId') || undefined)}>Опитай отново</button>}</div>}
-          {showStart ? <section className="shark-chat-welcome ice-section" data-ice-art={mode === 'work' ? 'studio' : 'agent'} aria-labelledby="chat-welcome-title">
+          {showStart ? <section className="shark-chat-welcome" aria-labelledby="chat-welcome-title">
             <div className="shark-chat-welcome-copy">
               <Logo size="lg" />
               <h1 id="chat-welcome-title">{mode === 'work' ? 'С какво ще работим?' : 'Как мога да помогна?'}</h1>
@@ -961,7 +984,7 @@ export default function ChatPage() {
             {showStart && (sharkAssistant || (mode === 'work' && tools.some(({ available }) => available))) && <div className="shark-chat-suggestions" aria-label="Предложения">
               {mode === 'work' ? tools.filter(({ available }) => available).slice(0, 3).map((tool) => <button type="button" disabled={pending} key={tool.id} onClick={() => chooseTool(tool)}><ToolIcon tool={tool} /> {tool.label}</button>) : suggestions.map(({ label, text, icon: Icon }) => <button type="button" key={label} disabled={pending} onClick={() => { setInput(text); send(text); }}><Icon size={16} /> {label}</button>)}
             </div>}
-            <form className="shark-chat-composer ice-section" data-ice-art={mode === 'work' ? 'studio' : 'agent'} onSubmit={formSubmit}>
+            <form className="shark-chat-composer" onSubmit={formSubmit}>
               {(attachment || selectedTool || branchFrom || uploading || projectContext) && <div className="shark-chat-chips" data-transcription={isTranscription || undefined}>
                 {attachment && <div className="shark-chat-chip">
                   {attachmentPreview ? <button type="button" className="shark-chat-chip-preview" aria-label={`Преглед на ${attachment.name}`} onClick={() => openInspector(attachmentPreview)}>{attachmentPreview.type === 'image' ? <img src={attachmentPreview.url} alt="" /> : attachmentPreview.type === 'audio' ? <AudioLines size={16} /> : <FileText size={16} />}<span className="shark-chat-chip-name">{attachment.name}</span></button> : <span><FileText size={16} />{attachment.name}</span>}
@@ -982,7 +1005,7 @@ export default function ChatPage() {
               </div>}
               <label className="shark-chat-sr" htmlFor="chat-input">Съобщение</label>
               {datasetExample && <span className="shark-chat-sr" id="chat-dataset-example">Пример за групиране. {datasetExample}. Използвай точните имена на колоните от таблицата.</span>}
-              <textarea id="chat-input" ref={inputRef} value={input} rows={2} maxLength={12000} disabled={pending || !canSend || !!loadProblem}
+              <textarea id="chat-input" ref={inputRef} value={input} rows={1} maxLength={12000} disabled={pending || !canSend || !!loadProblem}
                 aria-describedby={datasetExample ? 'chat-dataset-example' : undefined}
                 placeholder={datasetExample ?? (mode === 'work' ? 'Опиши задачата си…' : 'Напиши съобщение…')}
                 onChange={(event) => { if (failedRequest.current) { clearFailedChatTurn(); setNotice(''); } setInput(event.target.value); setProblem(''); }}
@@ -1020,7 +1043,6 @@ export default function ChatPage() {
                 <input ref={fileRef} type="file" hidden onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void uploadFile(file); }} />
                 {selectedTool && INPUT_FILES[selectedTool.input] && <button type="button" title="Избери входен файл" aria-label="Избери входен файл" className="shark-chat-compose-icon" disabled={pending} onClick={() => chooseFile(selectedTool.input)}><Paperclip size={17} /></button>}
                 <div className="shark-chat-compose-spacer" />
-                <span className="shark-chat-model-button" title="Основен агент в n8n">{modelLabel}</span>
                 <button type="button" className="shark-chat-compose-icon" aria-label={dictationLabel} aria-pressed={media.listening === 'dictation'} title={media.dictationReason || dictationLabel} disabled={!media.dictation || !canSend || pending} onClick={startDictation}><Mic size={20} /></button>
                 <button type="button" className="shark-chat-compose-icon shark-chat-voice" aria-label={conversationLabel} aria-pressed={media.listening === 'conversation' || media.speaking} title={voiceUnavailable || conversationLabel} disabled={!media.speaking && (!!voiceUnavailable || !canSend || pending)} onClick={startVoice}><AudioLines size={20} /></button>
                 {sending ? <button className="shark-chat-send" type="button" aria-label="Спри отговора" title="Спри отговора" onClick={() => sendController.current?.abort()}><Square size={16} fill="currentColor" /></button> :
@@ -1035,7 +1057,7 @@ export default function ChatPage() {
               {!loading && account && !sharkAssistant && capabilityReason && <span>{capabilityReason}</span>}
             </div>
           </div> : showStart && <div className="shark-chat-compose-area">
-            <div className="shark-chat-sign-in ice-section" data-ice-art="agent">
+            <div className="shark-chat-sign-in">
               <p>Влез, за да пишеш в чата и да отвориш историята си.</p>
               <Link className="shark-chat-new" href={signInHref}><Shield size={17} aria-hidden="true" /> Вход за чат</Link>
             </div>

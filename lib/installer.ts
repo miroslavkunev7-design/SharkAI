@@ -16,11 +16,16 @@ export function getInstallerInfo(): InstallerInfo | null {
   if (external) {
     try {
       const url = new URL(external);
-      if (url.protocol !== 'https:' || url.username || url.password || !url.pathname.endsWith(`/${installerFilename}`)) return null;
+      if (url.protocol !== 'https:' || url.username || url.password) return null;
+      const name = url.pathname.split('/').at(-1);
+      // The website can deploy before the next signed Windows release. Keep serving its configured published build.
+      const previousRelease = url.origin === 'https://github.com'
+        && /^\/miroslavkunev7-design\/SharkAI\/releases\/download\/v(\d+\.\d+\.\d+)\/SharkAI-Setup-\1\.exe$/.test(url.pathname);
+      if (!name || (name !== installerFilename && !previousRelease)) return null;
       const sizeMb = Number(process.env.INSTALLER_SIZE_MB);
       return {
         source: 'external',
-        name: installerFilename,
+        name,
         size: Number.isFinite(sizeMb) && sizeMb > 0 ? Math.round(sizeMb * 1_000_000) : undefined,
         url: url.href,
       };

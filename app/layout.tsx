@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
+import { desktopWebRevision } from '@/lib/build-revision';
+import { DesktopWebUpdate } from './desktop-web-update';
 
 export const metadata: Metadata = {
   title: 'SharkAI — AI чат и работно пространство',
@@ -32,7 +34,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="bg">
-      <body className="font-sans min-h-screen">{children}</body>
+      <body className="font-sans min-h-screen">{children}<DesktopWebUpdate revision={desktopWebRevision()} /></body>
     </html>
   );
 }
