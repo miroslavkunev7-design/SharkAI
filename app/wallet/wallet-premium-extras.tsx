@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import {useEffect, useMemo, useState} from 'react';
 import {ArrowLeftRight, ArrowRight, CreditCard, RefreshCw, ShieldCheck} from 'lucide-react';
+import {krakenPairRequest,verifiedKrakenReference} from './crypto-reference';
 
 const codes = ['EUR','GBP','USD','CHF','BGN','BTC','ETH','USDT'] as const;
 type CurrencyCode = typeof codes[number];
-type Rate = {base: CurrencyCode; quote: CurrencyCode; date: string; rate: number};
+type Rate = {base: CurrencyCode; quote: CurrencyCode; date: string; rate: number; source:'identity'|'Frankfurter'|'Kraken Spot'};
 
 function permitted(code:string):code is CurrencyCode {
   return (codes as readonly string[]).includes(code);
@@ -26,21 +27,29 @@ export function WalletReferenceConverter({compact=false,initialPair='fiat'}:{com
   const [reference,setReference]=useState<Rate|null>(null);
   const [reload,setReload]=useState(0);
   useEffect(()=>{
-    if(base===quote){setReference({base,quote,date:'',rate:1});setStatus('ready');return;}
+    if(base===quote){setReference({base,quote,date:'',rate:1,source:'identity'});setStatus('ready');return;}
     const controller=new AbortController();
     setStatus('loading');setReference(null);
-    // No account info, balances, amounts or identifiers are sent to the public rates API.
-    fetch('https://api.frankfurter.dev/v2/rate/'+base.toLowerCase()+'/'+quote.toLowerCase(),{
-      method:'GET',signal:controller.signal,cache:'no-store'
-    }).then(async response=>{
+    const kraken=krakenPairRequest(base,quote);
+    // Public market data only: never transmit a Wise identifier, balance, amount or account key.
+    const url=kraken?'/api/markets/crypto?q='+encodeURIComponent(kraken.pair)+'&page=1':
+      'https://api.frankfurter.dev/v2/rate/'+base.toLowerCase()+'/'+quote.toLowerCase();
+    fetch(url,{method:'GET',signal:controller.signal,cache:'no-store'}).then(async response=>{
       if(!response.ok)throw Error('Rate unavailable');
       const row:unknown=await response.json();
+      if(kraken){
+        const spot=verifiedKrakenReference(base,quote,row);
+        if(!spot)throw Error('Unverified Kraken quote');
+        return {...spot,base,quote};
+      }
       if(!row||typeof row!=='object')throw Error('Invalid rate');
       const data=row as Record<string,unknown>;
       if(data.base!==base||data.quote!==quote||typeof data.rate!=='number'||
         !Number.isFinite(data.rate)||data.rate<=0||typeof data.date!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(data.date))
-        throw Error('Unverified quote');
-      if(!controller.signal.aborted){setReference({base,quote,date:data.date,rate:data.rate});setStatus('ready');}
+        throw Error('Unverified fiat rate');
+      return {base,quote,date:data.date,rate:data.rate,source:'Frankfurter' as const};
+    }).then(verified=>{
+      if(!controller.signal.aborted){setReference(verified);setStatus('ready');}
     }).catch(()=>{if(!controller.signal.aborted){setStatus('unavailable');setReference(null);}});
     return ()=>controller.abort();
   },[base,quote,reload]);
@@ -86,12 +95,13 @@ export function WalletReferenceConverter({compact=false,initialPair='fiat'}:{com
       {status==='loading'?'Проверка на референтен курс…':
       status==='unavailable'?'В момента няма потвърден курс за избраната двойка.':
       reference?(base===quote?'Една и съща валута.':
-        '1 '+base+' ≈ '+new Intl.NumberFormat('bg-BG',{maximumFractionDigits:7}).format(reference.rate)+' '+quote+' · '+reference.date):'—'}
+        '1 '+base+' ≈ '+new Intl.NumberFormat('bg-BG',{maximumFractionDigits:7}).format(reference.rate)+' '+quote+' · '+reference.source+' · '+reference.date):'—'}
     </div>
     <button type="button" className="sw-btn sw-exchange-action" onClick={()=>setReload(n=>n+1)} disabled={status==='loading'}>
       <RefreshCw/> Обнови курса
     </button>
-    <p className="sw-exchange-disclaimer">Ориентировъчна справка от Frankfurter. Не е курс на Wise, оферта или извършен превод.</p>
+    <p className="sw-exchange-disclaimer">Информационни курсове от {reference?.source==='Kraken Spot'?'Kraken Spot':'Frankfurter'}.
+      Това не е курс на Wise, оферта, препоръка за търговия или извършен превод.</p>
     {!compact&&<Link className="sw-exchange-more" href="/wallet?tab=settings">Настройки на платежната сметка <ArrowRight/></Link>}
   </section>;
 }
