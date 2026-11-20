@@ -17,7 +17,7 @@
   padding: clamp(16px, 2vw, 24px);
   border: 1px solid var(--pfm-line);
   border-radius: 24px;
-  background: linear-gradient(125deg, #152a45 0%, #112038 52%, #171b35 100%);
+  background: var(--shark-panel-dark);
   box-shadow: inset 0 1px #ecf6ff0c;
   container: pfm / inline-size;
 }
@@ -69,7 +69,7 @@
 .pfm-dialog {
   width: min(610px, calc(100% - 24px)); max-width: 100%; max-height: min(90vh, 860px); max-height: min(90dvh, 860px); margin: auto;
   padding: clamp(18px, 3vw, 30px); border: 1px solid #7a9fc168; border-radius: 25px; overflow: auto; overscroll-behavior: contain;
-  background: radial-gradient(ellipse at 0 0,#213a5a 0,transparent 57%), linear-gradient(135deg,#14243a,#141a30);
+  background: var(--shark-panel-dark);
   box-shadow: 0 24px 100px #03061599;
 }
 .pfm-dialog:not([open]) { display: none; }

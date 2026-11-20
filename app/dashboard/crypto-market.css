@@ -3,7 +3,7 @@
 .crypto-market header p,.crypto-search>span,.crypto-market caption { color:#c1d3e3; font-size:.85rem; }
 .crypto-at,.crypto-market figcaption { color:#4c6777; font-size:.85rem; }
 .crypto-market h2 { font-size:clamp(1.35rem,3vw,1.85rem); }
-.crypto-detail { color:#16344a;background:linear-gradient(155deg,#fff,#edf7fc);border:1px solid #abc6d6;border-radius:1rem;display:grid;gap:.9rem;padding:clamp(.8rem,2vw,1.35rem);min-width:0;}
+.crypto-detail { color:#16344a;background:var(--shark-panel-light);border:1px solid #abc6d6;border-radius:1rem;display:grid;gap:.9rem;padding:clamp(.8rem,2vw,1.35rem);min-width:0;}
 .crypto-title,.crypto-search,.crypto-pagination { display:flex;gap:.75rem;align-items:center;justify-content:space-between;flex-wrap:wrap; }
 .crypto-title h3 { font-size:1.4rem; }.crypto-title h3 span {color:#587483;font-weight:500;}
 .crypto-ranges { display:flex;flex-wrap:wrap;gap:.2rem; }

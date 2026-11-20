@@ -5,7 +5,7 @@
   padding: clamp(1rem, 2.4vw, 1.65rem);
   border: 1px solid var(--workspace-line, #a2bac9);
   border-radius: 1rem;
-  background: linear-gradient(145deg, #f9fdff, #edf7fc);
+  background: var(--shark-panel-light);
   color: var(--workspace-ink, #102e43);
   text-align: left;
 }
@@ -86,7 +86,7 @@
 .wallet-projection small { color: #465e6d; line-height: 1.5; }
 .wallet-projection .wallet-projection-error { color: #91313b; }
 .wallet-projection-error button { padding: .3rem .45rem; border: 0; background: transparent; color: #145c8a; font: inherit; text-decoration: underline; cursor: pointer; }
-.wallet-euro-reference { padding: .85rem 1rem; border: 1px solid #b5cdd8; border-radius: .7rem; background: #eef6f8; }
+.wallet-euro-reference { padding: .85rem 1rem; border: 1px solid #b5cdd8; border-radius: .7rem; background: var(--shark-panel-light); }
 .wallet-euro-reference h3, .wallet-euro-reference summary { margin: 0; font-size: 1rem; font-weight: 700; color: #23485a; }
 .wallet-euro-reference summary { cursor: pointer; }
 .wallet-euro-reference > :is(p, dl) { margin-top: .6rem; }

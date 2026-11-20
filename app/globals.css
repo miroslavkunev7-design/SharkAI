@@ -107,6 +107,12 @@
   --shark-violet: #6e48aa;
   --shark-ice-border: #7299c94d;
   --shark-muted: #b0bfd9;
+  --shark-ice-texture: url('/sharkai/ice-surface.webp');
+  --shark-panel-dark: linear-gradient(112deg, #0b1d32df, #0a182bed 44%, #142642de 75%, #1b2a48c9),
+    var(--shark-ice-texture) center / 100% 100% no-repeat, #102038;
+  --shark-panel-light: linear-gradient(109deg, #f1fbffda, #e4f4ffbd 56%, #daeaff87),
+    var(--shark-ice-texture) center / 100% 100% no-repeat, #d9effc;
+  --shark-scene-shade: linear-gradient(100deg, #0c1c30f5 3%, #0c1a30e6 35%, #10213ab8 62%, #101c3269);
   --shark-action-gradient: linear-gradient(115deg, #095ccc, #5152d3 57%, #8144a5);
   color-scheme: dark;
 }
@@ -118,9 +124,7 @@
 
 .shark-glass {
   border: 1px solid var(--shark-ice-border);
-  background:
-    linear-gradient(133deg, #9cd6ff21 0%, transparent 32%, #a16bff13 79%, #7cdfff17 100%),
-    #0d172bed;
+  background: var(--shark-panel-dark);
   box-shadow: inset 0 1px #c2d9ff39, inset 0 -1px #aca1ff20, 0 16px 42px #02051366;
   backdrop-filter: blur(20px) saturate(130%);
 }
@@ -486,12 +490,12 @@
   --ice-ink: #081b32;
   --ice-focus: #1466cd;
   --ice-edge: #bcf1ff;
-  --ice-tint: transparent;
+  --ice-tint: #e9f9ff16;
   position: relative;
   isolation: isolate;
   color: var(--ice-ink);
   background-color: #b9e8fb;
-  background-image: linear-gradient(var(--ice-tint), var(--ice-tint)), url('/sharkai/ice-surface.webp');
+  background-image: linear-gradient(109deg, #effbff72, transparent 65%), linear-gradient(var(--ice-tint), var(--ice-tint)), var(--shark-ice-texture);
   background-repeat: no-repeat;
   background-position: center;
   background-size: 100% 100%;
@@ -505,6 +509,7 @@
   --ice-focus: #9ce8ff;
   --ice-edge: #7299c977;
   --ice-tint: #09162edc;
+  background-image: linear-gradient(115deg, #10253ce0, var(--ice-tint) 64%, #192c49c7), var(--shark-ice-texture);
   --ice-art-opacity: .56;
   background-color: #101c32;
   box-shadow: inset 0 1px #dff4ff2e, inset 0 -1px #82bef533, 0 4px 18px #02071961;
@@ -541,6 +546,7 @@
 }
 
 @media (forced-colors: active) {
+  :root { --shark-panel-dark: Canvas; --shark-panel-light: Canvas; }
   .ice-section, .ice-section.ice-section--dark { --ice-focus: Highlight; color: CanvasText; background: Canvas; border-color: ButtonText; }
   .ice-section[data-ice-art]::before { display: none; }
 }

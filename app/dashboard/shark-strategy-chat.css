@@ -1,4 +1,4 @@
-.shark-strategy-thread { border:1px solid var(--shark-border, #b7cddc); border-radius:18px; padding:clamp(16px,3vw,26px); margin:16px 0; }
+.shark-strategy-thread { border:1px solid var(--shark-border, #b7cddc); border-radius:18px; background:var(--shark-panel-light); color:#102b42; padding:clamp(16px,3vw,26px); margin:16px 0; }
 .shark-strategy-thread h3 { margin:0 0 12px; }
 .shark-strategy-thread form { display:grid; gap:10px; }
 .shark-strategy-thread form button { justify-self:start; display:inline-flex; align-items:center; gap:8px; }

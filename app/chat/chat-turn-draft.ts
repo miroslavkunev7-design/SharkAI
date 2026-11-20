@@ -29,27 +29,27 @@ export interface PendingChatTurn {
   stopped?: boolean;
 }
 
-const storageKey = 'sharkai:pending-chat-turn:v1';
+const storageKey = (compact: boolean) => compact ? 'sharkai:pending-quick-chat-turn:v1' : 'sharkai:pending-chat-turn:v1';
 
 export function chatTurnScope(conversationId?: string, projectId?: string) {
   return JSON.stringify([conversationId ?? '', projectId ?? '']);
 }
 
-export function writePendingChatTurn(turn: PendingChatTurn | null) {
+export function writePendingChatTurn(turn: PendingChatTurn | null, compact = false) {
   try {
-    if (turn) sessionStorage.setItem(storageKey, JSON.stringify(turn));
-    else sessionStorage.removeItem(storageKey);
+    if (turn) sessionStorage.setItem(storageKey(compact), JSON.stringify(turn));
+    else sessionStorage.removeItem(storageKey(compact));
   } catch { /* Chat still works when browser storage is unavailable. */ }
 }
 
-export function readPendingChatTurn(owner: string | undefined, scope: string): PendingChatTurn | null {
+export function readPendingChatTurn(owner: string | undefined, scope: string, compact = false): PendingChatTurn | null {
   if (!owner) return null;
   try {
-    const raw = sessionStorage.getItem(storageKey);
+    const raw = sessionStorage.getItem(storageKey(compact));
     if (!raw) return null;
     const turn = JSON.parse(raw) as PendingChatTurn;
     if (turn.owner !== owner) {
-      writePendingChatTurn(null);
+      writePendingChatTurn(null, compact);
       return null;
     }
     if (turn.scope !== scope || typeof turn.input !== 'string' || typeof turn.problem !== 'string'

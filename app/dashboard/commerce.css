@@ -14,6 +14,6 @@
 .commerce-up { bottom:50%;background:#086c72; }.commerce-down { top:50%;background:#a2384f; }
 .commerce-missing { top:48%;height:3px;border:1px dashed #718395; }
 .commerce-axis { display:flex;justify-content:space-between;font-size:.77rem;color:#314e63; }
-.commerce-candidate { padding:.75rem;border:1px solid #80a8bc;border-radius:.55rem;background:#f6fcfff2; }
+.commerce-candidate { padding:.75rem;border:1px solid #80a8bc;border-radius:.55rem;background:var(--shark-panel-light); }
 .commerce-candidate summary { cursor:pointer;font-weight:650;overflow-wrap:anywhere; }
 .commerce-candidate[open]>:not(summary) { margin-top:.7rem; }

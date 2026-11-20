@@ -23,8 +23,9 @@ export function DesktopWebUpdate({ revision }: { revision?: string }) {
         const deployed = status.revision ?? status.commit;
         if (status.ok !== true || typeof deployed !== 'string' || !/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(deployed)) return;
         if (deployed === revision) { setUpdate(''); return; }
-        // The installer download page has no user input. Keep active chats, calls and forms open.
+        // An opened quick chat may still contain a draft or an active request after minimizing.
         if (location.pathname === '/download' && !location.search && !location.hash
+          && !document.getElementById('shark-quick-panel')
           && sessionStorage.getItem('sharkai-desktop-reload') !== deployed) {
           sessionStorage.setItem('sharkai-desktop-reload', deployed);
           location.reload();

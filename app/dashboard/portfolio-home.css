@@ -123,7 +123,7 @@
   gap: 2px;
   padding: 12px clamp(12px, 2vw, 25px) 14px;
   border-top: 1px solid #a4c9f92e;
-  background: linear-gradient(110deg, #111f36ed, #17203ce8 64%, #262345e3);
+  background: var(--shark-panel-dark);
 }
 .pf-home .pf-home-action {
   display: flex;
@@ -163,7 +163,7 @@
   flex-direction: column;
   align-self: stretch;
   padding: clamp(16px, 2vw, 25px);
-  background: radial-gradient(ellipse at right top, #26355c58 0%, transparent 68%), linear-gradient(150deg, #14233a, #111c30 72%);
+  background: var(--shark-panel-dark);
 }
 .pf-home-tabs {
   display: inline-flex;
@@ -242,7 +242,7 @@
 .pf-home-rows small, .pf-home-row-status { color: var(--pf-muted); font-size: .76rem; }
 .pf-home-row-status { max-width: 13ch; text-align: right; }
 .pf-home-list-note { margin-top: 6px; }
-.pf-home-history { padding: 19px 24px; background: linear-gradient(120deg, #14243b, #151d34); }
+.pf-home-history { padding: 19px 24px; background: var(--shark-panel-dark); }
 .pf-home-history-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
 .pf-home-history h2 { margin: 0; }
 .pf-home-ranges { display: flex; gap: 2px; }

@@ -32,7 +32,7 @@
 .sw-btn-secondary:hover { background:#2b4761; }
 .sw-grid { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:1rem; margin-top:1rem; align-items:start; }
 .sw-stack { display:grid; gap:1rem; }
-.sw-actions,.sw-panel,.sw-forecast-card { border:1px solid #26394c; border-radius:1.15rem; background:#111d2c; }
+.sw-actions,.sw-panel,.sw-forecast-card { border:1px solid #6392b95c; border-radius:1.15rem; background:var(--shark-panel-dark); }
 .sw-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); padding:.85rem .2rem; }
 .sw-actions button { display:grid; justify-items:center; gap:.4rem; font-size:.82rem; color:#deedfb; font-weight:630; border-radius:.75rem; }
 .sw-actions button span,.sw-tile-icon,.sw-movement-icon { display:grid; place-items:center; width:42px; height:42px; border-radius:50%; background:#1d354a; color:#a2ebff; }
@@ -47,7 +47,7 @@
 .sw-section-head>svg,.sw-section-head>a,.sw-section-head>button { color:#a1eaff; }
 .sw-section-head a,.sw-section-head button { display:grid; place-items:center; border-radius:50%; min-height:36px; min-width:36px; background:#1b3042; }
 .sw-section-head svg { width:18px; }
-.sw-forecast-card { background:linear-gradient(115deg,#17344af5,#142331ee 86%),url('/sharkai/markets.webp') center/cover; min-height:210px; }
+.sw-forecast-card { background:var(--shark-scene-shade),url('/sharkai/markets.webp') 72% center/cover no-repeat,#13283b; min-height:210px; }
 .sw-forecast-card:hover { border-color:#5b91a8; }
 .sw-forecast-card p { max-width:31ch; }
 .sw-tile-icon { border-radius:.8rem; background:#18455d; }

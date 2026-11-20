@@ -69,7 +69,7 @@
   padding: 7px;
   border: 1px solid #71b8ed55;
   border-radius: 13px;
-  background: linear-gradient(155deg, #172641ed, #0c1628ee);
+  background: var(--shark-panel-dark);
   box-shadow: inset 0 1px #e5f7ff2d, 0 5px 18px #02061061;
   color: #dbe9fb;
   font-size: clamp(.7rem, 1.65vw, .91rem);
@@ -81,7 +81,7 @@
 .shark-launch-tiles button:nth-child(3) svg { color: #ccb2ff; }
 .shark-launch-tiles button:nth-child(4) svg { color: #a4e6ff; }
 .shark-launch-tiles button:hover { border-color: #b5e4ffad; }
-.shark-launch-tiles button[aria-pressed='true'] { border-color: #9adbffd9; background: linear-gradient(145deg, #174772, #2d2962); color: #fff; box-shadow: inset 0 1px #ecfaff51, 0 0 22px #409dd754; }
+.shark-launch-tiles button[aria-pressed='true'] { border-color: #9adbffd9; background: linear-gradient(145deg, #174772dc, #2d2962db), var(--shark-ice-texture) center / 100% 100%; color: #fff; box-shadow: inset 0 1px #ecfaff51, 0 0 22px #409dd754; }
 
 .shark-launch-copy { min-width: 0; max-width: min(47%, 550px); margin-top: clamp(30px, 5vw, 72px); }
 .shark-launch-copy h1 { margin: 0; color: #f4f9ff; font-size: var(--launch-heading-size); font-weight: 820; line-height: 1.04; letter-spacing: -.052em; text-wrap: balance; }
@@ -101,13 +101,18 @@
   overflow: hidden;
   border: 1px solid #76b2e245;
   border-radius: 16px;
-  background: linear-gradient(135deg, #111e32, #0a1324 70%);
+  background: var(--shark-panel-dark);
   box-shadow: inset 0 1px #d0f3ff19;
 }
 
 .shark-launch-summary a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; min-width: 0; min-height: 82px; padding: 10px clamp(8px, 1.4vw, 20px); }
+.shark-launch-summary a { background: var(--shark-scene-shade), var(--module-art) right center / cover no-repeat, #112037; }
+.shark-launch-summary #investments { --module-art: url('/sharkai/markets.webp'); }
+.shark-launch-summary #loop { --module-art: url('/sharkai/studio.webp'); }
+.shark-launch-summary #wallet { --module-art: url('/sharkai/shark-hero.webp'); }
+.shark-launch-summary #work { --module-art: url('/sharkai/team.webp'); }
 .shark-launch-summary a + a { border-inline-start: 1px solid #8fbcea2c; }
-.shark-launch-summary a:is(:hover, :focus-visible) { background: #23426a6e; }
+.shark-launch-summary a:is(:hover, :focus-visible) { box-shadow: inset 0 0 0 2px #87c6ff80; }
 .shark-launch-summary a:focus-visible { outline-offset: -3px; }
 .shark-launch-summary-icon { color: #74d8ff; }
 .shark-launch-summary a:nth-child(even) .shark-launch-summary-icon { color: #c2a7ff; }
