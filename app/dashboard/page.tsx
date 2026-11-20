@@ -740,7 +740,7 @@ function DashboardContent() {
   }
 
   return (
-    <div className="module-workspace">
+    <div className="module-workspace" data-ultra-view={view}>
       <a className="module-skip" href="#workspace-content">Към съдържанието</a>
       <aside className="module-sidebar ice-section ice-section--dark" data-ice-art={WORKSPACE_ART[view] ?? 'shark'}>
         <WorkspaceBrand />
