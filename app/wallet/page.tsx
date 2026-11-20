@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 import {WalletHome} from './wallet-home';
 import './wallet.css';
+import './wallet-approved-theme.css';
 
 export const metadata:Metadata={title:'Портфейл | Shark AI',description:'Портфейл, движения и инвестиционни прогнози в Shark AI.'};
 
