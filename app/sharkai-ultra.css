@@ -262,3 +262,15 @@
   .shark-chat-shell .shark-chat-workspace::before {display:none;}
   .shark-chat-shell .shark-chat-topbar {background:Canvas;color:CanvasText;}
 }
+
+
+/* Position the SINGLE existing Shark Assistant launcher above Wallet's
+   last-transactions card on phones. Open panel remains above bottom navigation. */
+@media (max-width:699px) {
+  body:has(.sw-root) .shark-overlay-stack:has(.shark-quick-dock) {
+    --quick-bottom:clamp(216px,28dvh,285px);
+  }
+  body:has(.sw-root) .shark-overlay-stack:has(.shark-quick-panel:not([hidden])) {
+    --quick-bottom:calc(88px + env(safe-area-inset-bottom));
+  }
+}
