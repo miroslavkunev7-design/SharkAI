@@ -168,3 +168,48 @@
 @media(forced-colors:active) {
   :is(.shark-header.shark-glass,.module-topbar,.shark-quick-header,.shark-chat-message-user,.shark-chat-message-assistant){background:Canvas;color:CanvasText;}
 }
+/* Thematic imagery for every dashboard module uses ORIGINAL SharkAI assets.
+   The global shell stays one component; only the image layer changes by view. */
+.module-workspace .module-main {
+  position:relative; isolation:isolate;
+}
+.module-workspace .module-main::before {
+  content:""; position:absolute; inset:0; z-index:-1; pointer-events:none;
+  background-position:center top; background-size:cover; background-repeat:no-repeat;
+  opacity:.16;
+  -webkit-mask-image:linear-gradient(to bottom,black,transparent 76%);
+  mask-image:linear-gradient(to bottom,black,transparent 76%);
+}
+.module-workspace[data-ultra-view="studio"] .module-main::before {
+  background-image:url('/sharkai/studio.webp');
+}
+.module-workspace[data-ultra-view="agents"] .module-main::before {
+  background-image:url('/sharkai/team.webp');
+}
+.module-workspace[data-ultra-view="automotive"] .module-main::before {
+  background-image:url('/assets/image-1.png');
+}
+.module-workspace[data-ultra-view="investments"] .module-main::before {
+  background-image:url('/sharkai/markets.webp');
+}
+.module-workspace[data-ultra-view="commerce"] .module-main::before {
+  background-image:url('/sharkai/studio.webp');
+}
+.module-workspace[data-ultra-view="settings"] .module-main::before,
+.module-workspace[data-ultra-view="overview"] .module-main::before {
+  background-image:url('/sharkai/shark-hero.webp');
+}
+.module-workspace :is(.module-panel,.module-banner,.module-tile,.module-form,.module-metric) {
+  border-color:rgba(207,247,255,.72);
+}
+.module-workspace :is(.module-panel,.module-tile,.module-banner).ice-section {
+  background-clip:padding-box;
+  box-shadow:var(--ultra-halo),0 10px 28px rgba(3,24,67,.24);
+}
+.module-workspace .module-banner[data-ice-art]::before {
+  width:var(--ice-art-extent,58%);
+  background-size:cover,cover,var(--ice-art-size,cover);
+}
+@media (max-width:760px) {
+  .module-workspace .module-main::before {opacity:.11;background-attachment:scroll;}
+}
