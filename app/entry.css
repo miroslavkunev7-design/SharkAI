@@ -159,16 +159,14 @@
 
 .shark-entry-feature h1,
 .shark-entry-price-intro h1 {
-  margin: 13px 0 18px;
-  font-size: clamp(2rem, 5.15vw, 4.7rem);
-  font-weight: 805;
-  line-height: 1.035;
-  letter-spacing: -.065em;
+  margin: 17px 0 21px;
+  font: 630 clamp(2rem, 4.35vw, 3.85rem)/1.1 var(--font-display, var(--font-body));
+  letter-spacing: -.036em;
 }
 
 .shark-entry-auth h1 {
   margin-bottom: 23px;
-  font-size: clamp(1.96rem, 3.7vw, 3.55rem);
+  font-size: clamp(2rem, 3.45vw, 3.1rem);
 }
 
 .shark-entry-download h1 span {
@@ -177,16 +175,16 @@
 
 .shark-entry-form {
   display: grid;
-  gap: 11px;
+  gap: 16px;
   max-width: 370px;
 }
 
 .shark-entry-form label {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   color: #102843;
   font-size: .94rem;
-  font-weight: 700;
+  font-weight: 610;
 }
 
 .shark-entry-form input {
@@ -276,7 +274,7 @@
   grid-template-columns: minmax(0, 1180px);
   justify-content: center;
   align-content: start;
-  gap: 14px;
+  gap: clamp(16px, 2vw, 24px);
 }
 
 .shark-entry-return {
@@ -328,7 +326,7 @@
 .shark-entry-price-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: clamp(14px, 1.7vw, 22px);
 }
 
 .shark-entry-plan {
@@ -345,15 +343,14 @@
   grid-template-rows: auto auto 1fr auto;
   min-height: 100%;
   align-items: start;
-  width: min(290px, 72%);
+  width: min(32ch, 72%);
 }
 
 .shark-entry-plan h2 {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 1.27rem;
-  font-weight: 780;
+  font: 640 1.4rem/1.25 var(--font-display, var(--font-body));
 }
 
 .shark-entry-plan h2 svg {
@@ -363,10 +360,11 @@
 }
 
 .shark-entry-plan-price {
-  font-size: clamp(2.3rem, 4.6vw, 3.45rem);
-  font-weight: 800;
-  line-height: 1.23;
-  letter-spacing: -.06em;
+  font-size: clamp(2.2rem, 4vw, 3.05rem);
+  font-weight: 640;
+  line-height: 1.18;
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
   margin-block: 8px 10px;
 }
 
@@ -378,12 +376,12 @@
 
 .shark-entry-plan ul {
   display: grid;
-  gap: 8px;
-  margin: 0 0 22px;
+  gap: 9px;
+  margin: 0 0 24px;
   color: #112b47;
-  font-size: .91rem;
-  font-weight: 620;
-  line-height: 1.3;
+  font-size: .96rem;
+  font-weight: 520;
+  line-height: 1.44;
 }
 
 .shark-entry-plan li {
@@ -489,7 +487,7 @@
     --ice-art-extent: 56%;
     --ice-art-position: 57% 43%;
     --ice-art-mask: linear-gradient(to right, transparent, #0005 22%, #000 58%),
-      linear-gradient(to bottom, #000 30%, #0004 73%, transparent 96%);
+      linear-gradient(to bottom, #000 16%, #0007 42%, transparent 74%);
   }
 
   .shark-entry-auth-panel.ice-section[data-ice-art]::before {
@@ -540,7 +538,7 @@
 
   .shark-entry-price-grid {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
+    gap: 14px;
   }
 
   .shark-entry-price-intro {
@@ -557,8 +555,9 @@
   }
 
   .shark-entry-plan-copy {
-    width: min(280px, 61%);
+    width: min(32ch, 74%);
   }
+  .shark-entry-plan { --ice-art-extent: 38%; --ice-art-mask: linear-gradient(to right, transparent, #0003 38%, #000 78%); }
 }
 
 @media (prefers-reduced-motion: reduce) {

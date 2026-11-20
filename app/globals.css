@@ -3,6 +3,42 @@
 @tailwind utilities;
 
 @font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url('/sharkai/fonts/source-sans-3-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url('/sharkai/fonts/source-sans-3-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: Overpass;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/sharkai/fonts/overpass-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+
+@font-face {
+  font-family: Overpass;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/sharkai/fonts/overpass-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
   font-family: Inter;
   font-style: normal;
   font-weight: 100 900;
@@ -31,8 +67,10 @@
 
 @layer base {
   :root {
-    --font-inter: Inter;
-    --font-space: 'Space Grotesk', Inter;
+    --font-body: 'Source Sans 3', system-ui, sans-serif;
+    --font-display: Overpass, 'Source Sans 3', system-ui, sans-serif;
+    --font-inter: var(--font-body);
+    --font-space: var(--font-display);
     --shark-cyan: #00D2FF;
     --shark-blue: #0072FF;
     --shark-purple: #9D50BB;
@@ -41,6 +79,10 @@
 
   html {
     scroll-behavior: smooth;
+  }
+
+  :where(h1, h2, h3) {
+    font-family: var(--font-display);
   }
 
   body {
@@ -115,9 +157,9 @@
   --shark-page-backdrop: radial-gradient(ellipse at 13% 0%, #15385994, transparent 53%),
     radial-gradient(ellipse at 96% 15%, #34265b8a, transparent 52%), #090f20;
   --shark-panel-dark: linear-gradient(113deg, #0c2c4bdb, #151c3aeb 47%, #28214add 77%, #352b58ce),
-    var(--shark-ice-texture) center / 100% 100% no-repeat, #102038;
+    var(--shark-ice-texture) center / cover no-repeat, #102038;
   --shark-panel-light: linear-gradient(109deg, #effbffdc, #e0ecffc6 54%, #e2ddfabe),
-    var(--shark-ice-texture) center / 100% 100% no-repeat, #d9effc;
+    var(--shark-ice-texture) center / cover no-repeat, #d9effc;
   --shark-scene-shade: linear-gradient(103deg, #0c2340f5 3%, #121d38e6 36%, #232345b8 64%, #37244d75);
   --shark-action-gradient: linear-gradient(114deg, #145bbc, #4655bf 49%, #77449e);
   color-scheme: dark;

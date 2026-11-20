@@ -29,6 +29,10 @@ const profile = z.object({
 const credential = z.object({
   broker:z.enum(['IBKR','SAXO']),account_key:z.string().min(1).max(128),token:z.string().regex(/^[A-Za-z0-9._~+/=-]{16,8192}$/),
 }).strict();
+const ibkrAccounts = z.object({
+  isPaper: z.boolean(),
+  accounts: z.array(z.string()),
+});
 type Profile = z.infer<typeof profile>;
 type Command = z.infer<typeof command>;
 type Receipt = { key:string; order:string|null; correlation:string|null; state:string; filled:number|null; observed:string };
@@ -185,12 +189,22 @@ async function persist(sql:Query,worker:string,c:Command,r:Receipt) {
 async function submit(sql:Query,worker:string,c:Command,p:Profile,token:string,send:typeof fetch,clock:()=>Date) {
   const outbound=payload(p);
   if (!outbound) return result('blocked',409,'UNSUPPORTED_ORDER');
+  const alreadyRecorded = p.state !== null;
+  if (p.broker === 'IBKR' && !alreadyRecorded) {
+    // IBKR serves paper and live accounts on the same host. Check this token before reserving the order.
+    const response = await brokerCall({broker:'IBKR',method:'GET',path:'/iserver/accounts'},token,send).catch(() => null);
+    const session = response?.status === 200 ? ibkrAccounts.safeParse(response.body) : null;
+    if (!session?.success) return result('unavailable',503,'IBKR_SESSION_UNVERIFIED');
+    if (session.data.isPaper || !session.data.accounts.includes(p.provider_account_key)) {
+      return result('blocked',409,'IBKR_LIVE_ACCOUNT_REQUIRED');
+    }
+  }
   const claim=await sql(Prisma.sql`SELECT sharkai_broker.claim_profit_only_job(${worker},${c.job_id}::uuid,${c.nonce},
       ${p.job_digest},${p.credential_sha256},${outbound.clientReference}) AS result`);
   const replay=z.object({status:z.literal('replayed'),state:states}).safeParse(claim);
   if (replay.success) return result('replayed',200,replay.data.state);
   const confirmed=z.object({status:z.literal('claimed'),client_reference:z.literal(outbound.clientReference)}).safeParse(claim);
-  if (!confirmed.success) return result('blocked',409,'APPROVAL_OR_LIMIT');
+  if (!confirmed.success || alreadyRecorded) return result('blocked',409,'APPROVAL_OR_LIMIT');
   let ack;
   try {
     if (clock().valueOf()>=Date.parse(p.job.quote_expires_at)) throw new Error('Quote expired');

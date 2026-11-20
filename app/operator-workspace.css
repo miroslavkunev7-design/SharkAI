@@ -1,7 +1,7 @@
 .operator-workspace {
   display: grid;
   align-content: start;
-  gap: 14px;
+  gap: clamp(16px, 1.7vw, 23px);
   min-height: 100dvh;
 }
 
@@ -42,10 +42,8 @@
 }
 
 .operator-hero-copy h1 {
-  font-size: clamp(1.55rem, 4.6vw, 2.55rem);
-  font-weight: 800;
-  line-height: 1.05;
-  letter-spacing: -.05em;
+  font: 640 clamp(1.65rem, 3.5vw, 2.55rem)/1.12 var(--font-display, var(--font-body));
+  letter-spacing: -.033em;
   overflow-wrap: anywhere;
 }
 
@@ -96,7 +94,7 @@
 
 .operator-metric dt {
   font-size: clamp(.68rem, 1.8vw, .83rem);
-  font-weight: 740;
+  font-weight: 600;
   line-height: 1.27;
   overflow-wrap: anywhere;
 }
@@ -104,9 +102,10 @@
 .operator-metric dd {
   margin: 2px 0 0;
   font-size: clamp(1.12rem, 2.7vw, 1.55rem);
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -.04em;
+  font-weight: 640;
+  line-height: 1.1;
+  letter-spacing: -.025em;
+  font-variant-numeric: tabular-nums;
 }
 
 .operator-metric-icon {
@@ -138,7 +137,7 @@
   --ice-art-mask: linear-gradient(90deg, transparent, #0003 28%, #000b 65%, #000);
   --ice-art-position: 72% center;
   --ice-art-opacity: .48;
-  padding: clamp(13px, 3vw, 21px);
+  padding: clamp(16px, 3vw, 24px);
 }
 
 .operator-panel-title {

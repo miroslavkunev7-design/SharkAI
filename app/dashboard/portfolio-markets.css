@@ -4,7 +4,7 @@
   --pfm-line: #a2bde12b;
   --pfm-shine: #a8baff;
   color: #f1f6ff;
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body, system-ui);
   font-size: 1rem;
   font-variant-numeric: tabular-nums;
   line-height: 1.45;

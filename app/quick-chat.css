@@ -61,7 +61,7 @@ body:has(.shark-quick-dock) .shark-footer nav { padding-inline-end: 64px; }
 .shark-quick-heading, .shark-quick-actions { display: flex; align-items: center; gap: 6px; }
 .shark-quick-heading { gap: 10px; }
 .shark-quick-heading img { width: 32px; height: 32px; object-fit: contain; }
-.shark-quick-heading h2 { color: #eef8ff; font-size: 1rem; font-weight: 680; letter-spacing: -.02em; }
+.shark-quick-heading h2 { color: #eef8ff; font: 630 1.06rem/1.25 var(--font-display, var(--font-body)); letter-spacing: -.017em; }
 .shark-quick-actions :is(a, button) { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: #cfe7ff; }
 .shark-quick-actions :is(a, button):hover { color: #fff; background: var(--shark-icon-surface); box-shadow: inset 0 1px #c6e8ff3b; }
 .shark-quick-panel .shark-chat-main[data-start='true'] { grid-template-rows: minmax(0, 1fr) auto; row-gap: 0; }
@@ -69,12 +69,13 @@ body:has(.shark-quick-dock) .shark-footer nav { padding-inline-end: 64px; }
 .shark-quick-panel .shark-chat-main[data-start='true'] .shark-chat-compose-area { grid-row: 2; }
 .shark-quick-panel .shark-chat-welcome-copy { gap: 12px; }
 .shark-quick-panel .shark-chat-welcome-copy img { width: 52px; height: 52px; }
-.shark-quick-panel .shark-chat-welcome-copy h3 { font-size: 1.3rem; font-weight: 620; letter-spacing: -.035em; }
+.shark-quick-panel .shark-chat-welcome-copy h3 { font: 600 1.38rem/1.25 var(--font-display, var(--font-body)); letter-spacing: -.024em; }
 .shark-quick-panel .shark-chat-compose-area { gap: 5px; padding: 8px 10px 10px; }
 .shark-quick-panel .shark-chat-composer { padding: 8px; border-radius: 18px; }
 .shark-quick-panel .shark-chat-composer textarea { min-height: 34px; max-height: 78px; }
 .shark-quick-panel .shark-chat-composer-actions { margin-top: 3px; }
 .shark-quick-panel .shark-chat-thread { gap: 15px; padding: 16px 12px 10px; }
+.shark-quick-panel .shark-chat-message-text { font-size: .94rem; line-height: 1.55; }
 .shark-quick-panel .shark-chat-inspector-region { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 8; }
 @media (max-width: 760px) {
   .shark-overlay-stack:has(.shark-quick-dock) { --quick-inset: max(11px, env(safe-area-inset-right)); --quick-bottom: max(11px, env(safe-area-inset-bottom)); }

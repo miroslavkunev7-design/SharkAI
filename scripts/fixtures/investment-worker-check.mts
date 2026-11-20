@@ -19,7 +19,9 @@ export async function setupBrokerWorkerFixtures(q:Query) {
 }
 export async function checkBrokerWorker(q:Query,db:PrismaClient) {
   let queryError:unknown;
+  let claims=0;
   const sql=async(s:Prisma.Sql)=>{
+    if (s.text.includes('sharkai_broker.claim_profit_only_job(')) claims++;
     try { return (await db.$queryRaw<Array<{result:unknown}>>(s))[0].result; }
     catch (error) { queryError=error; throw error; }
   };
@@ -145,12 +147,21 @@ export async function checkBrokerWorker(q:Query,db:PrismaClient) {
       return new Request('https://example.invalid/internal',{method:'POST',body:data,headers:{'content-type':'application/json',
         'x-shark-order-worker':worker,'x-shark-order-time':t,'x-shark-order-signature':sig}});
     };
-    let submissions=0, polls=0,uncertain=false;
+    let submissions=0, polls=0, accountChecks=0, uncertain=false;
+    const liveSession = () => Response.json({accounts:['another-account',brokerKey],selectedAccount:'another-account',isPaper:false});
+    let accountList:() => Response = liveSession;
     const transport:typeof fetch=async (input,opts) => {
       assert.equal(opts?.redirect,'error');
       assert.equal(new Headers(opts?.headers).get('authorization'),'Bearer '+token);
       const url=new URL(String(input));
       assert.equal(url.origin,broker==='IBKR'?'https://api.ibkr.com':'https://gateway.saxobank.com');
+      if (url.pathname==='/v1/api/iserver/accounts') {
+        assert.equal(broker,'IBKR');
+        assert.equal(opts?.method,'GET');
+        assert.equal(opts?.body,undefined);
+        accountChecks++;
+        return accountList();
+      }
       if (opts?.method==='POST') {
         submissions++;
         const body=JSON.parse(String(opts.body));
@@ -182,11 +193,35 @@ export async function checkBrokerWorker(q:Query,db:PrismaClient) {
     assert.equal((await call('submit',signed('submit',stale))).status,404);
     assert.equal((await call('submit',signed('submit',over))).status,409);
     assert.equal(submissions,0);
+    if (broker==='IBKR') {
+      const unverified: [number, () => Response][] = [
+        [409, () => Response.json({accounts:[brokerKey],isPaper:true})],
+        [409, () => Response.json({accounts:['different-account'],selectedAccount:brokerKey,isPaper:false})],
+        [503, () => Response.json({accounts:[brokerKey]})],
+        [503, () => Response.json({accounts:[brokerKey],isPaper:'false'})],
+        [503, () => Response.json({accounts:[brokerKey,7],isPaper:false})],
+        [503, () => new Response('{', {status:200})],
+        [503, () => Response.json({accounts:[brokerKey],isPaper:false},{status:401})],
+        [503, () => { throw new Error('Session lookup disconnected'); }],
+      ];
+      const claimsBefore=claims, checksBefore=accountChecks;
+      for (const [status,reply] of unverified) {
+        accountList=reply;
+        assert.equal((await call('submit',signed('submit'))).status,status);
+        assert.equal(claims,claimsBefore);
+        assert.equal(submissions,0);
+      }
+      assert.equal(accountChecks,checksBefore+unverified.length);
+      accountList=liveSession;
+    }
     const contender=randomUUID(),contenderNonce=randomBytes(24).toString('base64url');
     await stage(contender,3);
+    const checksBeforeDispatch=accountChecks;
     const pair=await Promise.all([call('submit',signed('submit')),call('submit',signed('submit',contender,contenderNonce))]);
     assert.deepEqual(pair.map(x=>x.status).sort(),[200,409]);
     if (pair[1].ok) {job=contender;nonce=contenderNonce;}
+    const checksAfterDispatch=accountChecks;
+    assert.equal(checksAfterDispatch-checksBeforeDispatch,broker==='IBKR' ? 2 : 0);
     assert.equal((await (await call('submit',signed('submit'))).json()).status,'replayed');
     assert.equal(submissions,1);
     const pending=await q('SELECT * FROM sharkai_broker.list_worker_actions($1,false)',[worker]);
@@ -196,6 +231,7 @@ export async function checkBrokerWorker(q:Query,db:PrismaClient) {
     assert.equal(polls,0);
     assert.equal((await (await call('poll',signed('poll'),{...env,SHARKAI_BROKER_WORKER_ENABLED:'false'})).json()).status,'FILLED');
     assert.equal(polls,1);
+    assert.equal(accountChecks,checksAfterDispatch);
     const r=(await q("SELECT filled_units,reconciliation_required FROM sharkai_broker.order_ledger WHERE account_id=$1 AND request_key=$2",[account,'worker:'+job])).rows[0];
     assert.equal(r.filled_units,'3'); assert.equal(r.reconciliation_required,true);
     assert.equal((await call('poll',signed('poll'))).status,409);
