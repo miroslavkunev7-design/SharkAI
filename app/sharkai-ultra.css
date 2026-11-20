@@ -1,0 +1,349 @@
+/* SharkAI Ultra — shared, non-destructive presentation tokens.
+ * Existing routes, auth, subscriptions, AI and Wise logic stay authoritative.
+ * Approved assets are applied by the companion wallet ZIP installer.
+ */
+:root {
+  --ultra-midnight: #071c39;
+  --ultra-sapphire: #073ca2;
+  --ultra-violet: #6b29d2;
+  --ultra-amethyst: #4317a2;
+  --ultra-cyan: #22dcff;
+  --ultra-ice: #effcff;
+  --ultra-ink: #0b2450;
+  --ultra-gradient: linear-gradient(121deg, #214caadf 0%, #6631c8e9 60%, #2c70cbdd 100%);
+  --ultra-rim: 1px solid rgba(214, 248, 255, .68);
+  --ultra-halo: 0 0 0 1px rgba(227, 248, 255, .38) inset,
+    0 0 13px rgba(34, 220, 255, .23), 0 0 22px rgba(107, 41, 210, .18);
+  --ultra-satin: inset 0 1px rgba(255,255,255,.43), 0 8px 24px rgba(6, 15, 48, .24);
+}
+/* SAME surface language for Home, Studio, Agents, Automotive, Commerce, Wallet. */
+:is(.shark-header.shark-glass, .module-topbar) {
+  position: relative;
+  background:
+    radial-gradient(ellipse 63% 115% at 85% 0%, rgba(57,167,240,.34), transparent 78%),
+    linear-gradient(112deg, rgba(30,17,112,.97), rgba(70,26,166,.94) 48%, rgba(12,84,188,.92) 90%);
+  border-color: rgba(187,234,255,.54);
+  box-shadow: var(--ultra-satin), 0 0 13px rgba(46,201,246,.20);
+  isolation: isolate;
+}
+.shark-header.shark-glass { border-radius: 0 0 28px 28px; overflow: visible; }
+.shark-header.shark-glass::after {
+  position:absolute; content:""; pointer-events:none; z-index:-1;
+  inset:auto 0 -2px; height:3px; border-radius:999px;
+  background:linear-gradient(90deg,#cbacff,#12e0fb 65%,#f1daff);
+  box-shadow:0 0 9px rgba(35,228,255,.55),0 0 12px rgba(147,54,235,.30);
+}
+:is(.shark-header .shark-nav-links a, .module-topbar .module-utility-button,
+.module-topbar .module-account-puck, .shark-nav-toggle) {
+  border-radius:999px;
+  border:var(--ultra-rim);
+  background:var(--ultra-gradient);
+  box-shadow:var(--ultra-satin), 0 0 9px rgba(40,212,255,.22);
+  backdrop-filter:blur(12px) saturate(145%);
+}
+:is(.shark-header .shark-nav-links a, .module-topbar .module-utility-button,
+.module-topbar .module-account-puck):hover { border-color:#e7fbff; box-shadow:var(--ultra-halo); }
+:is(.shark-action,.shark-action-secondary,.btn-primary,.btn-secondary,.module-action,.shark-chat-new) {
+  border-radius:999px;
+  border:var(--ultra-rim);
+  color:#f9fbff;
+  background:var(--ultra-gradient);
+  box-shadow:var(--ultra-satin), 0 0 10px rgba(34,220,255,.24);
+  backdrop-filter:blur(12px) saturate(142%);
+  transition:box-shadow .2s, transform .2s;
+}
+:is(.shark-action,.shark-action-secondary,.btn-primary,.btn-secondary,.module-action,.shark-chat-new):hover:not(:disabled) {
+  color:#fff; box-shadow:var(--ultra-halo); transform:translateY(-1px);
+}
+:is(.shark-glass,.glass,.glass-strong,.module-tile,.module-banner,.shark-home-module,.module-metrics,.shark-auth-card) {
+  border-color:rgba(213,245,255,.66);
+  box-shadow:var(--ultra-satin),0 0 12px rgba(34,220,255,.16);
+  backdrop-filter:blur(16px) saturate(133%);
+}
+/* Frozen crystalline cards: fill from edge to edge, leaving no interior blank rim. */
+.ice-section { isolation:isolate; overflow:hidden; border-color:rgba(207,246,255,.80); box-shadow:var(--ultra-halo),0 6px 24px rgba(8,25,56,.18); }
+.ice-section[data-ice-art]::before {
+  inset:0 0 0 auto;
+  width:var(--ice-art-extent,61%);
+  border-radius:inherit;
+  background-size:cover,cover,var(--ice-art-size,cover);
+  background-blend-mode:normal,soft-light,normal;
+  mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.6) 30%,black 88%);
+  -webkit-mask-image:linear-gradient(90deg,transparent 0%,rgba(0,0,0,.6) 30%,black 88%);
+  pointer-events:none;
+}
+:is(.module-workspace,.shark-launch-home,.shark-chat-shell) {
+  font-family:var(--font-body,'Source Sans 3',system-ui,sans-serif);
+}
+:is(.module-section-title,.module-banner h1,.shark-launch-copy h1,.ice-section h2,.shark-chat-welcome h1) {
+  letter-spacing:-.025em;
+  text-wrap:balance;
+}
+.module-workspace {
+  background:
+    radial-gradient(ellipse at 70% 7%,rgba(40,112,198,.13),transparent 65%),
+    radial-gradient(ellipse at 15% 88%,rgba(92,33,174,.17),transparent 60%),
+    #07162b;
+}
+.module-sidebar.ice-section, .module-drawer.ice-section, .module-tile.ice-section {
+  border-color:rgba(196,242,255,.67);
+  box-shadow:var(--ultra-halo),0 13px 28px rgba(0,8,24,.30);
+}
+.module-nav a[aria-current=page], .shark-launch-tiles button[aria-pressed=true] {
+  background:var(--ultra-gradient);
+  border:var(--ultra-rim);
+  box-shadow:var(--ultra-halo);
+}
+.module-tile, .module-banner, .shark-home-module {
+  overflow:hidden;
+  border-radius:22px;
+}
+.shark-home-module img,.shark-launch-art img { object-fit:cover; }
+.shark-home-module::after {
+  background:
+    linear-gradient(101deg,rgba(9,30,61,.90) 5%,rgba(22,40,88,.50) 65%,rgba(58,36,112,.24));
+}
+/* The EXISTING global QuickChatWidget is the only global launcher. */
+.shark-quick-trigger {
+  border:2px solid rgba(218,250,255,.91);
+  background:
+    url('/sharkai/chat/shark-avatar.webp') center/cover no-repeat,
+    url('/sharkai/shark-hero.webp') 58% 48%/260% auto no-repeat,
+    #172765;
+  box-shadow:0 0 0 2px rgba(113,54,205,.50),0 0 16px rgba(52,220,255,.47),0 0 26px rgba(121,44,202,.36);
+}
+.shark-quick-trigger:hover { box-shadow:0 0 0 2px rgba(245,240,255,.72),0 0 24px rgba(46,220,255,.63),0 0 36px rgba(139,33,237,.43); }
+.shark-quick-panel {
+  border:1px solid rgba(202,251,255,.91);
+  border-radius:27px;
+  box-shadow:var(--ultra-halo),0 15px 56px rgba(2,8,40,.58);
+}
+.shark-quick-panel .shark-chat-workspace::before {
+  background:
+    linear-gradient(90deg,rgba(175,228,255,.14),rgba(4,28,78,.06)),
+    url('/sharkai/chat/approved-coast.webp') center/cover no-repeat,
+    url('/sharkai/agent.webp') center/cover no-repeat;
+}
+.shark-quick-header {
+  background:
+    url('/sharkai/chat/approved-wave-header.webp') center/100% 100% no-repeat,
+    linear-gradient(115deg,#5514a5,#1147bc 67%,#06b3dc);
+  box-shadow:inset 0 1px rgba(255,255,255,.60),0 3px 14px rgba(9,28,92,.29);
+  border-bottom:2px solid rgba(195,249,255,.72);
+}
+.shark-quick-panel .shark-chat-message-user,
+.shark-chat-shell .shark-chat-message-user {
+  color:#14283c;
+  border:1px solid rgba(239,255,102,.94);
+  background:linear-gradient(111deg,#b9ff19 0%,#d9ff2b 66%,#f1ff29 100%);
+  box-shadow:inset 0 1px rgba(255,255,255,.68),
+    0 0 12px rgba(188,255,31,.70),0 0 24px rgba(186,255,42,.43);
+}
+.shark-quick-panel .shark-chat-message-assistant,
+.shark-chat-shell .shark-chat-message-assistant {
+  border-radius:20px;
+  border:1px solid rgba(226,251,255,.82);
+  padding:12px 14px;
+  color:#102851;
+  background:linear-gradient(125deg,rgba(229,247,255,.96),rgba(221,230,255,.91) 70%,rgba(218,205,255,.85));
+  box-shadow:inset 0 1px rgba(255,255,255,.80),0 0 9px rgba(98,202,255,.30);
+}
+.shark-chat-message-assistant .shark-chat-message-text { color:#102851; }
+.shark-chat-message-user .shark-chat-message-text { color:#14283c; }
+.shark-quick-panel .shark-chat-composer {
+  border:1px solid rgba(216,249,255,.88);
+  background:linear-gradient(120deg,rgba(119,51,199,.83),rgba(34,120,205,.82) 70%,rgba(24,196,232,.74));
+  box-shadow:var(--ultra-halo);
+  backdrop-filter:blur(16px) saturate(146%);
+}
+:is(.shark-chat-send,.shark-chat-compose-icon,.shark-chat-icon):where(:not(:disabled)) { box-shadow:inset 0 1px rgba(255,255,255,.42),0 0 8px rgba(73,211,255,.23); }
+@media(max-width:760px) {
+  .shark-header.shark-glass { border-radius:0 0 30px 30px; }
+  .shark-quick-panel { border-radius:25px; }
+  .shark-launch-home .shark-home-module { border-radius:19px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  :is(.shark-action,.shark-action-secondary,.btn-primary,.btn-secondary,.module-action,.shark-chat-new){transition:none;}
+}
+@media(forced-colors:active) {
+  :is(.shark-header.shark-glass,.module-topbar,.shark-quick-header,.shark-chat-message-user,.shark-chat-message-assistant){background:Canvas;color:CanvasText;}
+}
+/* Thematic imagery for every dashboard module uses ORIGINAL SharkAI assets.
+   The global shell stays one component; only the image layer changes by view. */
+.module-workspace .module-main {
+  position:relative; isolation:isolate;
+}
+.module-workspace .module-main::before {
+  content:""; position:absolute; inset:0; z-index:-1; pointer-events:none;
+  background-position:center top; background-size:cover; background-repeat:no-repeat;
+  opacity:.16;
+  -webkit-mask-image:linear-gradient(to bottom,black,transparent 76%);
+  mask-image:linear-gradient(to bottom,black,transparent 76%);
+}
+.module-workspace[data-ultra-view="studio"] .module-main::before {
+  background-image:url('/sharkai/studio.webp');
+}
+.module-workspace[data-ultra-view="agents"] .module-main::before {
+  background-image:url('/sharkai/team.webp');
+}
+.module-workspace[data-ultra-view="automotive"] .module-main::before {
+  background-image:url('/assets/image-1.png');
+}
+.module-workspace[data-ultra-view="investments"] .module-main::before {
+  background-image:url('/sharkai/markets.webp');
+}
+.module-workspace[data-ultra-view="commerce"] .module-main::before {
+  background-image:url('/sharkai/studio.webp');
+}
+.module-workspace[data-ultra-view="settings"] .module-main::before,
+.module-workspace[data-ultra-view="overview"] .module-main::before {
+  background-image:url('/sharkai/shark-hero.webp');
+}
+.module-workspace :is(.module-panel,.module-banner,.module-tile,.module-form,.module-metric) {
+  border-color:rgba(207,247,255,.72);
+}
+.module-workspace :is(.module-panel,.module-tile,.module-banner).ice-section {
+  background-clip:padding-box;
+  box-shadow:var(--ultra-halo),0 10px 28px rgba(3,24,67,.24);
+}
+.module-workspace .module-banner[data-ice-art]::before {
+  width:var(--ice-art-extent,58%);
+  background-size:cover,cover,var(--ice-art-size,cover);
+}
+@media (max-width:760px) {
+  .module-workspace .module-main::before {opacity:.11;background-attachment:scroll;}
+}
+
+
+/* Approved full-page Shark Assistant presentation.
+ * The existing ChatWorkspace and all backend tools remain unchanged.
+ * Share the same approved coast/wave artwork with the floating chat.
+ */
+.shark-chat-shell .shark-chat-workspace::before {
+  background:
+    linear-gradient(116deg,rgba(6,26,63,.66) 0%,rgba(8,38,78,.39) 55%,rgba(7,39,82,.25) 100%),
+    url('/sharkai/chat/approved-coast.webp') center 45% / cover no-repeat;
+  background-blend-mode:normal;
+}
+.shark-chat-shell .shark-chat-topbar {
+  border-bottom:1px solid rgba(216,248,255,.83);
+  background:
+    linear-gradient(116deg,rgba(53,14,125,.46),rgba(10,76,171,.42) 68%,rgba(5,166,218,.27)),
+    url('/sharkai/chat/approved-wave-header.webp') center / 100% 100% no-repeat;
+  box-shadow:inset 0 1px rgba(255,255,255,.43),0 0 16px rgba(43,208,255,.23);
+  backdrop-filter:blur(15px) saturate(145%);
+}
+.shark-chat-shell .shark-chat-composer {
+  border:1px solid rgba(211,244,255,.80);
+  background:linear-gradient(128deg,rgba(65,28,158,.90),rgba(22,84,177,.87) 67%,rgba(9,150,201,.80));
+  box-shadow:inset 0 1px rgba(255,255,255,.49),0 0 14px rgba(34,220,255,.28),0 0 18px rgba(116,39,218,.22);
+  backdrop-filter:blur(13px) saturate(136%);
+}
+.shark-chat-shell .shark-chat-rail {
+  border-color:rgba(187,238,255,.70);
+  background:
+    linear-gradient(118deg,rgba(14,30,74,.96),rgba(36,28,91,.93)),
+    url('/sharkai/wallet/ice-fullbleed.webp') center / cover no-repeat;
+}
+.shark-chat-shell .shark-chat-welcome {
+  border-radius:26px;
+  background:linear-gradient(115deg,rgba(14,42,87,.18),rgba(91,49,169,.09));
+}
+.shark-chat-shell .shark-chat-message-user {
+  color:#14283c;
+}
+.shark-chat-shell .shark-chat-message-assistant .shark-chat-message-text {color:#102851;}
+@media (max-width:820px) {
+  .shark-chat-shell .shark-chat-topbar {
+    border-radius:0 0 23px 23px;
+  }
+}
+@media (forced-colors:active) {
+  .shark-chat-shell .shark-chat-workspace::before {display:none;}
+  .shark-chat-shell .shark-chat-topbar {background:Canvas;color:CanvasText;}
+}
+
+
+/* Position the SINGLE existing Shark Assistant launcher above Wallet's
+   last-transactions card on phones. Open panel remains above bottom navigation. */
+@media (max-width:699px) {
+  body:has(.sw-root) .shark-overlay-stack:has(.shark-quick-dock) {
+    --quick-bottom:clamp(216px,28dvh,285px);
+  }
+  body:has(.sw-root) .shark-overlay-stack:has(.shark-quick-panel:not([hidden])) {
+    --quick-bottom:calc(88px + env(safe-area-inset-bottom));
+  }
+}
+
+
+/* Desktop Shark Assistant: one clickable premium glass bubble with original mascot. */
+@media (min-width:761px) {
+  .shark-quick-trigger {
+    display:flex;align-items:center;justify-content:flex-end;
+    width:218px;height:64px;padding:0 18px 0 78px;border-radius:999px;
+    background:
+      url('/sharkai/chat/shark-avatar.webp') left -6px center / 102px auto no-repeat,
+      linear-gradient(117deg,rgba(25,59,168,.94),rgba(96,24,202,.95) 58%,rgba(47,49,189,.93));
+    box-shadow:inset 0 1px rgba(255,255,255,.62),0 0 13px rgba(44,209,255,.54),0 0 18px rgba(139,45,224,.43);
+  }
+  .shark-quick-trigger::after {
+    content:'Shark Assistant';
+    display:block;font-family:var(--font-display,system-ui,sans-serif);
+    font-size:14px;font-weight:750;letter-spacing:-.01em;
+    color:#fff;white-space:nowrap;text-shadow:0 1px 8px rgba(0,0,0,.46);
+  }
+}
+
+
+/* Premium continuity across Admin, login, pricing, and Windows download pages.
+   The same React pages and existing server operations are retained unchanged. */
+.operator-workspace .operator-topbar,
+.shark-admin .shark-admin-topbar {
+  position:relative;isolation:isolate;
+  padding:clamp(9px,1.6vw,19px);
+  border:1px solid rgba(198,237,255,.71);
+  border-radius:25px;
+  background:
+    radial-gradient(ellipse 62% 140% at 92% 2%,rgba(29,194,249,.28),transparent 70%),
+    linear-gradient(113deg,rgba(42,21,128,.96),rgba(85,26,177,.94) 44%,rgba(10,82,185,.94));
+  box-shadow:inset 0 1px rgba(255,255,255,.47),0 0 13px rgba(37,206,253,.27),0 0 22px rgba(108,40,206,.18);
+  backdrop-filter:blur(14px) saturate(138%);
+}
+.operator-workspace .operator-topbar::after,
+.shark-admin .shark-admin-topbar::after {
+  content:"";position:absolute;inset:auto 18px -2px;height:2px;
+  pointer-events:none;border-radius:999px;
+  background:linear-gradient(90deg,#e4c8ff,#50eaff 65%,#f3dbff);
+  box-shadow:0 0 10px rgba(68,224,255,.54);
+}
+.operator-admin :is(.operator-hero,.operator-panel,.operator-metrics,.shark-admin-metric),
+.shark-admin .shark-admin-section.ice-section {
+  border-color:rgba(201,244,255,.79);
+  box-shadow:var(--ultra-halo),0 10px 27px rgba(5,18,54,.29);
+}
+.operator-admin :is(.operator-panel,.shark-admin-section.ice-section)[data-ice-art]::before {
+  background-size:cover,cover,var(--ice-art-size,cover);
+  inset-inline-end:0;
+}
+body .shark-entry-page {
+  background:
+    radial-gradient(ellipse 80% 55% at 92% 0%,rgba(80,39,171,.33),transparent 72%),
+    radial-gradient(ellipse 56% 90% at 0% 100%,rgba(15,159,220,.20),transparent 69%),
+    #07162e;
+}
+.shark-entry-page .shark-entry-feature.ice-section,
+.shark-entry-page .shark-entry-plan.ice-section,
+.shark-entry-page .shark-entry-price-intro.ice-section {
+  border:1px solid rgba(207,248,255,.81);
+  box-shadow:var(--ultra-halo),0 18px 38px rgba(0,10,37,.32);
+  overflow:hidden;
+  backdrop-filter:blur(13px) saturate(132%);
+}
+.shark-entry-page .shark-entry-feature.ice-section::before {
+  background-size:cover,cover,var(--ice-art-size,cover);
+}
+@media (max-width:760px) {
+  .operator-workspace .operator-topbar,
+  .shark-admin .shark-admin-topbar {border-radius:19px;}
+  .shark-entry-page .shark-entry-feature.ice-section {border-radius:22px;}
+}

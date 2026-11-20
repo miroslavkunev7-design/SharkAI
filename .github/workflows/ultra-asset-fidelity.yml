@@ -1,0 +1,30 @@
+name: SharkAI Ultra Asset Integrity
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'app/sharkai-ultra.css'
+      - 'app/wallet/**'
+      - 'app/quick-chat-widget.tsx'
+      - 'app/chat/chat-workspace.tsx'
+      - 'public/sharkai/wallet/**'
+      - 'public/sharkai/chat/**'
+      - 'assets-sha256.json'
+      - 'scripts/verify-original-assets.mjs'
+      - 'scripts/test-sharkai-ultra.mjs'
+  workflow_dispatch:
+jobs:
+  ultra-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify shared agent, Wise backend and approved presentation
+        run: node --test scripts/test-sharkai-ultra.mjs
+      - name: Enforce original approved images by SHA-256
+        run: node scripts/verify-original-assets.mjs

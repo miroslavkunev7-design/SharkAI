@@ -1,0 +1,50 @@
+name: SharkAI Ultra Web Build
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - 'app/**'
+      - 'components/**'
+      - 'lib/**'
+      - 'public/sharkai/**'
+      - 'assets-sha256.json'
+      - 'scripts/test-sharkai-ultra.mjs'
+      - 'scripts/test-ultra-visual-clarity.mjs'
+      - 'scripts/test-ultra-route-regressions.mjs'
+      - 'scripts/test-ultra-route-smoke.mjs'
+      - 'scripts/test-ultra-live-rates.mts'
+      - 'app/wallet/crypto-reference.ts'
+      - 'scripts/verify-original-assets.mjs'
+      - '.github/workflows/ultra-web-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact PR commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Verify original visuals and Wallet + agent invariants
+        run: |
+          node scripts/verify-original-assets.mjs
+          SHARKAI_REQUIRE_LOCKED_ASSETS=1 node --test scripts/test-sharkai-ultra.mjs
+          node --test scripts/test-ultra-visual-clarity.mjs
+          node --test scripts/test-ultra-route-regressions.mjs
+          node --import tsx --test scripts/test-ultra-live-rates.mts
+      - name: Build production Next.js app (no live credentials)
+        run: npm run build
+      - name: Verify ten public and Wallet routes in a running production build
+        run: node scripts/test-ultra-route-smoke.mjs
