@@ -18,9 +18,9 @@ function formatEstimate(value:number,code:CurrencyCode){
 }
 
 /** Informational, read-only reference values. Never submit money or use Wise credentials. */
-export function WalletReferenceConverter({compact=false}:{compact?:boolean}){
-  const [base,setBase]=useState<CurrencyCode>('EUR');
-  const [quote,setQuote]=useState<CurrencyCode>('GBP');
+export function WalletReferenceConverter({compact=false,initialPair='fiat'}:{compact?:boolean;initialPair?:'fiat'|'crypto'}){
+  const [base,setBase]=useState<CurrencyCode>(initialPair==='crypto'?'BTC':'EUR');
+  const [quote,setQuote]=useState<CurrencyCode>(initialPair==='crypto'?'EUR':'GBP');
   const [rawAmount,setRawAmount]=useState('');
   const [status,setStatus]=useState<'loading'|'ready'|'unavailable'>('loading');
   const [reference,setReference]=useState<Rate|null>(null);
