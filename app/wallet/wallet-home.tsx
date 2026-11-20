@@ -17,7 +17,9 @@ import {WalletReferenceConverter,WalletCardsReadOnly} from './wallet-premium-ext
 const tabs={
  overview:{label:'Начало',icon:House},
  transactions:{label:'Движения',icon:List},
+ payments:{label:'Плащания',icon:ArrowLeftRight},
  currencies:{label:'Валути',icon:ArrowLeftRight},
+ crypto:{label:'Крипто',icon:ArrowLeftRight},
  cards:{label:'Карти',icon:CreditCard},
  details:{label:'Детайли',icon:Wallet},
  forecast:{label:'Прогноза',icon:ChartNoAxesCombined},
@@ -48,6 +50,7 @@ type Statement={currency:string;from:string;to:string;as_of:string;has_more:bool
 
 function Transactions({account,compact=false}:{account:Account;compact?:boolean}){
   const [revision,setRevision]=useState(0);
+  const [query,setQuery]=useState('');
   const [load,setLoad]=useState<{key:string;statement:Statement|null}|null>(null);
   const currency=account.data?.wallet.currency??account.data?.settings.currency;
   const allowed=account.data?.wallet_capabilities.deposit_statements===true;
@@ -63,15 +66,25 @@ function Transactions({account,compact=false}:{account:Account;compact?:boolean}
     return ()=>controller.abort();
   },[allowed,currency,key]);
   const current=load?.key===key?load:null,statement=current?.statement;
+  const needle=query.trim().toLocaleLowerCase('bg-BG');
+  const searched=statement?.transactions.filter(row=>
+    [row.category||'',row.occurred_at,displayMinor(row.amount_minor,statement.currency)]
+      .join(' ').toLocaleLowerCase('bg-BG').includes(needle)
+  )??[];
   const title=compact?'Последни движения':'Движения по сметката';
   return <section className="sw-panel"><div className="sw-section-head"><h2>{title}</h2>{compact?<Link href={tabLink('transactions')} aria-label="Всички движения"><ArrowRight/></Link>:
     allowed&&<button type="button" onClick={()=>setRevision(n=>n+1)} aria-label="Обнови движенията"><RefreshCw/></button>}</div>
+    {!compact&&<label className="sw-transaction-search"><Search size={19} aria-hidden="true"/>
+      <input type="search" aria-label="Търси в движенията" placeholder="Търси в движенията" value={query}
+        onChange={event=>setQuery(event.target.value)} autoComplete="off"/>
+    </label>}
     {account.state==='guest'?<p className="sw-hint"><LockKeyhole/> Влез, за да видиш движенията по своята сметка.</p>:
       account.state==='loading'?<p role="status">Зареждане…</p>:
       !allowed?<p>Извлечението ще се покаже след потвърдена връзка с право за четене на движенията.</p>:
       !current?<p role="status">Зареждане на извлечението…</p>:!statement?<p role="alert">Доставчикът временно не предоставя извлечението.</p>:
       <><p>{dateLabel(statement.from)} – {dateLabel(statement.to)} · Wise</p>{statement.transactions.length===0?
-        <p>Няма осчетоводени движения за периода.</p>:<ul className="sw-movements">{statement.transactions.slice(0,compact?3:statement.transactions.length).map((row,i)=>{
+        <p>Няма осчетоводени движения за периода.</p>:searched.length===0?
+        <p>Няма движения по зададеното търсене.</p>:<ul className="sw-movements">{searched.slice(0,compact?3:searched.length).map((row,i)=>{
           const credit=row.direction==='credit',Icon=credit?ArrowDownLeft:ArrowUpRight;
           const category=row.category||(credit?'Постъпление':'Плащане');
           return <li key={row.occurred_at+'-'+i}><span className={'sw-movement-icon '+(credit?'is-credit':'')}><Icon/></span>
@@ -201,9 +214,30 @@ export function WalletHome({section}:{section:Section}){
      </>:section==='transactions'?<>
        <div className="sw-page-heading"><span><Activity/> Личен портфейл</span><h1>Движения</h1></div>
        <Transactions account={account}/>
+     </>:section==='payments'?<>
+       <div className="sw-page-heading"><span><ArrowLeftRight/> Личен портфейл</span><h1>Плащания</h1></div>
+       <section className="sw-panel sw-payment-hub" aria-label="Плащания чрез Wise">
+         <h2>Плащания чрез Wise</h2>
+         <p>Прегледай желаното действие. Финалното потвърждение на паричен превод се извършва само в Wise.</p>
+         <div className="sw-payment-options">{(Object.keys(payments) as Payment[]).map(id=>{
+           const {label,icon:Icon}=payments[id];
+           return <button type="button" key={id} aria-pressed={payment===id}
+             onClick={()=>setPayment(current=>current===id?null:id)}><Icon/>{label}</button>;
+         })}</div>
+         {paymentState?<div className="sw-payment-detail" aria-live="polite">
+           <h3>{paymentState.title}</h3>
+           <p>{verified?paymentState.body:account.state==='guest'?'Влез в профила си и свържи Wise, за да продължиш.':'Това действие изисква потвърден Wise акаунт.'}</p>
+           {verified?<a className="sw-btn" href={wise} target="_blank" rel="noopener noreferrer">Продължи в Wise <ArrowUpRight/></a>:
+             <Link className="sw-btn sw-btn-secondary" href={account.state==='guest'?login('settings'):tabLink('settings')}>Към настройките <ChevronRight/></Link>}
+         </div>:<p>Избери действие, за да видиш начина на изпълнение.</p>}
+       </section>
      </>:section==='currencies'?<>
        <div className="sw-page-heading"><span><ArrowLeftRight/> Личен портфейл</span><h1>Валути</h1></div>
        <WalletReferenceConverter/>
+     </>:section==='crypto'?<>
+       <div className="sw-page-heading"><span><ArrowLeftRight/> Личен портфейл</span><h1>Крипто справка</h1></div>
+       <p className="sw-crypto-notice">Само информативно сравнение. Не се купуват и продават активи; курс се показва само при потвърден източник.</p>
+       <WalletReferenceConverter initialPair="crypto"/>
      </>:section==='cards'?<>
        <div className="sw-page-heading"><span><CreditCard/> Личен портфейл</span><h1>Карти</h1></div>
        <WalletCardsReadOnly/>
@@ -225,8 +259,8 @@ export function WalletHome({section}:{section:Section}){
    <nav className="sw-mobile-navigation" aria-label="Главна мобилна навигация">
      <Link className={section==='overview'?'is-active':''} aria-current={section==='overview'?'page':undefined} href="/wallet"><House/>Начало</Link>
      <Link href="/dashboard?view=investments"><ChartNoAxesCombined/>Инвестиции</Link>
-     <Link className={section==='transactions'?'is-active':''} href={tabLink('transactions')}><ArrowLeftRight/>Плащания</Link>
-     <Link className={section==='currencies'?'is-active':''} href={tabLink('currencies')}><span className="sw-crypto-symbol">₿</span>Крипто</Link>
+     <Link className={section==='payments'?'is-active':''} href={tabLink('payments')}><ArrowLeftRight/>Плащания</Link>
+     <Link className={section==='crypto'?'is-active':''} href={tabLink('crypto')}><span className="sw-crypto-symbol">₿</span>Крипто</Link>
      <Link className={section==='settings'?'is-active':''} href={tabLink('settings')}><MoreHorizontal/>Още</Link>
    </nav>
  </div></div>;
