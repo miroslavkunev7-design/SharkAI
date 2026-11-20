@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import {useEffect,useState} from 'react';
 import {Activity,ArrowDownLeft,ArrowLeft,ArrowRight,ArrowUpRight,ArrowUpFromLine,ChartNoAxesCombined,ChevronRight,ChevronDown,Eye,EyeOff,
-  House,List,LockKeyhole,Plus,RefreshCw,Settings2,ShieldCheck,Wallet,Waypoints} from 'lucide-react';
+  House,List,LockKeyhole,Plus,RefreshCw,Settings2,ShieldCheck,Wallet,Waypoints,Search,CreditCard,ArrowLeftRight,MoreHorizontal} from 'lucide-react';
 import {Logo} from '@/components/Logo';
 import {displayMinor,type WalletSettingsInput} from '@/lib/wallet-investments-contract';
 import type {WalletInvestmentsOwnerDashboard} from '@/lib/wallet-investments-server';
@@ -12,8 +12,18 @@ import {WalletProviderActions} from '../dashboard/wallet-provider-actions';
 import {WalletInvestmentsForm} from '../dashboard/wallet-investments-form';
 import {TradingConsent} from '../dashboard/trading-consent';
 import WalletForecast from '../dashboard/wallet-forecast';
+import {WalletReferenceConverter,WalletCardsReadOnly} from './wallet-premium-extras';
 
-const tabs={overview:{label:'Начало',icon:House},transactions:{label:'Движения',icon:List},forecast:{label:'Прогноза',icon:ChartNoAxesCombined},settings:{label:'Настройки',icon:Settings2}};
+const tabs={
+ overview:{label:'Начало',icon:House},
+ transactions:{label:'Движения',icon:List},
+ currencies:{label:'Валути',icon:ArrowLeftRight},
+ cards:{label:'Карти',icon:CreditCard},
+ details:{label:'Детайли',icon:Wallet},
+ forecast:{label:'Прогноза',icon:ChartNoAxesCombined},
+ settings:{label:'Настройки',icon:Settings2}
+} as const;
+const desktopTabs=['overview','transactions','currencies','cards','settings'] as const;
 type Section=keyof typeof tabs;
 type Account={state:'loading'|'guest'|'unavailable';data:null}|{state:'ready';data:WalletInvestmentsOwnerDashboard};
 const tabLink=(section:Section)=>section==='overview'?'/wallet':'/wallet?tab='+section;
