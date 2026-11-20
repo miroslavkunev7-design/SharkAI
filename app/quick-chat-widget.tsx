@@ -24,7 +24,7 @@ function Launcher() {
   return (
     <div className="shark-quick-dock">
       <button type="button" ref={trigger} className="shark-quick-trigger" hidden={open}
-        aria-label="Отвори бърз чат с Шарк" title="Бърз чат с Шарк" aria-haspopup="dialog"
+        aria-label="Отвори Shark Assistant" title="Отвори Shark Assistant" aria-haspopup="dialog"
         aria-expanded={open} aria-controls={started ? 'shark-quick-panel' : undefined}
         onClick={() => { setStarted(true); setOpen(true); }} />
       {started && <section id="shark-quick-panel" className="shark-quick-panel" role="dialog"
