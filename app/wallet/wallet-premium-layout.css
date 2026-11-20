@@ -274,3 +274,48 @@
   .sw-main>.sw-grid>.sw-stack>.sw-panel:has(.sw-movements){min-height:140px;}
 }
 @media(prefers-reduced-motion:reduce){.sw-account-toggle svg{transition:none;}}
+
+
+/* Routed Wallet interactions: accessible actual search, Wise action selection and read-only crypto. */
+.sw-transaction-search{
+  display:flex;align-items:center;gap:10px;min-height:45px;padding:7px 13px;
+  border-radius:18px;border:1px solid rgba(106,180,241,.75);
+  background:linear-gradient(125deg,rgba(242,251,255,.94),rgba(206,230,254,.90));
+  color:#164f93;box-shadow:inset 0 1px rgba(255,255,255,.85),0 0 9px rgba(35,189,244,.20);
+}
+.sw-transaction-search>svg{flex:none;}
+.sw-transaction-search input{
+  width:100%;min-width:0;min-height:34px;border:0;outline:0;
+  background:transparent;color:#0b2450;font-size:1rem;
+}
+.sw-transaction-search input::placeholder{color:#496d9c;}
+.sw-transaction-search:focus-within{outline:2px solid #19caff;outline-offset:2px;}
+.sw-payment-hub{max-width:930px;min-height:275px;gap:16px;}
+.sw-payment-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;}
+.sw-payment-options>button{
+  display:flex;align-items:center;justify-content:center;gap:7px;min-height:52px;
+  min-width:0;padding:9px 12px;border-radius:999px;
+  border:1px solid rgba(200,245,255,.91);color:#fff;font-weight:750;
+  background:linear-gradient(115deg,#1364e8,#5e28d2 70%,#8725da);
+  box-shadow:inset 0 1px rgba(255,255,255,.71),0 0 11px rgba(19,203,252,.38);
+}
+.sw-payment-options>button[aria-pressed=true],.sw-payment-options>button:hover {
+  box-shadow:inset 0 1px rgba(255,255,255,.8),0 0 14px rgba(33,214,255,.70),0 0 16px rgba(128,44,224,.43);
+}
+.sw-payment-options>button svg{width:19px;height:19px;flex:none;}
+.sw-payment-detail{display:grid;align-content:start;justify-items:start;gap:12px;padding:10px 4px;}
+.sw-payment-detail h3{font-weight:800;color:#0b2450;}
+.sw-crypto-notice{
+  max-width:750px;padding:13px 17px;margin:0 0 13px;
+  border-radius:18px;border:1px solid rgba(203,244,255,.81);
+  color:#0c2b56;font-weight:650;
+  background:linear-gradient(114deg,rgba(235,249,255,.94),rgba(214,221,255,.91));
+  box-shadow:0 0 12px rgba(38,205,250,.22);
+}
+@media(max-width:699px){
+ .sw-transaction-search{min-height:44px;margin-bottom:2px;}
+ .sw-payment-options{gap:6px;}
+ .sw-payment-options>button{min-height:62px;flex-direction:column;gap:4px;font-size:.76rem;padding:8px 4px;}
+ .sw-payment-detail{padding:8px 2px;}
+ .sw-payment-hub{min-height:270px;}
+}
