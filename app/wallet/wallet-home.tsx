@@ -9,6 +9,7 @@ import {accountBalance, accountLabel, useWalletData, type WalletData} from './wa
 import {WalletView, RecentRows} from './wallet-views';
 import {walletLogin, walletTitles, walletUrl, type WalletRoute} from './wallet-routes';
 import {WalletReferenceConverter} from './wallet-premium-extras';
+import { requestQuickChat } from '../quick-chat-launch';
 import {WiseReviewForm,WiseWindowLink} from './wise-window';
 
 type Go = (route: WalletRoute) => void;
@@ -18,7 +19,7 @@ function subscribeViewport(listener: () => void) {
   media.addEventListener('change',listener);
   return () => media.removeEventListener('change',listener);
 }
-export function openSharkAssistant() { window.dispatchEvent(new Event('sharkai:open-chat')); }
+export const openSharkAssistant = requestQuickChat;
 
 // The ZIP uses these filled glyphs alongside Lucide line icons.
 function CardIcon({size=24}) {

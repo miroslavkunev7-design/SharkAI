@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Ellipsis, Minus } from 'lucide-react';
 import { consumeQuickChat, currentReturnPath } from '@/lib/auth-return';
+import { quickChatEvent, takeQuickChatRequest } from './quick-chat-launch';
 
 const ChatWorkspace = lazy(() => import('./chat/chat-workspace'));
 
@@ -23,9 +24,11 @@ function Launcher() {
   }, []);
 
   useEffect(() => {
-    window.addEventListener('sharkai:open-chat', launch);
-    if (consumeQuickChat(currentReturnPath('/chat'))) launch();
-    return () => window.removeEventListener('sharkai:open-chat', launch);
+    const onRequest = () => { takeQuickChatRequest(); launch(); };
+    window.addEventListener(quickChatEvent, onRequest);
+    const resume = consumeQuickChat(currentReturnPath('/chat'));
+    if (takeQuickChatRequest() || resume) launch();
+    return () => window.removeEventListener(quickChatEvent, onRequest);
   }, [launch]);
 
   useEffect(() => {

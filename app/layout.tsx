@@ -7,6 +7,7 @@ import './quick-chat.css';
 import './sharkai-ultra.css';
 import './site-scenes.css';
 import { SessionBoundary } from './session-boundary';
+import { earlyQuickChatScript } from './quick-chat-launch';
 import './session-boundary.css';
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="bg">
+      <head><script dangerouslySetInnerHTML={{ __html: earlyQuickChatScript }} /></head>
       <body className="shark-site font-sans min-h-screen">
         <div className="site-daylight" aria-hidden="true" />
         <SessionBoundary>
