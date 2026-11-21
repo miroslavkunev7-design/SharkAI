@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { Logo } from '@/components/Logo';
 import type { ChatTool } from '@/lib/chat-tools';
 import { accountPlanLabel } from '../account-plan';
+import { QuickChatHeader } from '../quick-chat-header';
 import {
-  AppWindow, ArrowDown, ArrowUp, AudioLines, Bell, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, Download, ExternalLink,
+  AppWindow, ArrowDown, ArrowRight, ArrowUp, AudioLines, Bell, BriefcaseBusiness, Camera, Check, ChevronDown, Copy, Download, ExternalLink,
   FileText, Folder, Globe2, Image as ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare,
-  Mic, Minus, PanelLeftClose, PanelLeftOpen, Paperclip, Pencil, Plus, RotateCcw, ScanLine, ScreenShare,
-  Search, Settings, Shield, Sparkles, Square, SquarePen, Table2, X,
+  Mic, PanelLeftClose, PanelLeftOpen, Paperclip, Pencil, Plus, RotateCcw, ScanLine, ScreenShare,
+  Search, Settings, Shield, Sparkles, Square, SquarePen, Table2, Volume2, X,
 } from 'lucide-react';
 import { captureFrame, useChatMedia } from './chat-media';
 import { readChatResponse } from './chat-response';
@@ -130,6 +131,8 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
   const [loginRequired, setLoginRequired] = useState(false);
   const [notice, setNotice] = useState('');
   const [copied, setCopied] = useState('');
+  const [spokenReply, setSpokenReply] = useState('');
+  const utterance = useRef<SpeechSynthesisUtterance | null>(null);
   const [small, setSmall] = useState(compact);
   const [railVisible, setRailVisible] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -173,16 +176,22 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
   const canSend = !!account;
   useEffect(() => {
     const field = inputRef.current;
-    if (!field) return;
+    if (!field || compact) return;
     field.style.height = 'auto';
     field.style.height = field.scrollHeight + 'px';
-  }, [input, canSend, loading, small]);
+  }, [input, canSend, compact, loading, small]);
   const pending = loading || sending || uploading || mediaPending || modeSaving;
   const awaitingProjects = projects.some(projectInProgress);
   const showStart = !loading && !loadProblem && messages.length === 0 && !optimistic;
   const { scrollRef, following, followLatest, onScroll } = useChatScroll(!showStart && !loading && !loadProblem);
   const signInHref = `/login?next=${encodeURIComponent(`/chat${compact || typeof window === 'undefined' ? '' : window.location.search}`)}`;
   useEffect(() => { visible.current = active; }, [active]);
+  useEffect(() => () => {
+    if (utterance.current) {
+      utterance.current = null;
+      window.speechSynthesis?.cancel();
+    }
+  }, []);
 
 
   const loadConversation = useCallback(async (id?: string, draftProjectId?: string) => {
@@ -381,6 +390,7 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
       if (compact && (!visible.current || !shellRef.current?.contains(event.target as Node))) return;
       if (cameraDialog.current?.open) return;
       if (event.key === 'Escape') {
+        if (compact && (popup || inspector || drawerOpen)) event.preventDefault();
         if (popup) closePopup(true);
         else if (inspector) closeInspector();
         else if (small && drawerOpen) closeDrawer();
@@ -528,12 +538,47 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
 
   function minimize() {
     visible.current = false;
+    stopReading();
     media.stopListening();
     media.stopSpeaking();
     closeCamera();
     closePopup();
     setInspector(null);
     onMinimize?.();
+  }
+
+  function stopReading() {
+    if (!utterance.current) return;
+    utterance.current = null;
+    window.speechSynthesis.cancel();
+    setSpokenReply('');
+  }
+
+  function readReply(message: Message) {
+    const wasSpeaking = spokenReply === message.id;
+    stopReading();
+    if (wasSpeaking) return;
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+      setProblem('Браузърът не поддържа озвучаване на отговори.');
+      return;
+    }
+    media.stopSpeaking();
+    const speech = new SpeechSynthesisUtterance(message.content);
+    speech.lang = /\p{Script=Cyrillic}/u.test(message.content) ? 'bg-BG' : 'en-US';
+    utterance.current = speech;
+    function finish() {
+      if (utterance.current !== speech) return;
+      utterance.current = null;
+      setSpokenReply('');
+    }
+    speech.onend = finish;
+    speech.onerror = () => {
+      if (utterance.current !== speech) return;
+      finish();
+      setProblem('Браузърът не успя да озвучи отговора.');
+    };
+    setSpokenReply(message.id);
+    window.speechSynthesis.speak(speech);
   }
 
   async function openCamera() {
@@ -643,12 +688,18 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
       if (!panelAction) writePendingChatTurn(null, compact);
       const id = result.conversationId ?? request.conversationId;
       const received: Message[] = result.messages ?? [
-        { id: request.requestId, role: 'user', content: request.message, imagePath: request.uploadId, attachmentMime: canvasMime },
+        { id: request.requestId, role: 'user', content: request.message, imagePath: request.uploadId, attachmentMime: canvasMime ?? (attachment?.id === request.uploadId ? attachment?.mimeType : undefined) },
         { id: `${request.requestId}-answer`, role: 'assistant', content: result.content, toolResult: result.toolResult },
       ];
       const replySource = result.assistant === 'shark' ? 'shark' : result.assistantFallback === true ? 'fallback' : undefined;
       const replyId = received.findLast((item) => item.role === 'assistant')?.id;
-      const labelReply = (item: Message): Message => replySource && item.id === replyId ? { ...item, replySource } : item;
+      const labelReply = (item: Message): Message => {
+        if (replySource && item.id === replyId) return { ...item, replySource };
+        if (compact && item.role === 'user' && attachment && item.imagePath === attachment.id) {
+          return { ...item, attachmentName: attachment.name, attachmentMime: item.attachmentMime ?? attachment.mimeType };
+        }
+        return item;
+      };
       if (request.branchFrom) {
         await loadConversation(id);
         if (replySource) setMessages((current) => current.map(labelReply));
@@ -769,6 +820,7 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
 
   function startDictation() {
     if (pending) return;
+    stopReading();
     media.stopSpeaking();
     setProblem('');
     setNotice('');
@@ -778,6 +830,7 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
   function startVoice() {
     if (media.speaking) { media.stopSpeaking(); return; }
     if (pending) return;
+    stopReading();
     setProblem('');
     setNotice('');
     void media.listen('conversation', (text) => { setInput(text); send(text, { speak: true }); });
@@ -860,21 +913,40 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
     const preview = attached ? attachmentInspection(attached) : null;
     const canEditFile = !local && preview?.type !== 'image' && attached?.mimeType
       && !CANVAS_MIME_TYPES.includes(attached.mimeType) && !!artifactEditor(attached);
-    return (
-      <article className={`shark-chat-message shark-chat-message-${message.role}`} key={message.id} aria-label={message.role === 'assistant' ? author : 'Ти'}>
-        {message.role === 'assistant' && <div className="shark-chat-message-author"><Logo size="sm" /> {author}</div>}
-        {preview?.type === 'image' && (
+    const content = <>
+        {!compact && preview?.type === 'image' && (
           <button type="button" className="shark-chat-image" onClick={() => openInspector(preview)}><img src={preview.url} alt="Прикачено изображение" /></button>
         )}
-        {attached && !local && <div className="shark-chat-message-attachments">
+        {!compact && attached && !local && <div className="shark-chat-message-attachments">
           {preview?.type === 'text' && <button type="button" className="shark-chat-attachment-link" onClick={() => openInspector(preview)}><FileText size={16} /> Преглед на прикачения файл</button>}
           {preview?.type === 'audio' && <button type="button" className="shark-chat-attachment-link" onClick={() => openInspector(preview)}><AudioLines size={16} /> Прослушай записа</button>}
           {preview?.type !== 'image' && <a className="shark-chat-attachment-link" href={artifactDownloadUrl(uploadUrl(attached.id), attached)} download={attached.name}><Download size={16} /> Изтегли прикачения файл</a>}
           <button type="button" disabled={pending} className="shark-chat-attachment-link" onClick={() => attachArtifact(attached, false)}><Paperclip size={16} /> Прикачи файла</button>
           {canEditFile && <button type="button" disabled={pending} className="shark-chat-attachment-link" onClick={() => attachArtifact(attached, true)}><Pencil size={16} /> Използвай файла за редакция</button>}
         </div>}
-        {(!message.toolResult?.imageJobId || message.toolResult.status === 'completed') && <div className="shark-chat-message-text">{message.content}</div>}
+        {(!message.toolResult?.imageJobId || message.toolResult.status === 'completed') && (compact
+          ? <p>{message.content}</p> : <div className="shark-chat-message-text">{message.content}</div>)}
         {message.toolResult && <ToolReceipt result={message.toolResult} open={openInspector} reuse={attachArtifact} editable={(file) => !!artifactEditor(file)} disabled={pending} projectStatus={project && projectStatusLabel(project)} reminder={reminderId ? reminders.reminders.find(({ id }) => id === reminderId) : undefined} reminderDue={!!reminderId && reminders.notifications.some(({ reminderId: id }) => id === reminderId)} />}
+    </>;
+    if (compact) return <article className={`original-chat-message is-${message.role}`} key={message.id} aria-label={message.role === 'assistant' ? author : 'Твоето съобщение'}>
+      <div className="original-chat-message-copy">{content}
+        {attached && <p className="original-chat-file-label"><Paperclip size={15} aria-hidden="true" />
+          {local ? <span>{attachment?.name ?? attached.name}</span> : preview ?
+            <button type="button" onClick={() => openInspector(preview)}>{attached.name}</button> :
+            <a href={artifactDownloadUrl(uploadUrl(attached.id), attached)} download={attached.name}>{attached.name}</a>}
+        </p>}
+      </div>
+      {message.role === 'assistant' && !local && message.content && <button type="button"
+        className={`original-chat-round original-chat-speaker${spokenReply === message.id ? ' is-active' : ''}`}
+        aria-label={spokenReply === message.id ? 'Спри озвучаването' : 'Озвучаване на отговора'}
+        aria-pressed={spokenReply === message.id} onClick={() => readReply(message)}>
+        {spokenReply === message.id ? <Square size={14} /> : <Volume2 size={18} />}
+      </button>}
+    </article>;
+    return (
+      <article className={`shark-chat-message shark-chat-message-${message.role}`} key={message.id} aria-label={message.role === 'assistant' ? author : 'Ти'}>
+        {message.role === 'assistant' && <div className="shark-chat-message-author"><Logo size="sm" /> {author}</div>}
+        {content}
         {!local && (
           <div className="shark-chat-message-actions">
             <button type="button" title={copied === message.id ? 'Копирано' : 'Копирай'} aria-label={copied === message.id ? 'Копирано' : 'Копирай'} onClick={() => void copyMessage(message)}>{copied === message.id ? <Check size={15} /> : <Copy size={15} />}</button>
@@ -903,12 +975,20 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
     }).catch(() => setProblem('Изходът от акаунта не успя.'));
   }
 
-  const ContentRegion = compact ? 'div' : 'main';
-  const WelcomeHeading = compact ? 'h3' : 'h1';
+  const thread = <>
+    {messages.map((message, index) => renderMessage(message, index))}
+    {optimistic && renderMessage(optimistic, messages.length, true)}
+    {sending && (partial ? renderMessage({ id: 'stream', role: 'assistant', content: partial }, messages.length, true) : (
+      <div className={compact ? 'original-chat-message is-assistant' : 'shark-chat-status'} role="status">
+        <LoaderCircle size={17} className="shark-chat-spinner" /> {selectedTool ? `Изпълнявам ${selectedTool.label}…` : 'Очаквам отговор…'}
+      </div>
+    ))}
+  </>;
   return (
-    <div className="shark-chat-shell" ref={shellRef} data-rail={!compact && railVisible} data-drawer={drawerOpen}
+    <div className={compact ? 'original-chat-shell' : 'shark-chat-shell'} ref={shellRef} data-rail={!compact && railVisible} data-drawer={drawerOpen}
       onKeyDown={compact ? (event) => {
         if (event.key === 'Escape' && !popup && !inspector && !cameraDialog.current?.open) {
+          event.preventDefault();
           event.stopPropagation();
           minimize();
         }
@@ -956,15 +1036,64 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
         </div>
       </aside>}
 
-      <div className="shark-chat-workspace" data-mode={mode} inert={(small && !!inspector) || (small && drawerOpen)}>
-        {compact ? <header className="shark-quick-header">
-          <div className="shark-quick-heading"><Logo size="sm" /><h2>Shark Assistant</h2></div>
-          <div className="shark-quick-actions">
-            {!input && !attachment && !pending && <Link href={conversationId ? '/chat?conversationId=' + encodeURIComponent(conversationId) : '/chat'}
-              aria-label="Отвори пълния чат" title="Отвори пълния чат"><ExternalLink size={17} /></Link>}
-            <button type="button" data-quick-minimize onClick={minimize} aria-label="Минимизирай чата" title="Минимизирай чата"><Minus size={20} /></button>
+      {compact ? <div className="original-chat-widget" inert={!!inspector}>
+        <div className="original-chat-scene" aria-hidden="true" />
+        <QuickChatHeader key={String(active)} active={active} online={sharkAssistant} loading={loading} signedIn={!!account}
+          models={models} model={model} selectModel={setModel} disabled={pending} minimize={minimize}
+          fullChatHref={!input && !attachment && !pending ? conversationId ? '/chat?conversationId=' + encodeURIComponent(conversationId) : '/chat' : null}
+          dictationLabel={dictationLabel} dictationReason={media.dictationReason} startDictation={startDictation}
+          voiceLabel={conversationLabel} voiceReason={voiceUnavailable} startVoice={startVoice} />
+        <div className="original-chat-scroller" ref={scrollRef} onScroll={onScroll} tabIndex={0} aria-label="История на разговора" role="region">
+          <div className="original-chat-thread" role="log" aria-label="Разговор с Shark Assistant" aria-live="polite" aria-relevant="additions">
+            {loading && <p className="original-chat-message is-assistant" role="status">Зареждане на разговора…</p>}
+            {loadProblem && <div className="original-chat-message is-assistant" role="alert"><div className="original-chat-message-copy">
+              <p>{loadProblem}</p>{loginRequired ? <Link href={signInHref}>Вход за чат</Link> :
+                <button type="button" onClick={() => void loadConversation()}>Опитай отново</button>}
+            </div></div>}
+            {!loading && !loadProblem && !account && <div className="original-chat-message is-assistant"><div className="original-chat-message-copy">
+              <p>Влез в профила си, за да пишеш на Shark Assistant.</p><Link href={signInHref}>Вход за чат</Link>
+            </div></div>}
+            {account && !sharkAssistant && capabilityReason && <p className="original-chat-message is-assistant" role="status">{capabilityReason}</p>}
+            {thread}
           </div>
-        </header> : <header className="shark-chat-topbar" ref={topbarRef}>
+        </div>
+        <footer className="original-chat-footer">
+          {attachment && <div className="original-chat-pending-file"><Paperclip size={14} /><span title={attachment.name}>{attachment.name}</span>
+            {attachmentPreview && <button type="button" aria-label={`Преглед на ${attachment.name}`} onClick={() => openInspector(attachmentPreview)}>{attachmentPreview.type === 'audio' ? <Volume2 size={15} /> : <FileText size={15} />}</button>}
+            <button type="button" aria-label="Премахни прикачения файл" disabled={sending} onClick={() => setAttachment(null)}><X size={14} /></button>
+          </div>}
+          {(problem || notice || uploading || media.recordStage || media.speechStage) && <div className="original-chat-record-status" aria-live="polite">
+            {problem && <span role="alert">{problem}</span>}{notice && <span>{notice}</span>}
+            {uploading && <span>Качване…</span>}
+            {media.recordStage && <span>{media.recordStage === 'permission' ? 'Очаквам разрешение за микрофона…' : media.recordStage === 'transcribing' ? 'Разпознавам записа…' : 'Записвам. Натисни отново, за да приключиш.'}</span>}
+            {media.speechStage && <span>{media.speechStage === 'preparing' ? 'Подготвям звук…' : 'SharkAI отговаря на глас.'}</span>}
+            {!pending && failedRequest.current && (problem || notice) && <button type="button" onClick={() => { if (failedRequest.current) void submit(failedRequest.current); }}>Повтори изпращането</button>}
+          </div>}
+          <form className="original-chat-composer" onSubmit={formSubmit}>
+            <input ref={fileRef} type="file" hidden accept={FILE_ACCEPT} onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ''; if (file) void uploadFile(file); }} />
+            <button type="button" className="original-chat-round original-chat-attach" disabled={!canSend || pending || !!media.listening || !!loadProblem}
+              onClick={() => chooseFile()} title="Прикачи" aria-label="Прикачи файл"><Paperclip size={21} /></button>
+            <textarea className="original-chat-input" ref={inputRef} value={input} rows={1} maxLength={12000} autoComplete="off"
+              aria-label="Съобщение до Shark Assistant" placeholder="Пишете на Shark…" disabled={!canSend || pending || !!loadProblem}
+              onChange={(event) => { if (failedRequest.current) { clearFailedChatTurn(); setNotice(''); } setInput(event.target.value); setProblem(''); }}
+              onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); if (!media.listening) send(); } }} />
+            <button type="button" className={`original-chat-round original-chat-mic${media.recordStage === 'recording' ? ' is-recording' : ''}`}
+              aria-label={media.listening ? 'Спри записа' : 'Запиши гласово съобщение'} aria-pressed={!!media.listening}
+              title={!media.recordingSupported ? 'Браузърът не поддържа запис.' : media.listening ? 'Спри записа' : 'Микрофон'}
+              disabled={!canSend || !media.recordingSupported || pending || !!loadProblem || media.recordStage === 'permission'}
+              onClick={() => {
+                if (media.listening === 'dictation') { startDictation(); return; }
+                if (media.listening === 'conversation') { startVoice(); return; }
+                stopReading(); media.stopSpeaking(); setProblem(''); setNotice('');
+                void media.listen('attachment', (file) => { void uploadFile(file); });
+              }}>{media.recordStage === 'recording' ? <Square size={18} /> : <Mic size={22} />}</button>
+            {sending ? <button type="button" className="original-chat-round original-chat-send" title="Спри отговора" aria-label="Спри отговора" onClick={() => sendController.current?.abort()}><Square size={17} /></button> :
+              <button type="submit" className="original-chat-round original-chat-send" title="Изпрати" aria-label="Изпрати съобщението"
+                disabled={!canSend || pending || !!loadProblem || !!media.listening || (!input.trim() && !attachment)}><ArrowRight size={25} /></button>}
+          </form>
+        </footer>
+      </div> : <div className="shark-chat-workspace" data-mode={mode} inert={(small && !!inspector) || (small && drawerOpen)}>
+        <header className="shark-chat-topbar" ref={topbarRef}>
           <div className="shark-chat-topbar-start">
             <button ref={railTrigger} className="shark-chat-icon shark-chat-rail-trigger" type="button" aria-label={railOpen ? 'Скрий историята' : 'Отвори историята'} title="История и проекти" aria-controls="chat-rail" aria-expanded={railOpen} onClick={railAction}>
               {small ? <Menu size={21} /> : railOpen ? <PanelLeftClose size={19} /> : <PanelLeftOpen size={19} />}
@@ -993,24 +1122,20 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
             {account && <button type="button" className="shark-chat-icon shark-chat-reminder-trigger" aria-label={reminders.notifications.length ? `Напомняния, ${reminders.notifications.length} непрочетени` : 'Напомняния'} title="Напомняния" aria-haspopup={small ? 'dialog' : undefined} aria-expanded={inspector?.type === 'reminders'} aria-controls="chat-reminders-panel" onClick={() => openInspector({ type: 'reminders', title: 'Напомняния' })}><Bell size={18} />{reminders.notifications.length > 0 && <span aria-hidden="true">{reminders.notifications.length}</span>}</button>}
             {!small && !railOpen && <Link className="shark-chat-topbar-studio" href="/dashboard?view=studio" aria-label="Студио" title="Студио"><AppWindow size={17} /><span>Студио</span></Link>}
           </div>
-        </header>}
-        <ContentRegion id={compact ? 'quick-chat-main' : 'chat-main'} tabIndex={-1} className="shark-chat-main" data-start={showStart}>
+        </header>
+        <main id="chat-main" tabIndex={-1} className="shark-chat-main" data-start={showStart}>
           {loading && <p className="shark-chat-center-state" role="status"><LoaderCircle size={19} className="shark-chat-spinner" /> Зареждане на разговора…</p>}
-          {loadProblem && <div className="shark-chat-center-state" role="alert">{loadProblem} {loginRequired ? <Link className="shark-chat-new" href={signInHref}>Вход за чат</Link> : <button type="button" onClick={() => void loadConversation(compact ? undefined : new URLSearchParams(window.location.search).get('conversationId') || undefined)}>Опитай отново</button>}</div>}
+          {loadProblem && <div className="shark-chat-center-state" role="alert">{loadProblem} {loginRequired ? <Link className="shark-chat-new" href={signInHref}>Вход за чат</Link> : <button type="button" onClick={() => void loadConversation(new URLSearchParams(window.location.search).get('conversationId') || undefined)}>Опитай отново</button>}</div>}
           {showStart ? <section className="shark-chat-welcome" aria-labelledby="chat-welcome-title">
             <div className="shark-chat-welcome-copy">
               <Logo size="lg" />
-              <WelcomeHeading id="chat-welcome-title">{mode === 'work' ? 'С какво ще работим?' : 'Как мога да помогна?'}</WelcomeHeading>
+              <h1 id="chat-welcome-title">{mode === 'work' ? 'С какво ще работим?' : 'Как мога да помогна?'}</h1>
             </div>
           </section> : !loading && !loadProblem ? (
             <div className="shark-chat-thread-area">
               <div className="shark-chat-thread-scroll" ref={scrollRef} tabIndex={0} role="region" aria-label="История на разговора" onScroll={onScroll}>
                 <div className="shark-chat-thread" role="log" aria-label="Разговор с SharkAI" aria-live="polite">
-                  {messages.map((message, index) => renderMessage(message, index))}
-                  {optimistic && renderMessage(optimistic, messages.length, true)}
-                  {sending && (partial ? renderMessage({ id: 'stream', role: 'assistant', content: partial }, messages.length, true) : (
-                    <div className="shark-chat-status" role="status"><LoaderCircle size={17} className="shark-chat-spinner" /> {selectedTool ? `Изпълнявам ${selectedTool.label}…` : 'Очаквам отговор…'}</div>
-                  ))}
+                  {thread}
                 </div>
               </div>
               {!following && <button className="shark-chat-jump-latest shark-chat-compose-icon" type="button" aria-label="Към последното съобщение" title="Към последното съобщение"
@@ -1018,7 +1143,7 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
             </div>
           ) : null}
           {canSend && !loadProblem ? <div className="shark-chat-compose-area" ref={composeAreaRef}>
-            {!compact && showStart && (sharkAssistant || (mode === 'work' && tools.some(({ available }) => available))) && <div className="shark-chat-suggestions" aria-label="Предложения">
+            {showStart && (sharkAssistant || (mode === 'work' && tools.some(({ available }) => available))) && <div className="shark-chat-suggestions" aria-label="Предложения">
               {mode === 'work' ? tools.filter(({ available }) => available).slice(0, 3).map((tool) => <button type="button" disabled={pending} key={tool.id} onClick={() => chooseTool(tool)}><ToolIcon tool={tool} /> {tool.label}</button>) : suggestions.map(({ label, text, icon: Icon }) => <button type="button" key={label} disabled={pending} onClick={() => { setInput(text); send(text); }}><Icon size={16} /> {label}</button>)}
             </div>}
             <form className="shark-chat-composer" onSubmit={formSubmit}>
@@ -1049,9 +1174,7 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
                 onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send(); } }} />
               <div className="shark-chat-composer-actions">
                 <div className="shark-chat-plus-anchor">
-                  {compact ? <button type="button" className="shark-chat-compose-icon" aria-label="Прикачи файл или снимка" title="Прикачи файл или снимка"
-                    disabled={pending} onClick={() => chooseFile()}><Plus size={22} /></button>
-                    : popupButton('tools', 'Още действия', <Plus size={22} />, 'shark-chat-compose-icon', loading || sending)}
+                  {popupButton('tools', 'Още действия', <Plus size={22} />, 'shark-chat-compose-icon', loading || sending)}
                   {popup === 'tools' && <>
                     {small && <button type="button" tabIndex={-1} className="shark-chat-popup-backdrop" aria-label="Затвори още действия" onClick={() => closePopup(true)} />}
                     <div id="chat-popup-tools" className="shark-chat-popup shark-chat-tools-popup" role={small ? 'dialog' : undefined} aria-modal={small ? true : undefined} aria-label="Още действия" ref={popupRef}>
@@ -1083,13 +1206,12 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
                 {selectedTool && INPUT_FILES[selectedTool.input] && <button type="button" title="Избери входен файл" aria-label="Избери входен файл" className="shark-chat-compose-icon" disabled={pending} onClick={() => chooseFile(selectedTool.input)}><Paperclip size={17} /></button>}
                 <div className="shark-chat-compose-spacer" />
                 <button type="button" className="shark-chat-compose-icon" aria-label={dictationLabel} aria-pressed={media.listening === 'dictation'} title={media.dictationReason || dictationLabel} disabled={!media.dictation || !canSend || pending} onClick={startDictation}><Mic size={20} /></button>
-                {(!compact || !voiceUnavailable) && <button type="button" className="shark-chat-compose-icon shark-chat-voice" aria-label={conversationLabel} aria-pressed={media.listening === 'conversation' || media.speaking} title={voiceUnavailable || conversationLabel} disabled={!media.speaking && (!!voiceUnavailable || !canSend || pending)} onClick={startVoice}><AudioLines size={20} /></button>}
+                <button type="button" className="shark-chat-compose-icon shark-chat-voice" aria-label={conversationLabel} aria-pressed={media.listening === 'conversation' || media.speaking} title={voiceUnavailable || conversationLabel} disabled={!media.speaking && (!!voiceUnavailable || !canSend || pending)} onClick={startVoice}><AudioLines size={20} /></button>
                 {sending ? <button className="shark-chat-send" type="button" aria-label="Спри отговора" title="Спри отговора" onClick={() => sendController.current?.abort()}><Square size={16} fill="currentColor" /></button> :
                   <button className="shark-chat-send" type="submit" aria-label="Изпрати" title="Изпрати" disabled={!canSend || pending || !!loadProblem || (!input.trim() && !attachment && selectedTool?.input !== 'none')}><ArrowUp size={21} /></button>}
               </div>
             </form>
             <div className="shark-chat-composer-status" aria-live="polite">
-              {compact && account && media.dictationReason && <span>{media.dictationReason}</span>}
               {problem && <span className="shark-chat-notice" role="alert">{problem}</span>}
               {notice && <span>{notice}</span>}
               {!pending && (problem || notice) && failedRequest.current && <button type="button" className="shark-chat-new" onClick={() => { if (failedRequest.current) void submit(failedRequest.current); }}><RotateCcw size={15} /> Повтори изпращането</button>}
@@ -1102,8 +1224,8 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
               <Link className="shark-chat-new" href={signInHref}><Shield size={17} aria-hidden="true" /> Вход за чат</Link>
             </div>
           </div>}
-        </ContentRegion>
-      </div>
+        </main>
+      </div>}
       {inspector && <div className="shark-chat-inspector-region" id={inspector.type === 'reminders' ? 'chat-reminders-panel' : undefined} ref={inspectorRegion} role={small ? 'dialog' : undefined} aria-modal={small ? true : undefined} aria-label={inspector.title}><Inspector item={inspector} close={closeInspector} reminders={reminders} createReminder={reminderTool ? createReminder : undefined} disabled={pending} save={account && tools.some(({ id, available }) => id === 'text-file-edit' && available) ? saveCanvas : undefined} talk={pending ? undefined : (project) => newConversation(project)} /></div>}
       <dialog className="shark-chat-camera-dialog" ref={cameraDialog} onCancel={(event) => { event.preventDefault(); closeCamera(); }}>
         <header className="ice-section" data-ice-art="agent"><h2>Камера</h2><button className="shark-chat-icon" type="button" aria-label="Затвори камерата" onClick={closeCamera}><X size={18} /></button></header>

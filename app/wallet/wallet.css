@@ -1,102 +1,647 @@
-.sw-root { min-height:100dvh; color:#edf5ff; background:radial-gradient(ellipse at 76% -4%,#28294d,transparent 52%),linear-gradient(135deg,#10233a,#0c1123 60%); font-family:var(--font-body,system-ui); }
-.sw-shell { max-width:1160px; margin:auto; padding:0 clamp(1rem,4vw,3.5rem) 3rem; }
-.sw-header { display:flex; align-items:center; justify-content:space-between; min-height:78px; gap:1rem; border-bottom:1px solid #233448; }
-.sw-wordmark,.sw-return,.sw-btn,.sw-nav-item,.sw-account-label,.sw-page-heading>span,.sw-tile-link,.sw-hint { display:inline-flex; align-items:center; gap:.5rem; }
-.sw-wordmark { font-size:.88rem; color:#c3d3e1; font-weight:560; }
-.sw-wordmark span { font:650 1.3rem/1 var(--font-display,var(--font-body)); letter-spacing:-.03em; color:#fff; }
-.sw-wordmark span strong { color:#9be6ff; }
-.sw-wordmark i { display:block; width:1px; height:1.1rem; background:#365169; margin:0 .25rem; }
-.sw-return { font-size:.85rem; color:#c0d0e2; padding:.5rem 0; font-weight:600; }
-.sw-return svg,.sw-tile-link svg,.sw-btn svg { width:1rem; height:1rem; flex:none; }
-.sw-navigation { display:flex; flex-wrap:wrap; gap:.32rem; padding:1.12rem 0; }
-.sw-nav-item { border-radius:99px; padding:.6rem 1rem; color:#aebbcc; font-size:.86rem; font-weight:620; }
-.sw-nav-item svg,.sw-account-label svg,.sw-page-heading>span svg,.sw-hint svg { width:1.05rem; height:1.05rem; flex:none; }
-.sw-nav-item[aria-current=page] { background:var(--shark-icon-surface); color:#f1f6ff; box-shadow:inset 0 0 0 1px var(--shark-icon-edge),inset 0 1px #e8f5ff38; }
-.sw-nav-item:hover,.sw-return:hover { color:#fff; }
-.sw-main { min-width:0; }
-.sw-hero { min-height:288px; padding:2.1rem clamp(1.2rem,4vw,3rem); display:flex; align-items:center; border:1px solid #33536d; border-radius:1.5rem;
-  background:linear-gradient(103deg,#101e38 0%,#101e38f7 24%,#19213ccf 43%,#39245038 78%),
-    var(--shark-ice-texture) center/cover no-repeat,url('/sharkai/shark-hero.webp') 85% 46%/cover no-repeat;
-  background-blend-mode:normal,soft-light,normal; }
-.sw-hero-copy { max-width:64%; display:grid; justify-items:start; gap:.6rem; }
-.sw-account-label,.sw-page-heading>span { color:#b7ecfb; font-size:.82rem; font-weight:650; }
-.sw-hero h1 { font:600 clamp(1.22rem,2.2vw,1.6rem)/1.25 var(--font-display,var(--font-body)); letter-spacing:-.018em; margin-top:.45rem; }
-.sw-balance { display:flex; align-items:center; gap:.6rem; min-width:0; }
-.sw-balance strong { font-size:clamp(2.3rem,5vw,3.8rem); font-weight:620; line-height:1.08; letter-spacing:-.035em; font-variant-numeric:tabular-nums;
-  color:#fff; overflow-wrap:anywhere; }
-.sw-balance button { display:grid; place-items:center; min-height:40px; min-width:40px; color:#bdd6e7; }
-.sw-balance button svg { width:1.15rem; }
-.sw-hero p { color:#c6daeb; font-size:.88rem; max-width:34rem; }
-.sw-btn { width:fit-content; justify-content:center; padding:.7rem 1.05rem; border-radius:99px; min-height:42px; background:#a1eaff; color:#062139; font-weight:700; font-size:.86rem; }
-.sw-hero .sw-btn { margin-top:.6rem; }
-.sw-btn:hover { background:#d0f6ff; }
-.sw-btn-secondary { background:#203448; color:#ebf5ff; }
-.sw-btn-secondary:hover { background:#2b4761; }
-.sw-grid { display:grid; grid-template-columns:minmax(0,1.45fr) minmax(0,1fr); gap:1.25rem; margin-top:1.25rem; align-items:start; }
-.sw-stack { display:grid; gap:1.25rem; }
-.sw-actions,.sw-panel,.sw-forecast-card { border:1px solid #6392b95c; border-radius:1.15rem; background:var(--shark-panel-dark); }
-.sw-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); padding:1rem .45rem; }
-.sw-actions button + button { border-inline-start:1px solid #91afd12d; border-start-start-radius:0; border-end-start-radius:0; }
-.sw-actions button { display:grid; justify-items:center; gap:.4rem; font-size:.82rem; color:#deedfb; font-weight:630; border-radius:.75rem; }
-.sw-actions button span,.sw-tile-icon,.sw-movement-icon { display:grid; place-items:center; width:42px; height:42px; border-radius:50%; background:#1d354a; color:#a2ebff; }
-.sw-actions button span svg,.sw-tile-icon svg,.sw-movement-icon svg { width:20px; height:20px; }
-.sw-actions button span,.sw-tile-icon { background:var(--shark-icon-surface); color:var(--shark-icon-ice); border:1px solid var(--shark-icon-edge); box-shadow:inset 0 1px #d7ebff45,0 3px 8px #07122c66; }
-.sw-actions button:nth-child(even) span,.sw-tile-icon { color:var(--shark-icon-lilac); }
-.sw-actions button:hover span,.sw-actions button[aria-pressed=true] span { background:var(--shark-action-gradient); color:#fff; border-color:#dae5ffbc; }
-.sw-panel,.sw-forecast-card { display:grid; gap:.75rem; align-content:start; padding:clamp(1rem,2.4vw,1.55rem); min-width:0; }
-.sw-panel h2,.sw-forecast-card h2 { font:620 1.35rem/1.25 var(--font-display,var(--font-body)); color:#f7fbff; letter-spacing:-.021em; }
-.sw-panel p,.sw-forecast-card p,.sw-panel small { color:#bdccdc; line-height:1.55; font-size:.9rem; }
-.sw-panel small { font-size:.78rem; }
-.sw-panel :is(.sw-hint,.sw-section-head) svg { flex:none; }
-.sw-section-head { display:flex; align-items:center; justify-content:space-between; gap:.6rem; }
-.sw-section-head>svg,.sw-section-head>a,.sw-section-head>button { color:#a1eaff; }
-.sw-section-head a,.sw-section-head button { display:grid; place-items:center; border-radius:50%; min-height:36px; min-width:36px; background:#1b3042; }
-.sw-section-head svg { width:18px; }
-.sw-forecast-card { background:var(--shark-scene-shade),url('/sharkai/markets.webp') 72% center/cover no-repeat,#13283b; min-height:210px; }
-.sw-forecast-card:hover { border-color:#5b91a8; }
-.sw-forecast-card p { max-width:31ch; }
-.sw-tile-icon { border-radius:.8rem; }
-.sw-tile-link { color:#aaecff; font-weight:680; font-size:.88rem; margin-top:.3rem; }
-.sw-page-heading { margin:.45rem 0 1.2rem; }
-.sw-page-heading h1 { font-weight:670; font-size:clamp(2rem,5vw,3.4rem); letter-spacing:-.06em; margin-top:.32rem; line-height:1.12; color:white; }
-.sw-movements { list-style:none; margin:0; padding:0; }
-.sw-movements li { display:flex; align-items:center; gap:.75rem; padding:.75rem 0; border-bottom:1px solid #293a4c; }
-.sw-movements li:last-child { border-bottom:0; }
-.sw-movements li div { display:grid; gap:.2rem; flex:1; }
-.sw-movements li strong { font-weight:620; }
-.sw-movements li>strong { text-align:right; overflow-wrap:anywhere; }
-.sw-movement-icon { width:35px; height:35px; flex:none; background:#243548; color:#d7e4f5; }
-.sw-movement-icon.is-credit { background:#163d36; color:#9fefd2; }
-.sw-provider-actions { display:flex; align-items:center; flex-wrap:wrap; gap:.7rem; }
-.sw-provider-actions:empty { display:none; }
-.sw-disclosure { display:block; }
-.sw-disclosure summary { cursor:pointer; color:#f1f7fc; display:flex; align-items:center; justify-content:space-between; font-weight:650; }
-.sw-disclosure[open] summary { margin-bottom:1rem; }
-.sw-disclosure[open] summary svg { transform:rotate(180deg); }
-.sw-root :focus-visible { outline:2px solid #9be9ff;outline-offset:3px; }
-@media (forced-colors:active) {
-  .sw-hero { background:Canvas; }
-  .sw-nav-item[aria-current=page] { outline:1px solid Highlight; }
+/* Original SharkAI ZIP styles, scoped to the wallet route. */
+
+.zip-wallet{--shark-artifact-image-1:url("/wallet-original/image-01.png");--shark-artifact-image-3:url("/wallet-original/image-02.png");--shark-artifact-image-6:url("/wallet-original/image-03.png");--shark-artifact-image-8:url("/wallet-original/image-04.png");--shark-artifact-image-10:url("/wallet-original/image-05.png");--shark-artifact-image-13:url("/wallet-original/image-06.png");--shark-artifact-image-14:url("/wallet-original/image-07.png");--shark-artifact-image-15:url("/wallet-original/image-08.png")}
+.zip-wallet .desktop-wallet-header,.zip-wallet .desktop-wallet{display:none}@media(min-width:1024px){
+.zip-wallet .desktop-wallet-header{display:block;position:relative;isolation:isolate;width:100%;min-height:188px;padding:19px 38px 26px;color:#fff}
+.zip-wallet .desktop-wallet-header:before{content:"";position:absolute;inset:-30px 0 -5px;z-index:-1;pointer-events:none;background:url("/wallet-original/image-10.png") center/100% 100% no-repeat;filter:drop-shadow(0 3px 10px #7253d24a)}
+.zip-wallet .desktop-header-main{display:flex;align-items:center;justify-content:space-between;gap:24px;max-width:1492px;margin:0 auto;min-height:91px}
+.zip-wallet .desktop-brand{display:flex;align-items:center;gap:17px;flex-shrink:0;color:#fff;text-align:left;border:0;padding:0;background:none;cursor:pointer}
+.zip-wallet .desktop-shark-avatar{position:relative;display:inline-block;flex-shrink:0;width:91px;height:91px;overflow:hidden;border-radius:50%;filter:drop-shadow(0 0 7px #75d5ffb0)}
+.zip-wallet .desktop-shark-avatar img{position:absolute;max-width:none;width:779.121%;height:1687.912%;left:-31.868%;top:-106.593%;object-fit:fill}
+.zip-wallet .desktop-brand-copy{display:flex;flex-direction:column;gap:3px}
+.zip-wallet .desktop-brand-copy>strong{font-size:clamp(29px,2.8vw,42px);line-height:1.1;font-weight:700;letter-spacing:-1.3px;text-shadow:0 2px 8px #00184270}
+.zip-wallet .desktop-brand-copy>strong>span{color:#70efff}
+.zip-wallet .desktop-brand-copy>span{font-size:17px;letter-spacing:.3px;color:#e4dfff}
+.zip-wallet .desktop-header-controls{display:flex;align-items:center;justify-content:flex-end;gap:12px}
+.zip-wallet .desktop-header-control,.zip-wallet .desktop-header-tabs>button,.zip-wallet .desktop-account-picker,.zip-wallet .desktop-assistant-launcher{position:relative;isolation:isolate;display:inline-flex;align-items:center;justify-content:center;gap:9px;border:0;background:none;color:#fff;cursor:pointer}
+.zip-wallet .desktop-header-control:before,.zip-wallet .desktop-header-tabs>button:before,.zip-wallet .desktop-account-picker:before,.zip-wallet .desktop-assistant-launcher:before{content:"";position:absolute;z-index:-1;pointer-events:none;left:-2.312%;top:-22.4%;width:104.624%;height:144.8%;background:var(--shark-artifact-image-3) center/100% 100% no-repeat}
+.zip-wallet .desktop-header-control{height:42px;min-width:100px;padding:0 18px;font-size:14px;white-space:nowrap;text-shadow:0 1px 4px #28205c}
+.zip-wallet .desktop-header-search{width:205px;justify-content:flex-start;font-size:17px;padding-left:22px}
+.zip-wallet .desktop-header-control svg,.zip-wallet .desktop-header-tabs svg{flex-shrink:0}
+.zip-wallet .desktop-header-tabs{position:relative;display:flex;justify-content:flex-end;gap:15px;max-width:1492px;margin:17px auto 0;padding-right:3px}
+.zip-wallet .desktop-header-tabs>button{min-width:135px;height:43px;padding:0 20px;font-size:15px;line-height:1;font-weight:500;white-space:nowrap}
+.zip-wallet .desktop-header-tabs>button:before{opacity:.64;filter:saturate(.72)}
+.zip-wallet .desktop-header-tabs>button.is-selected:before{opacity:1;filter:brightness(1.16);box-shadow:0 0 15px #9d7cff55;border-radius:50%}
+.zip-wallet .desktop-header-tabs>button.is-selected{font-weight:700;text-shadow:0 0 9px #dfeaff99}
+.zip-wallet .desktop-wallet-header button:focus-visible,.zip-wallet .desktop-wallet button:focus-visible{outline:2px solid #effaff;outline-offset:4px;border-radius:18px}
+.zip-wallet .desktop-wallet-header button:hover:before{filter:brightness(1.14)}
+.zip-wallet .desktop-wallet{display:grid;position:relative;grid-template-columns:minmax(0,2.04fr) minmax(335px,1fr);grid-template-rows:minmax(344px,1fr) auto auto;grid-template-areas:"funds converter" "transactions converter" "assistant assistant";gap:18px 22px;align-items:stretch;width:100%;max-width:1548px;margin:0 auto;padding:18px 30px 29px;color:#100e40}
+.zip-wallet .desktop-wallet-card{position:relative;isolation:isolate;min-width:0;overflow:hidden;border:1px solid #e1f7ffcf;border-radius:27px;background:linear-gradient(114deg,#e1f5fff2,#c4dcf5e8 48%,#d6cff3eb);box-shadow:inset 0 1px 7px #fff,0 0 13px #82dcff82,0 14px 35px #020e3655}
+.zip-wallet .desktop-wallet-card:before{content:"";position:absolute;z-index:-1;inset:-12px -8px;pointer-events:none;background:url("/wallet-original/image-11.png") center/100% 100% no-repeat;opacity:.69}
+.zip-wallet .desktop-card-art{position:absolute;z-index:0;inset:0 0 0 39%;pointer-events:none;background-position:center;background-repeat:no-repeat;background-size:cover;-webkit-mask-image:linear-gradient(90deg,transparent,#000 37%);mask-image:linear-gradient(90deg,transparent,#000 37%)}
+.zip-wallet .desktop-funds-art{background-image:url("/wallet-original/image-12.png");opacity:.92}
+.zip-wallet .desktop-transactions-art{left:56%;background-image:var(--shark-artifact-image-6);opacity:.2}
+.zip-wallet .desktop-converter-art{top:44%;left:0;background-image:url("/wallet-original/image-13.png");opacity:.22;-webkit-mask-image:linear-gradient(180deg,transparent,#000 55%);mask-image:linear-gradient(180deg,transparent,#000 55%)}
+.zip-wallet .desktop-funds{grid-area:funds;display:flex;flex-direction:column;justify-content:space-between;gap:24px;min-height:344px;padding:27px 29px 25px}
+.zip-wallet .desktop-funds-copy,.zip-wallet .desktop-quick-actions,.zip-wallet .desktop-transactions-heading,.zip-wallet .desktop-transaction-list,.zip-wallet .desktop-transaction-empty,.zip-wallet .desktop-converter-heading,.zip-wallet .desktop-converter-mode,.zip-wallet .desktop-converter-form,.zip-wallet .desktop-converter-gated{position:relative;z-index:1}
+.zip-wallet .desktop-funds-copy{max-width:78%}
+.zip-wallet .desktop-funds-heading{display:flex;flex-wrap:wrap;align-items:center;gap:11px}
+.zip-wallet .desktop-funds-heading h1{margin:0;font-size:26px;line-height:1.25;letter-spacing:-.65px;font-weight:700}
+.zip-wallet .desktop-funds-heading .badge{white-space:nowrap;color:#341b62;border-color:#a59cdd91;background:#efe4f8b5;font-size:12px;font-weight:600;padding:5px 9px}
+.zip-wallet .desktop-account-name{margin:13px 0 3px;font-size:14px;line-height:1.5;color:#302550;font-weight:600}
+.zip-wallet .desktop-account-name>span{font-weight:400;color:#514369}
+.zip-wallet .desktop-balance-line{display:flex;flex-wrap:wrap;align-items:center;gap:12px;min-height:81px}
+.zip-wallet .desktop-balance-number{font-size:clamp(43px,4.2vw,66px);font-weight:700;line-height:1.15;letter-spacing:-2px;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.zip-wallet .desktop-balance-currency{display:inline-flex;align-items:center;gap:7px;font-size:26px;font-weight:700;white-space:nowrap}
+.zip-wallet .desktop-currency-mark{position:relative;display:inline-block;width:31px;height:22px}
+.zip-wallet .desktop-currency-mark img{position:absolute;left:-33.484%;top:-51.124%;width:168.439%;height:197.753%;max-width:none}
+.zip-wallet .desktop-currency-symbol{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:8px;color:#2c2484;background:linear-gradient(125deg,#c7fff4,#e1ceff);font-size:20px}
+.zip-wallet .desktop-balance-toggle{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:38px;height:38px;margin-left:1px;padding:0;border:1px solid #e9faff9c;border-radius:50%;color:#27195c;background:#dbe7ff55;cursor:pointer}
+.zip-wallet .desktop-account-picker{height:44px;min-width:241px;margin-top:10px;padding:0 21px;font-size:15px;font-weight:600}
+.zip-wallet .desktop-account-picker>svg:last-child{margin-left:auto}
+.zip-wallet .desktop-quick-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px;width:min(100%,514px);margin-top:3px}
+.zip-wallet .desktop-quick-action{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-width:0;padding:0;border:0;background:none;color:#201245;font-size:14px;font-weight:600;cursor:pointer}
+.zip-wallet .desktop-action-disc{position:relative;isolation:isolate;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:54px;height:54px;color:#fff}
+.zip-wallet .desktop-action-disc:before,.zip-wallet .desktop-transaction-icon:before{content:"";position:absolute;z-index:-1;pointer-events:none;left:-21.27%;top:-22.86%;width:144.97%;height:143.31%;background:var(--shark-artifact-image-8) center/100% 100% no-repeat}
+.zip-wallet .desktop-quick-action:hover .desktop-action-disc{filter:brightness(1.12)}
+.zip-wallet .desktop-transactions{grid-area:transactions;align-self:start;min-height:210px;padding:15px 24px 13px}
+.zip-wallet .desktop-transactions-heading{display:flex;align-items:center;gap:10px;margin-bottom:7px}
+.zip-wallet .desktop-transactions-heading h2{margin:0;font-size:21px;line-height:1.25;font-weight:700;letter-spacing:-.4px}
+.zip-wallet .desktop-transactions-heading .badge{font-size:12px;padding:3px 7px;color:#fff;background:#7661ad9e;border-color:#d8d1ff65}
+.zip-wallet .desktop-text-link{display:inline-flex;align-items:center;justify-content:center;gap:3px;padding:4px 8px;border:1px solid #f0fcff9c;border-radius:14px;background:#f0f6ff70;color:#2a2052;font-size:12px;font-weight:600;cursor:pointer}
+.zip-wallet .desktop-transactions-heading>.desktop-text-link{margin-left:auto;white-space:nowrap}
+.zip-wallet .desktop-transaction-row{display:grid;grid-template-columns:36px minmax(0,1fr) 86px minmax(90px,125px) 14px;align-items:center;gap:11px;width:100%;min-height:48px;padding:4px 0;border:0;border-bottom:1px solid #f9fcffc7;color:#17113f;background:none;text-align:left;cursor:pointer}
+.zip-wallet .desktop-transaction-row:last-child{border-bottom:0}
+.zip-wallet .desktop-transaction-row:hover{background:#ffffff30;border-radius:12px}
+.zip-wallet .desktop-transaction-icon{position:relative;isolation:isolate;display:inline-flex;align-items:center;justify-content:center;width:33px;height:33px;color:#fff}
+.zip-wallet .desktop-transaction-copy{display:flex;flex-direction:column;min-width:0;gap:2px}
+.zip-wallet .desktop-transaction-copy>strong{font-size:14px;line-height:1.3;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zip-wallet .desktop-transaction-copy>small,.zip-wallet .desktop-transaction-row>time{font-size:12px;line-height:1.25;color:#51486f}
+.zip-wallet .desktop-transaction-row>time{white-space:nowrap;text-align:center}
+.zip-wallet .desktop-transaction-amount{font-size:14px;line-height:1.3;font-weight:700;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.zip-wallet .desktop-transaction-amount.is-positive{color:#126625}
+.zip-wallet .desktop-transaction-row>.lucide{opacity:.5}
+.zip-wallet .desktop-transaction-empty{display:flex;flex-wrap:wrap;align-items:center;gap:12px;min-height:113px;padding:10px 0;color:#39305b}
+.zip-wallet .desktop-transaction-empty>p{flex:1;min-width:180px;margin:0;font-size:14px;line-height:1.6}
+.zip-wallet .desktop-converter{grid-area:converter;min-width:0;padding:22px 21px 23px}
+.zip-wallet .desktop-converter-heading{display:flex;align-items:center;gap:14px;margin-bottom:13px}
+.zip-wallet .desktop-converter-heading .desktop-action-disc{width:48px;height:48px}
+.zip-wallet .desktop-converter-heading h2{margin:0;font-size:27px;line-height:1.2;font-weight:700;letter-spacing:-.6px}
+.zip-wallet .desktop-converter-heading p{margin:4px 0 0;font-size:14px;color:#463462}
+.zip-wallet .desktop-converter-mode{display:flex;align-items:center;gap:7px;justify-content:space-between;padding:5px;margin-bottom:12px;border:1px solid #edf9ffb8;border-radius:24px;background:#8988c626}
+.zip-wallet .desktop-converter-mode>span,.zip-wallet .desktop-converter-mode>button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:32px;border:0;border-radius:18px;font-size:13px;white-space:nowrap}
+.zip-wallet .desktop-converter-mode>span{flex:1;color:#fff;background:linear-gradient(116deg,#298cce,#653bc0 72%,#903ad0);box-shadow:0 0 7px #a4a9ff80}
+.zip-wallet .desktop-converter-mode>button{flex:1;padding:0 6px;background:transparent;color:#33215f;cursor:pointer}
+.zip-wallet .desktop-converter-mode>button:hover{background:#edf7ff71}
+.zip-wallet .desktop-converter-form .screen{padding:0;color:#1d1746;background:none}
+.zip-wallet .desktop-converter-form .screen>.screen-heading{display:none}
+.zip-wallet .desktop-converter-form .stack{gap:11px}
+.zip-wallet .desktop-converter-form .panel{padding:12px 13px;border:1px solid #eefaffd9;border-radius:18px;background:linear-gradient(123deg,#effaffc9,#dce8ffb8 58%,#e6daf8c4);box-shadow:inset 0 1px 5px #ffffffa6,0 3px 9px #5a62a91f}
+.zip-wallet .desktop-converter-form .panel:before{opacity:.17;border-radius:18px}
+.zip-wallet .desktop-converter-form .field{gap:5px;margin-bottom:6px}
+.zip-wallet .desktop-converter-form .field>span{color:#39275c;font-size:12px;font-weight:600}
+.zip-wallet .desktop-converter-form .field input,.zip-wallet .desktop-converter-form .field select{height:39px;min-height:39px;padding:7px 10px;border:1px solid #d4e9fa;border-radius:12px;font-size:14px;background:#f0f8ffbd;color:#201b49}
+.zip-wallet .desktop-converter-form .field input{font-size:22px;font-weight:700;letter-spacing:-.4px}
+.zip-wallet .desktop-converter-form .field:last-child{margin-bottom:0}
+.zip-wallet .desktop-converter-form .amount{margin:5px 0 7px;font-size:32px;line-height:1.2;font-weight:700;letter-spacing:-1px;overflow-wrap:anywhere}
+.zip-wallet .desktop-converter-form .micro{margin:4px 0;font-size:12px;line-height:1.45;color:#44345f}
+.zip-wallet .desktop-converter-form .badge{font-size:12px;padding:3px 6px;color:#443065;background:#bcb5dd55;border-color:#c4bee9}
+.zip-wallet .desktop-converter-form .button{min-height:42px;padding:10px 12px;border-radius:21px;font-size:14px}
+.zip-wallet .desktop-converter-form .button.primary{background:linear-gradient(113deg,#1c90cd,#5a37bd 55%,#872bd2);border-color:#d4f4ff;color:#fff;box-shadow:inset 0 1px 4px #e6e7ff83,0 0 9px #9374ff66}
+.zip-wallet .desktop-converter-form .screen>.stack>.demo-note{display:none}
+.zip-wallet .desktop-converter-form form>.panel:first-child{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(100px,.8fr);gap:4px 11px}
+.zip-wallet .desktop-converter-form form>.panel:first-child>.field:first-child{grid-column:1;grid-row:1;margin:0}
+.zip-wallet .desktop-converter-form form>.panel:first-child>.field:last-child{grid-column:2;grid-row:1;margin:0}
+.zip-wallet .desktop-converter-form form>.panel:first-child>.micro{grid-column:1/-1;grid-row:2;margin:2px 0 0}
+.zip-wallet .desktop-converter-form form>.panel:nth-child(2){display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 9px;align-items:center}
+.zip-wallet .desktop-converter-form form>.panel:nth-child(2)>.field{grid-column:1/-1;grid-row:1;margin:0}
+.zip-wallet .desktop-converter-form form>.panel:nth-child(2)>.micro:first-of-type{grid-column:1;grid-row:2;margin:4px 0}
+.zip-wallet .desktop-converter-form form>.panel:nth-child(2)>.amount{grid-column:2;grid-row:2;margin:4px 0;font-size:29px;text-align:right}
+.zip-wallet .desktop-converter-form form>.panel:nth-child(2)>.badge{display:none}
+.zip-wallet .desktop-converter-form form>.panel:nth-child(2)>.micro:last-of-type{grid-column:1/-1;grid-row:3;margin:2px 0 0}
+.zip-wallet .desktop-converter-note{position:relative;display:flex;align-items:center;gap:8px;margin:12px 0 0;padding:9px 10px;border:1px solid #c7d7f3;border-radius:12px;color:#30204f;background:#edf4fff2;font-size:13px;line-height:1.45;text-shadow:none}
+.zip-wallet .desktop-converter-note>svg{flex-shrink:0;color:#65449d}
+.zip-wallet .desktop-converter-form .form-error{font-size:12px;line-height:1.5;color:#9b2450}
+.zip-wallet .desktop-converter-gated{display:flex;flex-direction:column;align-items:flex-start;gap:14px;min-height:325px;padding:22px 15px;border:1px solid #eefaffc9;border-radius:21px;background:#ebf6ff8a}
+.zip-wallet .desktop-converter-gated>h3{margin:0;font-size:22px;line-height:1.3}
+.zip-wallet .desktop-converter-gated>p{margin:0 0 5px;font-size:14px;line-height:1.75;color:#473962}
+.zip-wallet .desktop-converter-gated>.button{width:100%}
+.zip-wallet .desktop-assistant-lane{grid-area:assistant;display:flex;justify-content:flex-end;align-items:center;min-height:58px;padding-right:2px}
+.zip-wallet .desktop-assistant-launcher{height:52px;min-width:252px;margin-right:0;padding:0 19px 0 55px;font-size:17px;white-space:nowrap;filter:drop-shadow(0 6px 10px #0a073c4d)}
+.zip-wallet .desktop-assistant-launcher>.desktop-shark-avatar{position:absolute;left:-13px;bottom:-2px;width:68px;height:68px}
+.zip-wallet .desktop-assistant-online{width:9px;height:9px;flex-shrink:0;margin-left:6px;border-radius:50%;background:#26f20c;box-shadow:0 0 5px #71ed5e6e}
+.zip-wallet .desktop-assistant-launcher>.lucide{margin-left:1px;opacity:.95}}@media(min-width:1024px)and (max-width:1200px){
+.zip-wallet .desktop-wallet-header{padding:17px 26px 24px}
+.zip-wallet .desktop-header-controls{gap:8px}
+.zip-wallet .desktop-header-control{min-width:90px;padding:0 12px;font-size:13px}
+.zip-wallet .desktop-header-search{width:175px;font-size:16px}
+.zip-wallet .desktop-header-tabs{gap:10px}
+.zip-wallet .desktop-header-tabs>button{min-width:124px;padding:0 16px;font-size:14px}
+.zip-wallet .desktop-wallet{padding:15px 23px 26px;grid-template-columns:minmax(0,1.86fr) minmax(326px,1fr);gap:16px}
+.zip-wallet .desktop-funds{padding:24px;min-height:340px}
+.zip-wallet .desktop-funds-copy{max-width:100%}
+.zip-wallet .desktop-funds-heading h1{font-size:23px}
+.zip-wallet .desktop-funds-art{left:47%;opacity:.72}
+.zip-wallet .desktop-transactions{padding:18px 19px 14px}
+.zip-wallet .desktop-transactions-heading h2{font-size:18px}
+.zip-wallet .desktop-transaction-row{grid-template-columns:32px minmax(0,1fr) 70px minmax(82px,100px);gap:8px}
+.zip-wallet .desktop-transaction-row>.lucide{display:none}
+.zip-wallet .desktop-converter{padding:20px 17px}}@media(prefers-reduced-motion:reduce){
+.zip-wallet .desktop-wallet-header *,.zip-wallet .desktop-wallet *{scroll-behavior:auto!important}}
+.zip-wallet .page-view .row-label strong,.zip-wallet .bottom-sheet .row-label strong{overflow-wrap:anywhere}
+.zip-wallet .account-picker-list{scrollbar-width:thin;scrollbar-color:#8671b670 transparent;padding-right:3px}
+.zip-wallet .account-picker-list>.row{gap:8px;border-bottom:1px solid #ffffff90}
+.zip-wallet .account-picker-list>.row:last-child{border-bottom:0}
+.zip-wallet .account-picker-list>.row>div>.item-row{display:grid;grid-template-columns:36px minmax(0,1fr);gap:3px 11px;padding:9px 0;border:0;background:none}
+.zip-wallet .account-picker-list .row-icon{grid-column:1;grid-row:1 / 3}
+.zip-wallet .account-picker-list .row-label{grid-column:2;grid-row:1}
+.zip-wallet .account-picker-list .row-label strong{overflow-wrap:break-word}
+.zip-wallet .account-picker-list .row-end{grid-column:2;grid-row:2;max-width:none}
+.zip-wallet .account-picker-list .row-end>.row{justify-content:flex-start;gap:8px}
+.zip-wallet .account-picker-list>.row>.button{width:40px;min-width:40px;min-height:40px;padding:0;flex-shrink:0}
+.zip-wallet .account-picker-list>.row>.button>span{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}@media(min-width:1024px){
+.zip-wallet .workspace.desktop-layout{display:block;min-height:100dvh;padding:0;background:#051321}
+.zip-wallet .app-shell.desktop-layout{width:100%;height:auto;min-height:100dvh;max-height:none;border-radius:0;overflow:visible;box-shadow:none;--u:calc(393px / 709)}
+.zip-wallet .desktop-layout>.landscape{position:fixed;inset:0;height:100dvh;background-size:100% 100%;background-position:center top}
+.zip-wallet .desktop-layout>.scene-shade{position:fixed;inset:0;background:linear-gradient(180deg,#050c2c35,#061b2e25 65%,#061224a6)}
+.zip-wallet .desktop-layout>.scroll-area{height:auto;min-height:100dvh;overflow:visible;overscroll-behavior:auto}
+.zip-wallet .desktop-layout .route-container{min-height:0}
+.zip-wallet .desktop-layout.page-view .page-context{max-width:1160px;margin:0 auto;padding:20px 28px 4px}
+.zip-wallet .desktop-layout.page-view .screen{max-width:1160px;margin:0 auto;padding:22px 28px 110px}
+.zip-wallet .desktop-layout.page-view .screen>.stack{gap:20px}
+.zip-wallet .desktop-layout .sheet-overlay{position:fixed;z-index:100;align-items:center;justify-content:center;padding:30px}
+.zip-wallet .desktop-layout .bottom-sheet{width:min(600px,100%);max-height:calc(100dvh - 60px);border-radius:28px}
+.zip-wallet .desktop-layout .bottom-sheet .screen{max-width:none;padding:18px 24px 32px}
+.zip-wallet .desktop-layout>.chat-launch.floating{position:fixed;right:34px;bottom:32px;z-index:90}
+.zip-wallet .desktop-layout>.toast{position:fixed;left:auto;right:28px;top:24px;width:min(430px,calc(100vw - 56px));z-index:150}}
+.zip-wallet{font-family:Manrope,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;font-synthesis:none;color:#f7f9ff;background:#040c1c;--ink:#102446;--muted:#60748f;--success:#126640;--violet:#6e31cc;--cyan:#a3e9ff;--glass:linear-gradient(122deg,rgba(26,115,178,.73) -12%,rgba(73,41,153,.8) 32%,rgba(111,41,177,.85) 79%,rgba(87,104,199,.8));--glow:0 0 13px #7a4dff6b,inset 0 1px 3px #ffffffba,inset 0 -1px 2px #ccd4ffb8}
+.zip-wallet *{box-sizing:border-box}
+.zip-wallet{margin:0}
+.zip-wallet button,.zip-wallet input,.zip-wallet select,.zip-wallet textarea{font:inherit}
+.zip-wallet button{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.zip-wallet button:disabled{cursor:not-allowed;opacity:.45}
+.zip-wallet button:focus-visible,.zip-wallet a:focus-visible,.zip-wallet input:focus-visible,.zip-wallet select:focus-visible,.zip-wallet textarea:focus-visible{outline:3px solid #c4ff65;outline-offset:4px}
+.zip-wallet button{color:inherit}
+.zip-wallet h1,.zip-wallet h2,.zip-wallet h3,.zip-wallet p{margin:0}
+.zip-wallet h1{font-size:27px;line-height:1.2;letter-spacing:-.9px}
+.zip-wallet h2{font-size:18px;letter-spacing:-.4px}
+.zip-wallet h3{font-size:16px}
+.zip-wallet a{color:#bfefff}
+.zip-wallet strong{font-weight:750}
+.zip-wallet small{font-size:12px}
+.zip-wallet svg{flex-shrink:0}
+.zip-wallet button svg{pointer-events:none}
+.zip-wallet .workspace{min-height:100dvh;display:flex;justify-content:center;align-items:center;padding:20px 270px 20px 20px;background:radial-gradient(ellipse at 25% 0,#19336e3b,transparent 60%),radial-gradient(ellipse at 100% 70%,#431c6633,transparent 50%),#030a17}
+.zip-wallet .app-shell{width:430px;height:calc(100dvh - 40px);max-height:960px;position:relative;overflow:hidden;border-radius:36px;isolation:isolate;box-shadow:0 30px 100px #000a,0 0 0 1px #bac9ff3d}
+.zip-wallet .landscape,.zip-wallet .scene-shade{position:absolute;inset:0;pointer-events:none;z-index:-2}
+.zip-wallet .landscape{background:#0c1720 url("/wallet-original/image-14.png") center center/cover no-repeat}
+.zip-wallet .scene-shade{z-index:-1;background:linear-gradient(180deg,#041c6766 0%,#02164b44 33%,transparent 48%,#07152020 80%,#040d2180 100%)}
+.zip-wallet .scroll-area{height:100%;overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
+.zip-wallet .scroll-area::-webkit-scrollbar{display:none}
+.zip-wallet .desktop-caption{position:fixed;left:calc(50% + 150px);width:190px;display:flex;flex-direction:column;gap:15px;color:#bdd4e5}
+.zip-wallet .desktop-caption strong{font-size:26px;color:#fff}
+.zip-wallet .desktop-caption span{font-size:16px;line-height:1.6}
+.zip-wallet .desktop-caption small{opacity:.6;line-height:1.6}
+.zip-wallet .home-header{height:145px;position:relative;padding:18px 16px 32px;border-bottom:1px solid #dccbff;border-radius:0 0 57% 15%/0 0 24% 12%;background:linear-gradient(161deg,#662fb6e8,#3c176dd9 48%,#192f76d1 80%,#3f1f82df);box-shadow:0 2px 7px #976effd0,inset 0 -2px 2px #eae8ffa8;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.zip-wallet .home-header:after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(154deg,transparent 10%,#bff7ff09 11%,#d3c4ff19 12%,transparent 19%,transparent 46%,#b1c9ff22 47%,#fff0 56%,#b4ebff25 84%,transparent 85%)}
+.zip-wallet .brand-line{display:flex;align-items:center;justify-content:space-between;font-weight:800;font-size:13px;margin:0 5px 14px;letter-spacing:.3px}
+.zip-wallet .brand-line>span>span,.zip-wallet .wordmark span{color:#91e5ff}
+.zip-wallet .prototype-label{font-size:9px;letter-spacing:1.5px;opacity:.65}
+.zip-wallet .top-toolbar{display:flex;align-items:center;gap:10px;position:relative;z-index:1}
+.zip-wallet .profile-button{border:0;padding:0;background:none;flex-shrink:0}
+.zip-wallet .shark-avatar{width:48px;height:48px;border-radius:50%;display:block;overflow:hidden;position:relative;border:1px solid #b6e7ff;background:radial-gradient(circle at 20% 20%,#0b77a7,transparent 60%),linear-gradient(135deg,#144a93,#5315a6);box-shadow:0 0 8px #a59fff,inset 0 0 3px #fff}
+.zip-wallet .shark-avatar img{position:absolute;width:160%;max-width:none;height:150%;object-fit:cover;object-position:center top;left:-28%;top:5%;transform:scale(1.07)}
+.zip-wallet .glass-pill,.zip-wallet .glass-circle,.zip-wallet .bottom-dock,.zip-wallet .button.primary{position:relative;isolation:isolate;background:var(--glass);border:1px solid #d3d0ff;box-shadow:var(--glow);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);color:#fff;overflow:hidden}
+.zip-wallet .glass-pill:before,.zip-wallet .glass-circle:before,.zip-wallet .bottom-dock:before,.zip-wallet .button.primary:before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(146deg,transparent 15%,#e9e9ff19 16%,#dffaff40 25%,transparent 26%,transparent 65%,#e0bbff1d 66%,#d0f6ff14 76%,transparent 77%);pointer-events:none}
+.zip-wallet .glass-pill:after,.zip-wallet .button.primary:after{content:"";position:absolute;top:-40%;left:-60%;width:35%;height:200%;background:linear-gradient(90deg,transparent,#ffffff2e,transparent);transform:rotate(28deg);animation:shimmer 10s 3s infinite;pointer-events:none}
+.zip-wallet .glass-pill{border-radius:999px;min-height:46px;padding:10px 20px;font-weight:700;display:inline-flex;gap:8px;align-items:center;justify-content:center}
+.zip-wallet .glass-circle{border-radius:50%;display:flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}
+.zip-wallet .search-button{height:49px;flex:1;justify-content:flex-start;font-size:21px;font-weight:500;padding:10px 15px;min-width:0}
+.zip-wallet .toolbar-icon{width:48px;height:48px}
+.zip-wallet .home{padding:24px 16px 116px}
+.zip-wallet .home-hero{text-align:center}
+.zip-wallet .account-label{font-size:20px;line-height:1.4;font-weight:500;text-shadow:0 2px 9px #000}
+.zip-wallet .home-balance{border:0;background:none;padding:10px 0 0;display:flex;align-items:baseline;justify-content:center;gap:9px;margin:0 auto;color:#fff;text-shadow:0 4px 20px #07101b66}
+.zip-wallet .home-balance>span{font-size:64px;line-height:1.15;font-weight:800;letter-spacing:-2.5px}
+.zip-wallet .home-balance small{font-size:39px;font-weight:750;letter-spacing:-1px}
+.zip-wallet .account-switch{margin-top:44px;min-width:143px;font-size:21px;height:48px;font-weight:700}
+.zip-wallet .home-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:31px}
+.zip-wallet .quick-action{display:flex;flex-direction:column;align-items:center;gap:9px;min-width:0;font-size:14px;font-weight:750;background:transparent;border:0;padding:0}
+.zip-wallet .quick-action>.glass-circle{width:58px;height:58px}
+.zip-wallet .quick-action>span:last-child{text-shadow:0 2px 6px #0007}
+.zip-wallet .home-chat-lane{height:88px;display:flex;justify-content:flex-end;align-items:center;padding-right:6px}
+.zip-wallet .chat-launch{width:59px;height:59px;position:relative;border:0;padding:0;background:none;z-index:9;transition:transform .2s}
+.zip-wallet .chat-launch:hover{transform:translateY(-3px)}
+.zip-wallet .chat-launch .shark-avatar{width:59px;height:59px}
+.zip-wallet .chat-mark{position:absolute;right:-3px;top:-5px;background:#f5f0ff;border-radius:9px;color:#562791;width:23px;height:18px;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 8px #00102760}
+.zip-wallet .online-dot{width:12px;height:12px;position:absolute;right:2px;bottom:2px;border:2px solid #1c5948;background:#63ff45;border-radius:50%;box-shadow:0 0 5px #70ff00}
+.zip-wallet .chat-launch.floating{position:absolute;right:18px;bottom:112px;width:48px;height:48px}
+.zip-wallet .floating .shark-avatar{width:48px;height:48px}
+.zip-wallet .home-demo{font-size:10px;letter-spacing:.1px;text-align:center;margin-top:12px;color:#d9e6faaa;text-shadow:0 1px 4px #000}
+.zip-wallet .panel{position:relative;isolation:isolate;border:1px solid #dff9ffe0;border-radius:23px;padding:18px;background:linear-gradient(123deg,#e6faffd6,#c4d5efd4 51%,#ccebf9da);color:var(--ink);box-shadow:inset 0 2px 6px #fff,0 0 11px #94ceff50,0 8px 22px #03153330;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
+.zip-wallet .panel:before{content:"";z-index:-1;position:absolute;inset:0;border-radius:inherit;opacity:.52;pointer-events:none;background:linear-gradient(121deg,#fff8 0 1%,transparent 1% 91%,#d5f5ff90 91% 92%,transparent 92%),linear-gradient(51deg,transparent 5%,#ffffff60 5.5% 6%,transparent 6.5% 96%,#fff7 96%),linear-gradient(165deg,#ffffff6b,transparent 20% 70%,#ddf5ff8f 91%,#fff8);-webkit-mask-image:linear-gradient(90deg,#000,transparent 25% 75%,#000),linear-gradient(#000,transparent 22% 80%,#000);mask-image:linear-gradient(90deg,#000,transparent 25% 75%,#000),linear-gradient(#000,transparent 22% 80%,#000)}
+.zip-wallet .panel .panel{background:#dbeeff8c}
+.zip-wallet .recent-panel{padding:11px 16px 10px;border-radius:25px}
+.zip-wallet .recent-heading{display:flex;align-items:center;gap:7px;margin:0 0 6px}
+.zip-wallet .recent-heading h2{font-size:16px;font-weight:800;letter-spacing:-.65px;white-space:nowrap}
+.zip-wallet .recent-heading .badge{font-size:9px;padding:3px 5px}
+.zip-wallet .see-all{display:flex;gap:2px;align-items:center;margin-left:auto;background:#f2f6ff9e;border:1px solid #fff;border-radius:999px;font-weight:750;font-size:11px;color:var(--ink);padding:5px 8px;white-space:nowrap}
+.zip-wallet .recent-row{display:flex;align-items:center;width:100%;gap:10px;border:0;border-top:1px solid #ffffff9c;background:none;color:var(--ink);padding:8px 0;text-align:left}
+.zip-wallet .recent-row:first-of-type{border-top:0}
+.zip-wallet .recent-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:var(--glass);border:1px solid #dff6ff;border-radius:50%;color:#fff;box-shadow:var(--glow)}
+.zip-wallet .recent-copy{display:flex;flex-direction:column;min-width:0}
+.zip-wallet .recent-copy strong{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px;letter-spacing:-.4px}
+.zip-wallet .recent-copy small{font-size:10px;color:#3d5774;line-height:1.6}
+.zip-wallet .recent-value{margin-left:auto;white-space:nowrap;font-size:14px;font-weight:800;letter-spacing:-.3px}
+.zip-wallet .positive{color:var(--success)}
+.zip-wallet .no-transactions{padding:20px 0;display:grid;gap:12px;font-size:13px}
+.zip-wallet .bottom-dock{position:absolute;bottom:18px;left:12px;right:12px;height:75px;border-radius:40px;display:flex;padding:5px;gap:0;z-index:20;box-shadow:0 0 14px #a4c7ff65,inset 0 1px 3px #ffffffbd,inset 0 -1px 3px #f0ccff,0 12px 25px #030d2b8a;background:linear-gradient(115deg,#185e9994 -10%,#53319eca 25%,#592894ce 70%,#7632afcb);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
+.zip-wallet .bottom-dock button{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;border:1px solid transparent;background:none;border-radius:31px;padding:4px 2px;color:#f6f1ff;font-size:10px;font-weight:750;position:relative}
+.zip-wallet .bottom-dock .selected{background:linear-gradient(140deg,#72c8ff58,#945df78a);border-color:#dff6ffc2;box-shadow:inset 0 1px 7px #eeedffb8,0 0 10px #b9a5f77a}
+.zip-wallet .bottom-dock span{white-space:nowrap}
+.zip-wallet .bottom-dock svg{filter:drop-shadow(0 1px 4px #3006604d)}
+.zip-wallet .page-toolbar{height:83px;padding:19px 19px 10px;display:flex;gap:12px;align-items:center;background:linear-gradient(125deg,#15385fb5,#54217aa6);border-bottom:1px solid #afbbff38;-webkit-backdrop-filter:blur(15px);backdrop-filter:blur(15px)}
+.zip-wallet .page-toolbar .glass-circle{height:38px;width:38px}
+.zip-wallet .wordmark{font-weight:800;font-size:19px}
+.zip-wallet .small-profile{margin-left:auto}
+.zip-wallet .page-toolbar>.badge{font-size:8px;padding:3px 5px;color:#d4eaff;background:#ffffff0d}
+.zip-wallet .screen{padding:25px 18px 142px}
+.zip-wallet .screen-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:23px}
+.zip-wallet .screen-heading p{line-height:1.6;margin-top:7px;color:#d0deeb;font-size:13px}
+.zip-wallet .screen-heading .button{font-size:12px;min-height:36px;padding:8px 11px;margin-top:0}
+.zip-wallet .stack{display:flex;flex-direction:column;gap:16px}
+.zip-wallet .row{display:flex;align-items:center;gap:10px}
+.zip-wallet .row>div:first-child{min-width:0}
+.zip-wallet .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.zip-wallet .stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.zip-wallet .muted{color:#c1d2e5;font-size:13px;line-height:1.6}
+.zip-wallet .panel .muted,.zip-wallet .item-row .muted{color:#536987}
+.zip-wallet .micro{font-size:11px;line-height:1.6}
+.zip-wallet .amount{font-size:32px;font-weight:800;letter-spacing:-1.2px;margin:13px 0}
+.zip-wallet .money{font-variant-numeric:tabular-nums;white-space:nowrap}
+.zip-wallet .section-title{font-size:17px;margin-bottom:10px}
+.zip-wallet .list{display:flex;flex-direction:column}
+.zip-wallet .item-row{display:flex;width:100%;gap:11px;align-items:center;min-width:0;padding:13px 12px;background:#e3f2ffdb;border:1px solid #f7fcff85;text-align:left;color:var(--ink);border-radius:17px}
+.zip-wallet .panel>.item-row,.zip-wallet .panel>.list>.item-row,.zip-wallet .panel .row>.item-row,.zip-wallet .panel>.list>.row .item-row{background:none;border:none;border-bottom:1px solid #ffffffa1;border-radius:0;padding-left:0;padding-right:0}
+.zip-wallet .panel>.item-row:last-child,.zip-wallet .panel>.list>.item-row:last-child{border-bottom:0}
+.zip-wallet .row-icon{display:flex;justify-content:center;align-items:center;flex-shrink:0;border-radius:13px;width:36px;height:36px;background:linear-gradient(145deg,#849be632,#d5b7fd77);color:#4a3893}
+.zip-wallet .row-label{min-width:0;display:flex;flex-direction:column;gap:4px;flex:1}
+.zip-wallet .row-label strong{font-size:14px;line-height:1.4}
+.zip-wallet .row-label small{font-size:11px;line-height:1.5;color:#586f8b;overflow-wrap:anywhere}
+.zip-wallet .row-end{flex-shrink:0;font-size:12px;font-weight:700;max-width:42%;overflow-wrap:anywhere}
+.zip-wallet .row-end .money{font-size:12px}
+.zip-wallet .item-row.clickable:hover{background:#e2e7ffb5}
+.zip-wallet .item-row.danger{color:#9c304d}
+.zip-wallet .badge{border-radius:999px;padding:4px 7px;display:inline-flex;align-items:center;white-space:nowrap;font-size:10px;font-weight:700;line-height:1.2;background:#7355c526;color:#5a348e;border:1px solid #b8a8e65b}
+.zip-wallet .badge.cyan,.zip-wallet .badge.info{background:#808ed229;color:#374c9d}
+.zip-wallet .badge.muted{color:#667a96}
+.zip-wallet .badge.success{color:#175e44;background:#76ca982b}
+.zip-wallet .demo-note{padding:10px 12px;border-radius:12px;font-size:11px;line-height:1.65;color:#c7dcf0;background:#08203983;border:1px solid #afc6e029}
+.zip-wallet .panel .demo-note{color:#475e7b;background:#fff4}
+.zip-wallet .form-error{font-size:13px;color:#ffb4bd;line-height:1.6}
+.zip-wallet .panel .form-error{color:#9a244b}
+.zip-wallet .button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:45px;border-radius:999px;border:1px solid #e3eaff91;padding:11px 18px;line-height:1.35;font-size:13px;font-weight:750;text-align:center;transition:transform .16s,box-shadow .16s}
+.zip-wallet .button:active,.zip-wallet .quick-action:active{transform:scale(.97)}
+.zip-wallet .button.secondary{color:#293d6a;background:linear-gradient(135deg,#e3f5fce6,#cbcff1e8);box-shadow:inset 0 1px 2px #fff,0 2px 8px #0001}
+.zip-wallet .button.ghost{background:#e9efff13;border-color:#b5c8e742;box-shadow:none;color:inherit}
+.zip-wallet .panel .button.ghost{background:#f1f6ff48;color:#543d96}
+.zip-wallet .button.danger{background:linear-gradient(130deg,#a02461,#66347c);color:#fff}
+.zip-wallet .field{display:flex;flex-direction:column;gap:8px;min-width:0;font-size:12px;font-weight:700}
+.zip-wallet .field input,.zip-wallet .field select,.zip-wallet .field textarea{width:100%;min-height:50px;border:1px solid #e7efffa3;border-radius:15px;background:#edf5ffeb;color:var(--ink);padding:13px 14px;font-size:15px;box-shadow:inset 0 2px 5px #4f59821f}
+.zip-wallet .field input::placeholder{color:#6e829e}
+.zip-wallet .field select{appearance:auto;padding-right:10px}
+.zip-wallet .field input[type=date]{min-width:0}
+.zip-wallet .field input:focus,.zip-wallet .field select:focus{border-color:#b4a2ff;outline-offset:2px}
+.zip-wallet .panel .field input,.zip-wallet .panel .field select{background:#f4f7ffbc}
+.zip-wallet .form-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:7px}
+.zip-wallet .form-actions .button{flex:1}
+.zip-wallet .segments{display:flex;gap:4px;padding:4px;border:1px solid #b7ceec56;background:#d3ddff26;border-radius:999px;overflow-x:auto;scrollbar-width:none}
+.zip-wallet .segments button{flex:1;white-space:nowrap;background:none;border:0;color:#d6e4f7;padding:10px 12px;font-size:12px;border-radius:999px;font-weight:650}
+.zip-wallet .segments button.active{background:linear-gradient(130deg,#1672a28f,#713bc6c9);box-shadow:inset 0 1px 2px #ffffff80,0 2px 8px #061a443d;color:#fff}
+.zip-wallet .panel .segments button{color:var(--ink)}
+.zip-wallet .panel .segments button.active{color:#fff}
+.zip-wallet .toggle-row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid #acc8e267;position:relative}
+.zip-wallet .toggle-row>span:first-child{flex:1;display:flex;flex-direction:column;gap:5px}
+.zip-wallet .toggle-row strong{font-size:13px}
+.zip-wallet .toggle-row small{font-size:11px;line-height:1.5;opacity:.75}
+.zip-wallet .toggle-row input{position:absolute;right:0;width:44px;height:25px;opacity:0;z-index:1;cursor:pointer}
+.zip-wallet .toggle-switch{width:43px;height:25px;border-radius:999px;background:#768ba6;position:relative;flex-shrink:0;transition:background .2s}
+.zip-wallet .toggle-switch:after{content:"";position:absolute;top:3px;left:3px;width:19px;height:19px;background:#fff;border-radius:50%;transition:transform .2s;box-shadow:0 1px 3px #0003}
+.zip-wallet .toggle-row input:checked+.toggle-switch{background:linear-gradient(90deg,#3471b9,#7638bd)}
+.zip-wallet .toggle-row input:checked+.toggle-switch:after{transform:translate(18px)}
+.zip-wallet .toggle-row input:focus-visible+.toggle-switch{outline:3px solid #81c9ff;outline-offset:3px}
+.zip-wallet .empty{text-align:center;display:flex;align-items:center;flex-direction:column;gap:13px;padding:24px 15px}
+.zip-wallet .empty h2{font-size:19px}
+.zip-wallet .empty-icon{width:64px;height:64px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#839bde33;color:#94d9ff}
+.zip-wallet .panel .empty-icon{color:#5742a0}
+.zip-wallet .empty .muted{font-size:13px}
+.zip-wallet .asset-avatar{width:45px;height:45px;background:linear-gradient(145deg,#c0f0ff88,#8b7ac38c);color:inherit;display:inline-flex;align-items:center;justify-content:center;font-size:22px;border-radius:50%}
+.zip-wallet .currency-tag{font-size:12px;font-weight:800;padding:6px 10px;background:#9ec5e933;border-radius:99px}
+.zip-wallet .cyan-text{color:#9fe7ff}
+.zip-wallet .card-chip{margin-top:16px;color:#cad9f1}
+.zip-wallet .card-demo-number{margin:12px 0 16px;letter-spacing:3px;font-size:17px}
+.zip-wallet .pin-panel{display:flex;align-items:center;justify-content:center;gap:16px;padding:25px;font-size:30px;letter-spacing:8px}
+.zip-wallet .chat-thread{display:flex;flex-direction:column;gap:13px;min-height:260px}
+.zip-wallet .chat-bubble{font-size:13px;line-height:1.65;border-radius:21px;max-width:90%;padding:14px 16px;white-space:pre-wrap}
+.zip-wallet .chat-bubble.assistant{align-self:flex-start;color:#1c3358;background:linear-gradient(120deg,#c7ecffdf,#d6cff1e0);border:1px solid #e5faff;box-shadow:inset 0 1px 2px #fff,0 4px 20px #553bcb25;border-bottom-left-radius:6px;-webkit-backdrop-filter:blur(15px);backdrop-filter:blur(15px)}
+.zip-wallet .chat-bubble.user{align-self:flex-end;color:#214111;background:linear-gradient(130deg,#dfff3e,#a3ff3c);box-shadow:0 0 14px #b7ff5173,inset 0 1px 2px #f5ffcc;border:1px solid #edffb4;border-bottom-right-radius:6px}
+.zip-wallet .chat-quick-actions{display:flex;flex-wrap:wrap;gap:8px}
+.zip-wallet .chat-quick-actions .button{padding:8px 11px;min-height:36px;font-size:11px}
+.zip-wallet .chat-composer{display:flex;gap:8px;align-items:center;border-radius:24px;padding:9px;background:var(--glass);border:1px solid #ddd3ff;box-shadow:var(--glow)}
+.zip-wallet .chat-composer input,.zip-wallet .chat-composer textarea{flex:1;min-width:0;border:0;background:#ecf5ffb8;color:var(--ink);border-radius:16px;padding:12px 14px;font-size:14px}
+.zip-wallet .chat-composer .button{padding:11px;flex-shrink:0}
+.zip-wallet .chat-composer .field{flex:1}
+.zip-wallet .chat-composer .field>span{display:none}
+.zip-wallet .sheet-overlay{position:absolute;inset:0;z-index:40;display:flex;align-items:flex-end}
+.zip-wallet .sheet-backdrop{position:absolute;inset:0;background:#020d216e;border:0;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.zip-wallet .bottom-sheet{position:relative;width:100%;max-height:84%;overflow:auto;border-radius:30px 30px 0 0;border:1px solid #b5b6ed;background:linear-gradient(150deg,#19344ff7,#352253f8);box-shadow:0 -10px 55px #03081785;animation:sheet-in .28s cubic-bezier(.2,.7,.2,1);padding-top:20px}
+.zip-wallet .bottom-sheet .screen{padding:16px 18px 35px}
+.zip-wallet .sheet-grip{position:absolute;top:9px;left:calc(50% - 20px);height:4px;width:40px;background:#cdd5e477;border-radius:4px}
+.zip-wallet .sheet-close{position:absolute;top:21px;right:17px;border:0;background:#d7e7ff1f;border-radius:50%;display:flex;padding:5px;z-index:1}
+.zip-wallet .bottom-sheet h1{font-size:23px;padding-right:25px}
+.zip-wallet .bottom-sheet .screen-heading{margin-bottom:20px}
+.zip-wallet .toast{position:absolute;z-index:100;top:88px;left:18px;right:18px;padding:13px 16px;background:#e1f2fff2;color:#163152;font-size:12px;line-height:1.5;border:1px solid #d3f4ff;box-shadow:0 8px 25px #020f3a66;border-radius:17px;display:flex;align-items:center;gap:10px;animation:fade-in .2s}
+.zip-wallet .route-container.forward{animation:page-in .22s ease-out}
+.zip-wallet .route-container.back,.zip-wallet .route-container.tab{animation:fade-in .18s ease-out}
+.zip-wallet .route-container{min-height:60%}
+.zip-wallet .panel p:not([class]){font-size:13px;line-height:1.7;margin-top:8px}
+.zip-wallet .panel h3{margin-bottom:6px}
+.zip-wallet .panel ul{padding-left:20px;font-size:13px;line-height:1.8}
+.zip-wallet .panel hr{border:0;border-top:1px solid #e7f4ff;margin:12px 0}
+.zip-wallet code{font-size:11px;overflow-wrap:anywhere;white-space:pre-wrap}
+.zip-wallet .success-icon{color:#46bc87}
+.zip-wallet .payment-review-summary{display:grid;gap:13px}@keyframes page-in{0%{opacity:0;transform:translate(14px)}to{opacity:1;transform:translate(0)}}@keyframes fade-in{0%{opacity:.2}to{opacity:1}}@keyframes sheet-in{0%{transform:translateY(80%);opacity:.5}to{transform:translateY(0);opacity:1}}@keyframes shimmer{0%,65%{left:-60%;opacity:0}70%{opacity:.9}87%,to{left:140%;opacity:0}}@media(max-width:720px){
+.zip-wallet .workspace{display:block;padding:0;background:#071521}
+.zip-wallet .app-shell{width:100%;height:100dvh;max-height:none;border-radius:0;box-shadow:none}
+.zip-wallet .desktop-caption{display:none}
+.zip-wallet .home-header{padding-top:max(18px,env(safe-area-inset-top));height:145px}
+.zip-wallet .bottom-dock{bottom:max(15px,env(safe-area-inset-bottom))}
+.zip-wallet .home{padding-top:clamp(23px,4.5dvh,47px)}
+.zip-wallet .account-switch{margin-top:clamp(32px,5.2dvh,48px)}
+.zip-wallet .home-chat-lane{height:clamp(76px,10dvh,102px)}
+.zip-wallet .page-toolbar{padding-top:max(19px,env(safe-area-inset-top))}}@media(max-width:380px){
+.zip-wallet .top-toolbar{gap:7px}
+.zip-wallet .toolbar-icon,.zip-wallet .shark-avatar{height:43px;width:43px}
+.zip-wallet .search-button{height:44px;font-size:18px;padding:10px 12px}
+.zip-wallet .home{padding-left:13px;padding-right:13px}
+.zip-wallet .recent-panel{padding:12px}
+.zip-wallet .recent-heading h2{font-size:14px}
+.zip-wallet .recent-heading{gap:5px}
+.zip-wallet .recent-heading .badge{font-size:8px}
+.zip-wallet .see-all{font-size:10px;padding:5px 6px}
+.zip-wallet .recent-copy strong,.zip-wallet .recent-value{font-size:13px}
+.zip-wallet .home-balance>span{font-size:57px}
+.zip-wallet .quick-action{font-size:12px}
+.zip-wallet .screen{padding-left:14px;padding-right:14px}
+.zip-wallet .row-end{max-width:38%}
+.zip-wallet .bottom-dock button{font-size:9px}}
+.zip-wallet .panel:before{background:var(--shark-artifact-image-10) center/100% 100% no-repeat;-webkit-mask-image:none;mask-image:none;opacity:.82;inset:-3px}
+.zip-wallet .recent-panel:before{opacity:1;inset:-4px}
+.zip-wallet .chat-composer.stack{flex-direction:row;gap:8px;align-items:center}
+.zip-wallet .chat-composer .field{min-width:0;flex:1}
+.zip-wallet .chat-composer .field>span{display:block;position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.zip-wallet .chat-composer>.button{width:43px;min-width:43px;height:43px;min-height:43px;padding:0;border-radius:50%}
+.zip-wallet .chat-composer>.button>span{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+.zip-wallet .chat-quick-actions{margin-top:8px}@media(max-width:720px){
+.zip-wallet .home-header{height:132px}
+.zip-wallet .home{padding-top:clamp(18px,3dvh,30px)}
+.zip-wallet .home-balance>span{font-size:clamp(52px,15vw,62px)}
+.zip-wallet .account-switch{margin-top:clamp(24px,4dvh,38px)}
+.zip-wallet .home-actions{margin-top:clamp(22px,3dvh,28px)}
+.zip-wallet .home-chat-lane{height:clamp(62px,8dvh,84px)}
+.zip-wallet .recent-row{padding-top:7px;padding-bottom:7px}}@media(prefers-reduced-motion:reduce){
+.zip-wallet *,.zip-wallet *:before,.zip-wallet *:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}@font-face{font-family:Shark Sans;src:url("/wallet-original/original-font-1.ttf") format("truetype");font-weight:400 500;font-style:normal;font-display:swap}@font-face{font-family:Shark Sans;src:url("/wallet-original/original-font-2.ttf") format("truetype");font-weight:600 900;font-style:normal;font-display:swap}
+.zip-wallet{font-family:Shark Sans,Arial,sans-serif;font-feature-settings:"locl" 0;--ink:#100e40;--success:#136524;--glass:linear-gradient(118deg,#155ba3c9,#411a8cce 43%,#750bc6dc)}
+.zip-wallet .workspace{padding:20px 250px 20px 20px}
+.zip-wallet .app-shell{width:393px;height:min(807.063px,calc(100dvh - 40px));max-height:none;container-type:inline-size;--u:calc(100cqw / 709);border-radius:30px}
+.zip-wallet .desktop-caption{left:calc(50% + 133px)}
+.zip-wallet .landscape{top:calc(-80 * var(--u));height:calc(1536 * var(--u));bottom:auto;background:#051a29 url("/wallet-original/image-15.png") center top/100% 100% no-repeat}
+.zip-wallet .scene-shade{background:none}
+.zip-wallet .home-header{height:calc(195 * var(--u));padding:calc(20 * var(--u)) calc(31 * var(--u)) 0;border:0;border-radius:0;background:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;isolation:isolate}
+.zip-wallet .home-header:after{inset:auto auto auto 0;top:calc(-80 * var(--u));width:100%;height:calc(275 * var(--u));background:url("/wallet-original/image-16.png") center/100% 100% no-repeat;z-index:-1;border-radius:0}
+.zip-wallet .top-toolbar{gap:calc(18 * var(--u));height:calc(88 * var(--u))}
+.zip-wallet .profile-button{width:calc(86 * var(--u));height:calc(86 * var(--u))}
+.zip-wallet .shark-avatar{width:100%;height:100%;overflow:visible;border:0;background:none;box-shadow:none;isolation:isolate}
+.zip-wallet .shark-avatar img{width:128.615%;height:127.439%;left:-13.128%;top:-13.72%;object-fit:fill;transform:none}
+.zip-wallet .reference-avatar-exact{overflow:hidden;border-radius:50%;filter:drop-shadow(0 0 2px #6ecfff)}
+.zip-wallet .reference-avatar-exact img{max-width:none;width:779.121%;height:1687.912%;left:-31.868%;top:-106.593%;object-fit:fill}
+.zip-wallet .glass-pill,.zip-wallet .glass-circle,.zip-wallet .bottom-dock{background:none;border:0;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;overflow:visible;isolation:isolate}
+.zip-wallet .glass-pill:before,.zip-wallet .glass-circle:before,.zip-wallet .bottom-dock:before{content:"";position:absolute;z-index:-1;pointer-events:none;background-repeat:no-repeat;background-position:center;background-size:100% 100%;border-radius:0;opacity:1}
+.zip-wallet .glass-pill:before{inset:-22.4% auto auto -2.312%;width:104.624%;height:144.8%;background-image:var(--shark-artifact-image-3)}
+.zip-wallet .glass-pill:after{display:none}
+.zip-wallet .glass-circle:before{inset:-22.86% auto auto -21.27%;width:144.97%;height:143.31%;background-image:var(--shark-artifact-image-8)}
+.zip-wallet .search-button{height:calc(84 * var(--u));min-height:0;min-width:0;flex:1;gap:calc(20 * var(--u));padding:0 calc(25 * var(--u));font-size:calc(33 * var(--u));line-height:1;font-weight:400;letter-spacing:0}
+.zip-wallet .search-button svg{width:calc(39 * var(--u));height:calc(39 * var(--u));stroke-width:2.5}
+.zip-wallet .toolbar-icon{height:calc(84 * var(--u));width:calc(84 * var(--u))}
+.zip-wallet .toolbar-icon svg{width:calc(43 * var(--u));height:calc(43 * var(--u));stroke-width:3.2}
+.zip-wallet .home{padding:calc(70 * var(--u)) calc(28 * var(--u)) calc(231 * var(--u)) calc(29 * var(--u))}
+.zip-wallet .account-label{font-size:calc(34 * var(--u));line-height:calc(44 * var(--u));font-weight:400;letter-spacing:0;text-shadow:0 1px 5px #0006;white-space:nowrap}
+.zip-wallet .account-label span{font-family:"Noto Color Emoji","Apple Color Emoji",sans-serif;font-size:calc(32 * var(--u));vertical-align:baseline}
+.zip-wallet .home-balance{padding:0;margin:calc(12 * var(--u)) auto 0;gap:calc(12 * var(--u));height:calc(112 * var(--u));text-shadow:0 2px 8px #03102050}
+.zip-wallet .home-balance>span{font-size:calc(100 * var(--u));line-height:calc(112 * var(--u));font-weight:700;letter-spacing:0}
+.zip-wallet .home-balance small{font-size:calc(62 * var(--u));line-height:1;font-weight:700;letter-spacing:calc(-1 * var(--u))}
+.zip-wallet .account-switch{display:flex;min-height:0;min-width:0;width:calc(230 * var(--u));height:calc(82 * var(--u));padding:0;margin:calc(71 * var(--u)) auto 0;font-size:calc(35 * var(--u));line-height:1;font-weight:400;letter-spacing:0}
+.zip-wallet .account-switch:before{left:-6.082%;top:-19.964%;width:113.025%;height:135.935%;background-image:var(--shark-artifact-image-13)}
+.zip-wallet .home-actions{margin-top:calc(51 * var(--u));grid-template-columns:repeat(4,minmax(0,1fr));gap:0}
+.zip-wallet .quick-action{font-size:calc(26 * var(--u));line-height:calc(34 * var(--u));font-weight:500;letter-spacing:0;gap:calc(9 * var(--u));padding:0;white-space:nowrap}
+.zip-wallet .quick-action>.glass-circle{width:calc(98 * var(--u));height:calc(98 * var(--u))}
+.zip-wallet .quick-action svg{width:calc(45 * var(--u));height:calc(45 * var(--u));stroke-width:2.8}
+.zip-wallet .quick-action>span:last-child{text-shadow:0 2px 5px #0009}
+.zip-wallet .home-chat-lane{height:calc(157 * var(--u));padding-right:calc(18 * var(--u));align-items:center}
+.zip-wallet .chat-launch,.zip-wallet .chat-launch .shark-avatar{width:calc(105 * var(--u));height:calc(105 * var(--u))}
+.zip-wallet .chat-mark{right:calc(-4 * var(--u));top:calc(-6 * var(--u));width:calc(35 * var(--u));height:calc(27 * var(--u));border-radius:calc(12 * var(--u));background:#fff8ff;color:#5f2391;box-shadow:0 0 8px #a497ff66}
+.zip-wallet .chat-mark:after{content:"";position:absolute;left:4px;bottom:-3px;width:6px;height:6px;background:inherit;clip-path:polygon(0 0,100% 0,0 100%)}
+.zip-wallet .chat-mark svg{width:calc(29 * var(--u));height:calc(23 * var(--u));stroke-width:3.5}
+.zip-wallet .online-dot{right:calc(5 * var(--u));bottom:calc(8 * var(--u));width:calc(21 * var(--u));height:calc(21 * var(--u));border:calc(2 * var(--u)) solid #174e53;background:#26f20c;box-shadow:0 0 4px #51ef2870}
+.zip-wallet .recent-panel{height:calc(287 * var(--u));padding:calc(17 * var(--u)) calc(25 * var(--u)) calc(12 * var(--u)) calc(35 * var(--u));border:0;border-radius:calc(40 * var(--u));background:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;color:#0b073d}
+.zip-wallet .recent-panel:before{inset:-8.587% auto auto -1.527%;width:103.108%;height:115.235%;border-radius:0;opacity:1;background:url("/wallet-original/image-17.png") center/100% 100% no-repeat}
+.zip-wallet .recent-heading{height:calc(40 * var(--u));gap:calc(15 * var(--u));margin:0 0 calc(8 * var(--u));align-items:center}
+.zip-wallet .recent-heading h2{font-size:calc(29 * var(--u));line-height:1;font-weight:700;letter-spacing:calc(-.7 * var(--u))}
+.zip-wallet .recent-heading .badge{border:0;color:#fff;background:#7b6fcc91;border-radius:calc(16 * var(--u));padding:calc(4 * var(--u)) calc(9 * var(--u));font-weight:400;font-size:calc(17 * var(--u));line-height:1}
+.zip-wallet .see-all{padding:calc(5 * var(--u)) calc(14 * var(--u));font-size:calc(19 * var(--u));line-height:1.4;gap:0;font-weight:500;color:#160f43;background:#edf5fd8a;border:calc(1 * var(--u)) solid #faffffb8}
+.zip-wallet .see-all svg{height:calc(21 * var(--u));width:calc(17 * var(--u));stroke-width:2}
+.zip-wallet .recent-row{position:relative;height:calc(70 * var(--u));padding:0;gap:calc(25 * var(--u));border:0;color:inherit}
+.zip-wallet .recent-row:after{content:"";position:absolute;left:calc(69 * var(--u));right:0;bottom:0;height:calc(1 * var(--u));background:#ffffffa6}
+.zip-wallet .recent-row:last-child:after{display:none}
+.zip-wallet .recent-icon{position:relative;isolation:isolate;width:calc(64 * var(--u));height:calc(64 * var(--u));background:none;border:0;box-shadow:none}
+.zip-wallet .recent-icon:before{content:"";position:absolute;left:-21.27%;top:-22.86%;width:144.97%;height:143.31%;background:var(--shark-artifact-image-8) center/100% 100% no-repeat;z-index:-1}
+.zip-wallet .recent-icon svg{width:calc(38 * var(--u));height:calc(38 * var(--u));stroke-width:1.6}
+.zip-wallet .recent-copy{gap:0}
+.zip-wallet .recent-copy strong{max-width:calc(300 * var(--u));font-size:calc(25 * var(--u));line-height:calc(31 * var(--u));font-weight:700;letter-spacing:calc(-.6 * var(--u))}
+.zip-wallet .recent-copy small{font-size:calc(20 * var(--u));line-height:calc(26 * var(--u));color:#242051;letter-spacing:calc(-.2 * var(--u))}
+.zip-wallet .recent-value{font-size:calc(27 * var(--u));line-height:1;font-weight:700;letter-spacing:0;margin-left:auto}
+.zip-wallet .positive{color:#126625}
+.zip-wallet .bottom-dock{height:calc(123 * var(--u));left:calc(20 * var(--u));right:calc(20 * var(--u));bottom:calc(46 * var(--u));padding:calc(10 * var(--u)) calc(10 * var(--u));border-radius:calc(64 * var(--u));background:none;box-shadow:none;gap:0}
+.zip-wallet .bottom-dock:before{inset:-40.1% auto auto -1.669%;width:103.576%;height:181.45%;background-image:var(--shark-artifact-image-14)}
+.zip-wallet .bottom-dock button{border:0;border-radius:calc(55 * var(--u));padding:calc(7 * var(--u)) 0;gap:calc(7 * var(--u));font-size:calc(19 * var(--u));line-height:calc(25 * var(--u));font-weight:400;isolation:isolate}
+.zip-wallet .bottom-dock svg{width:calc(41 * var(--u));height:calc(41 * var(--u));stroke-width:2;filter:none}
+.zip-wallet .bottom-dock .selected{background:none;border:0;box-shadow:none}
+.zip-wallet .bottom-dock .selected:before{content:"";position:absolute;z-index:-1;pointer-events:none;left:-7.655%;top:-27.552%;width:117.647%;height:150.629%;background:var(--shark-artifact-image-15) center/100% 100% no-repeat}
+.zip-wallet .page-toolbar{background:linear-gradient(112deg,#142d6fa6,#371369d6 55%,#530d8cd6)}
+.zip-wallet .page-toolbar .glass-circle{isolation:isolate}
+.zip-wallet .chat-launch.floating .shark-avatar{width:48px;height:48px}
+.zip-wallet .screen .button.primary{background-image:linear-gradient(117deg,#1260abda,#43178fd9 46%,#7220bde8)}
+.zip-wallet .home-view .route-container{animation:none}
+.zip-wallet .home-balance{transform:translateY(calc(-14 * var(--u)))}
+.zip-wallet .account-label .currency-emoji{display:inline-block;position:relative;width:calc(38 * var(--u));height:calc(27 * var(--u));vertical-align:calc(-3 * var(--u));isolation:isolate}
+.zip-wallet .currency-emoji img{position:absolute;left:-33.484%;top:-51.124%;width:168.439%;height:197.753%}
+.zip-wallet .toolbar-icon .lucide-chart-no-axes-column{stroke-width:4.2}
+.zip-wallet .toolbar-icon .lucide-credit-card{stroke-width:2.5}
+.zip-wallet .toolbar-icon .lucide-credit-card rect{fill:#fff;stroke:#fff}
+.zip-wallet .toolbar-icon .lucide-credit-card line{stroke:#59239f;stroke-width:3}
+.zip-wallet .quick-action .lucide-landmark polygon{fill:#fff;stroke-width:2}
+.zip-wallet .quick-action .lucide-landmark line{stroke-width:3}
+.zip-wallet .quick-action .lucide-ellipsis circle{fill:#fff;stroke:#fff;stroke-width:1.5}
+.zip-wallet .bottom-dock .lucide-arrow-right-left{stroke-width:3}
+.zip-wallet .bottom-dock .lucide-chart-no-axes-combined{stroke-width:2.4}
+.zip-wallet .bottom-dock .lucide-bitcoin{transform:rotate(-10deg);stroke-width:2.7}
+.zip-wallet .bottom-dock .lucide-shield-plus path:first-child{fill:#fff;stroke:#fff}
+.zip-wallet .bottom-dock .lucide-shield-plus path:not(:first-child){stroke:#603098;stroke-width:2.8}
+.zip-wallet .bottom-dock button.selected{flex:0 0 calc(139 * var(--u))}
+.zip-wallet .quick-action .reference-bank{width:calc(43 * var(--u));height:calc(43 * var(--u))}
+.zip-wallet .recent-icon .reference-coffee{width:calc(39 * var(--u));height:calc(39 * var(--u))}
+.zip-wallet .recent-icon .reference-bag{width:calc(33 * var(--u));height:calc(36 * var(--u))}
+.zip-wallet .bottom-dock .reference-bitcoin{height:calc(46 * var(--u));width:calc(46 * var(--u))}
+.zip-wallet .bottom-dock .reference-more{height:calc(38 * var(--u));width:calc(38 * var(--u))}
+.zip-wallet .bottom-dock button{display:grid;grid-template-rows:calc(44 * var(--u)) calc(25 * var(--u));gap:calc(4 * var(--u));justify-items:center;align-content:center;align-items:center}@media(max-width:720px){
+.zip-wallet .workspace{padding:0}
+.zip-wallet .app-shell{width:100%;height:100dvh;max-height:none;border-radius:0}
+.zip-wallet .home-header{height:calc(195 * var(--u));padding-top:calc(20 * var(--u))}
+.zip-wallet .home{padding-top:calc(70 * var(--u))}
+.zip-wallet .bottom-dock{bottom:max(calc(46 * var(--u)),env(safe-area-inset-bottom))}}@media(max-width:720px)and (max-height:760px){
+.zip-wallet .home-header{height:calc(175 * var(--u))}
+.zip-wallet .home{padding-top:calc(45 * var(--u))}
+.zip-wallet .account-switch{margin-top:calc(20 * var(--u))}
+.zip-wallet .home-actions{margin-top:calc(35 * var(--u))}
+.zip-wallet .home-chat-lane{height:calc(120 * var(--u))}}
+.zip-wallet .page-view .page-context{display:flex;align-items:center;gap:9px;padding:8px 20px 0;min-height:46px;color:#fff}
+.zip-wallet .page-back{display:inline-flex;align-items:center;gap:8px;padding:0;border:0;background:none;color:#fff;font-size:12px;line-height:1}
+.zip-wallet .page-back>.glass-circle{width:34px;height:34px}
+.zip-wallet .page-context-brand{margin-left:auto;font-size:13px;letter-spacing:.3px;font-weight:700;text-shadow:0 1px 5px #02101f}
+.zip-wallet .page-context-brand>span{color:#8dedff}
+.zip-wallet .page-context>.badge{font-size:8px;letter-spacing:.8px;color:#e8ddff;border-color:#c5b0ff50;background:#6939a246;padding:3px 6px}
+.zip-wallet .page-view .screen{padding:18px 20px 145px}
+.zip-wallet .page-view .screen-heading{gap:12px;margin-bottom:22px}
+.zip-wallet .page-view .screen-heading h1{font-size:27px;line-height:1.2;letter-spacing:-.55px;font-weight:700;color:#fff;text-shadow:0 2px 10px #031526}
+.zip-wallet .page-view .screen-heading p{font-size:12px;line-height:1.6;color:#dce9f4;text-shadow:0 1px 6px #031526}
+.zip-wallet .page-view .screen-heading>.button{flex-shrink:0;margin-top:2px}
+.zip-wallet .page-view .stack{gap:18px}
+.zip-wallet .page-view .panel,.zip-wallet .bottom-sheet .panel{border:1px solid #e3faffb0;border-radius:24px;padding:18px;color:#100e40;background:linear-gradient(132deg,#d5f0ffef,#d9e5f2ed 50%,#bfddeff2);box-shadow:inset 0 1px 4px #fff,0 0 10px #81daff50,0 8px 20px #03122130;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.zip-wallet .page-view .panel:before,.zip-wallet .bottom-sheet .panel:before{inset:-5px;opacity:.92;border-radius:inherit;background-image:url("/wallet-original/image-18.png");background-repeat:no-repeat;background-size:100% 100%;-webkit-mask-image:none;mask-image:none}
+.zip-wallet .page-view .panel .panel,.zip-wallet .bottom-sheet .panel .panel{background:#d7edfaad;border-color:#effcff80;box-shadow:inset 0 1px 3px #fff8}
+.zip-wallet .page-view .panel .panel:before,.zip-wallet .bottom-sheet .panel .panel:before{opacity:.35}
+.zip-wallet .page-view .panel .muted,.zip-wallet .bottom-sheet .panel .muted{color:#353d69}
+.zip-wallet .page-view .section-title{font-size:17px;font-weight:700;line-height:1.35;letter-spacing:-.3px}
+.zip-wallet .page-view .amount{font-size:36px;letter-spacing:-1px;font-weight:700}
+.zip-wallet .page-view .item-row,.zip-wallet .bottom-sheet .item-row{border-radius:19px;background:linear-gradient(125deg,#d5eff9ec,#d2ddf2ed);border:1px solid #ebfcff99;color:#131141;min-height:62px}
+.zip-wallet .page-view .panel>.item-row,.zip-wallet .page-view .panel>.list>.item-row,.zip-wallet .page-view .panel .row>.item-row,.zip-wallet .page-view .panel>.list>.row .item-row,.zip-wallet .bottom-sheet .panel>.list>.item-row,.zip-wallet .bottom-sheet .panel>.item-row{border-radius:0;border:0;border-bottom:1px solid #ffffffa0;background:none}
+.zip-wallet .page-view .panel>.item-row:last-child,.zip-wallet .page-view .panel>.list>.item-row:last-child,.zip-wallet .bottom-sheet .panel>.list>.item-row:last-child,.zip-wallet .bottom-sheet .panel>.item-row:last-child{border-bottom:0}
+.zip-wallet .page-view .item-row.clickable:hover,.zip-wallet .bottom-sheet .item-row.clickable:hover{background:#fff3}
+.zip-wallet .page-view .row-icon,.zip-wallet .bottom-sheet .row-icon{position:relative;isolation:isolate;width:36px;height:36px;border-radius:50%;background:none;color:#fff}
+.zip-wallet .page-view .row-icon:before,.zip-wallet .bottom-sheet .row-icon:before{content:"";z-index:-1;pointer-events:none;position:absolute;left:-21.27%;top:-22.86%;width:144.97%;height:143.31%;background:var(--shark-artifact-image-8) center/100% 100% no-repeat}
+.zip-wallet .page-view .row-icon svg,.zip-wallet .bottom-sheet .row-icon svg{width:21px;height:21px;stroke-width:1.8}
+.zip-wallet .page-view .row-label strong,.zip-wallet .bottom-sheet .row-label strong{font-size:14px;line-height:1.4;font-weight:700;letter-spacing:-.2px}
+.zip-wallet .page-view .row-label small,.zip-wallet .bottom-sheet .row-label small{font-size:11px;color:#39456b;line-height:1.5}
+.zip-wallet .page-view .row-end,.zip-wallet .bottom-sheet .row-end{font-size:12px;font-weight:700}
+.zip-wallet .page-view .item-row.danger,.zip-wallet .bottom-sheet .item-row.danger{color:#8a275c}
+.zip-wallet .page-view .button.primary,.zip-wallet .page-view .button.secondary,.zip-wallet .bottom-sheet .button.primary,.zip-wallet .bottom-sheet .button.secondary{position:relative;isolation:isolate;background:none;border:0;box-shadow:none;overflow:visible;-webkit-backdrop-filter:none;backdrop-filter:none;color:#fff;min-height:45px;padding:11px 17px;font-size:13px;line-height:1.4;font-weight:600}
+.zip-wallet .page-view .button.primary:before,.zip-wallet .page-view .button.secondary:before,.zip-wallet .bottom-sheet .button.primary:before,.zip-wallet .bottom-sheet .button.secondary:before{content:"";position:absolute;z-index:-1;pointer-events:none;inset:-22.4% auto auto -2.312%;width:104.624%;height:144.8%;border-radius:0;opacity:1;background:var(--shark-artifact-image-3) center/100% 100% no-repeat}
+.zip-wallet .page-view .button.primary:after,.zip-wallet .bottom-sheet .button.primary:after{display:none}
+.zip-wallet .page-view .button.secondary:before,.zip-wallet .bottom-sheet .button.secondary:before{filter:saturate(.8) brightness(.94)}
+.zip-wallet .page-view .button.ghost,.zip-wallet .bottom-sheet .button.ghost{background:#f5f4ff19;border:1px solid #d1c2ff7a;color:inherit;box-shadow:inset 0 1px 2px #ffffff45}
+.zip-wallet .page-view .panel .button.ghost,.zip-wallet .bottom-sheet .panel .button.ghost{color:#35216b;background:#eef5ff4f;border-color:#8b8ac658}
+.zip-wallet .page-view .button.danger,.zip-wallet .bottom-sheet .button.danger{background:linear-gradient(115deg,#782d6e,#4d1d82);border:1px solid #e5a7e2a0;box-shadow:inset 0 1px 3px #f2c2ff70,0 0 8px #bb5bd947}
+.zip-wallet .page-view .segments,.zip-wallet .bottom-sheet .segments{padding:5px;border:1px solid #d9e3ff80;background:#cedef930;box-shadow:inset 0 1px 3px #ecf9ff6e}
+.zip-wallet .page-view .segments button,.zip-wallet .bottom-sheet .segments button{font-size:12px;font-weight:600}
+.zip-wallet .page-view .segments button.active,.zip-wallet .bottom-sheet .segments button.active{background:var(--shark-artifact-image-3) center/108% 146% no-repeat;color:#fff;box-shadow:none}
+.zip-wallet .page-view .panel .segments button:not(.active),.zip-wallet .bottom-sheet .panel .segments button:not(.active){color:#282351}
+.zip-wallet .page-view .field input,.zip-wallet .page-view .field select,.zip-wallet .page-view .field textarea,.zip-wallet .bottom-sheet .field input,.zip-wallet .bottom-sheet .field select{background:linear-gradient(120deg,#e3f5ffe8,#d6d8f2ed);border:1px solid #f6ffffdf;box-shadow:inset 0 2px 8px #53499514,0 0 5px #c6efff30;color:#151541;border-radius:16px;min-height:49px;font-size:15px}
+.zip-wallet .page-view .field input::placeholder,.zip-wallet .bottom-sheet .field input::placeholder{color:#6a6e92}
+.zip-wallet .page-view .field input:focus,.zip-wallet .page-view .field select:focus,.zip-wallet .bottom-sheet .field input:focus,.zip-wallet .bottom-sheet .field select:focus{border-color:#b78eff;outline:2px solid #9b7dfaaa;outline-offset:1px}
+.zip-wallet .page-view .toggle-switch,.zip-wallet .bottom-sheet .toggle-switch{box-shadow:inset 0 1px 3px #fff6,0 0 5px #b8bbff60;border:1px solid #eef9ff80}
+.zip-wallet .page-view .toggle-row input:checked+.toggle-switch,.zip-wallet .bottom-sheet .toggle-row input:checked+.toggle-switch{background:linear-gradient(120deg,#276db0,#7230bd 68%)}
+.zip-wallet .page-view .demo-note{color:#d8e9fb;background:linear-gradient(110deg,#102b4cb3,#2c1b58b3);border:1px solid #c3d4fb40;border-radius:16px}
+.zip-wallet .page-view .panel .demo-note{color:#3d4068;background:#edf8ff52;border-color:#b5bbdc88}
+.zip-wallet .page-view .empty-icon{background:var(--shark-artifact-image-8) center/145% 143% no-repeat;color:#fff;box-shadow:none}
+.zip-wallet .page-view .asset-avatar{color:#fff;background:var(--shark-artifact-image-8) center/145% 143% no-repeat;font-size:19px;border-radius:50%}
+.zip-wallet .bottom-sheet{background:linear-gradient(160deg,#201349f5,#07334ced);border-color:#ccefffbd;box-shadow:0 -3px 20px #7c6dff66,inset 0 1px 3px #e8dfff}
+.zip-wallet .bottom-sheet .screen-heading h1{font-size:25px;color:#fff;text-shadow:0 1px 8px #161133}
+.zip-wallet .bottom-sheet .screen-heading p{color:#d5dff3}
+.zip-wallet .bottom-sheet .sheet-close{background:linear-gradient(130deg,#28659ec9,#7432b9db);color:#fff;border:1px solid #ddd1ff9c;box-shadow:0 0 8px #9672ff4f}@media(max-width:380px){
+.zip-wallet .page-view .screen,.zip-wallet .page-view .page-context{padding-left:17px;padding-right:17px}
+.zip-wallet .page-view .screen-heading h1{font-size:25px}
+.zip-wallet .page-view .panel,.zip-wallet .bottom-sheet .panel{padding:16px}
+.zip-wallet .page-view .row-end{max-width:38%}
+.zip-wallet .page-view .button.primary,.zip-wallet .page-view .button.secondary{padding-left:13px;padding-right:13px;font-size:12px}
+.zip-wallet .page-view .grid-2{gap:12px}}
+.zip-wallet{margin:0;min-height:100%;background:#051624}
+.zip-wallet{overflow:hidden}
+.zip-wallet .workspace{padding:0;min-height:100vh;min-height:100dvh}
+.zip-wallet .desktop-caption{display:none}
+.zip-wallet .app-shell{height:100vh;height:100dvh;max-height:none;border-radius:0}@keyframes artifact-notice-delay{to{opacity:1;pointer-events:auto}}@media(min-width:1024px){
+.zip-wallet{overflow:auto}
+.zip-wallet .app-shell.desktop-layout{height:auto;min-height:100dvh}}@supports not (width:1cqw){
+.zip-wallet .app-shell{--u:calc(393px / 709)}@media(max-width:720px){
+.zip-wallet .app-shell{--u:calc(100vw / 709)}}}
+
+/* The ZIP crops the header artwork from its reference bitmap. This file contains
+   only that original artwork, so the interactive scene uses a normal image. */
+.zip-wallet .desktop-shark-avatar img.wallet-avatar-crop,
+.zip-wallet .reference-avatar-exact img.wallet-avatar-crop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
-.sw-root .module-wallet-form { display:grid; gap:.6rem; color:#deebf7; }
-.sw-root .module-wallet-form :is(input,select,textarea) { color:#132d42; background:#f0f8ff; padding:.44rem .6rem; border-radius:.45rem; }
-.sw-root .sw-stack>.module-wallet-panel { padding:1rem; border-radius:1rem; color:#0d263e; }
-.sw-root .sw-stack>.module-wallet-panel :is(h2,h3) { font-weight:650; }
-@media(max-width:699px) {
-  .sw-shell { padding:0 .9rem calc(5.9rem + env(safe-area-inset-bottom)); }
-  .sw-header { min-height:60px; }
-  .sw-wordmark { font-size:.8rem; gap:.27rem; }.sw-wordmark i { margin:0 .17rem; }
-  .sw-return { font-size:.79rem; }
-  .sw-navigation { padding:.42rem .35rem calc(.42rem + env(safe-area-inset-bottom)); flex-wrap:nowrap; gap:0; position:fixed;
-    bottom:0; left:0; right:0; z-index:10; margin:0; background:#0b1725fa; border-top:1px solid #304151; }
-  .sw-nav-item { flex:1 1 0; min-width:0; flex-direction:column; justify-content:center; gap:.18rem; min-height:47px; padding:.28rem; border-radius:.72rem; font-size:.69rem; }
-  .sw-nav-item svg { width:1.13rem; height:1.13rem; }
-  .sw-main { padding-top:.95rem; }
-  .sw-hero { padding:1.3rem 1.1rem; min-height:238px; border-radius:1.18rem; background-position:72% 50%; }
-  .sw-hero-copy { max-width:78%; }.sw-hero p { font-size:.81rem; }
-  .sw-grid { grid-template-columns:1fr; gap:.95rem; margin-top:.95rem; }.sw-stack { gap:.95rem; }
-  .sw-forecast-card { min-height:0; grid-template-columns:42px minmax(0,1fr); gap:.3rem .8rem; align-items:center; }
-  .sw-forecast-card .sw-tile-icon { grid-row:1 / span 2; align-self:start; }
-  .sw-forecast-card .sw-tile-link { grid-column:2; }.sw-forecast-card h2,.sw-forecast-card p { grid-column:2; }
-  .sw-movements li { gap:.5rem; }.sw-movements li strong { font-size:.89rem; }
+.zip-wallet { line-height: normal; }
+.zip-wallet :is(h1,h2,h3) { font-family: inherit; }
+.zip-wallet .currency-emoji img { max-width:none; }
+.zip-wallet .wallet-dialog {
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: inherit;
+}
+.zip-wallet .wallet-dialog:not([open]) { display: none; }
+.zip-wallet .wallet-dialog::backdrop { background: transparent; }
+.zip-wallet .desktop-converter-mode > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-height: 32px;
+  padding: 0 6px;
+  border-radius: 18px;
+  color: #33215f;
+  font-size: 13px;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.zip-wallet .desktop-converter-mode > a:hover { background: #edf7ff71; }
+.zip-wallet .wallet-rate-tool { display:inline-flex; align-items:center; vertical-align:middle; border:0; background:none; color:inherit; padding:2px; }
+.zip-wallet a.item-row { color:inherit; text-decoration:none; }
+.zip-wallet .no-transactions {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 5px 10px;
+  padding: 6px 0;
+}
+.zip-wallet .no-transactions .button { grid-column: 2; justify-self: start; min-height: 30px; padding: 3px 12px; }
+.zip-wallet .panel > .screen, .zip-wallet .screen .screen { padding: 0; }
+.zip-wallet .wallet-transfer-error { padding: 10px 20px; background: #25104e; color: white; }
+.zip-wallet .sw-disclosure > summary { display:flex; justify-content:space-between; gap:12px; cursor:pointer; }
+.zip-wallet .module-wallet-form,
+.zip-wallet .module-wallet-fields,
+.zip-wallet .module-wallet-provider-actions { display:grid; gap:12px; min-width:0; }
+.zip-wallet .module-wallet-form { margin:16px 0; }
+.zip-wallet .module-wallet-fields { border:0; padding:0; }
+.zip-wallet .module-wallet-fields legend { margin-bottom:8px; font-weight:700; }
+.zip-wallet .module-wallet-form label { display:flex; flex-direction:column; gap:8px; min-width:0; font-size:12px; font-weight:700; }
+.zip-wallet .module-wallet-form :is(input,select,textarea) {
+  width:100%; min-height:49px; padding:13px 14px; font-size:15px; border-radius:16px;
+  background:linear-gradient(120deg,#e3f5ffe8,#d6d8f2ed); border:1px solid #f6ffffdf;
+  box-shadow:inset 0 2px 8px #53499514,0 0 5px #c6efff30; color:#151541;
+}
+.zip-wallet .module-wallet-form input[type=checkbox] { width:18px; min-height:18px; align-self:flex-start; }
+.zip-wallet .module-wallet-metrics > div { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:6px 0; }
+.zip-wallet .module-wallet-metrics dd { font-weight:700; text-align:right; }
+@media (min-width:1024px) {
+  .zip-wallet .desktop-layout .wallet-dialog { padding:30px; }
 }

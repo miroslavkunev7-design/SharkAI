@@ -5,6 +5,7 @@ on:
     paths:
       - 'app/**'
       - 'public/sharkai/**'
+      - 'public/wallet-original/**'
       - '.github/workflows/ultra-screenshot-qa.yml'
   workflow_dispatch:
 

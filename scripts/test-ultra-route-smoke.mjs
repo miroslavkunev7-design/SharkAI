@@ -3,17 +3,19 @@
 import {spawn} from 'node:child_process';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {createServer} from 'node:net';
+import {tsImport} from 'tsx/esm/api';
 
 const check=(path,regex)=>({path,regex});
+const imported = await tsImport('../app/wallet/wallet-routes.ts', import.meta.url);
+const {walletTitles, walletUrl} = imported.default ?? imported;
 const checks=[
- check('/wallet',/Достъпни средства/),
- check('/wallet?tab=transactions',/Движения/),
- check('/wallet?tab=payments',/Плащания чрез Wise/),
- check('/wallet?tab=crypto',/Крипто справка/),
- check('/wallet?tab=cards',/Виртуални карти/),
- check('/wallet?tab=currencies',/Валути/),
- check('/wallet?tab=details',/Детайли/),
- check('/wallet?tab=settings',/Настройки/),
+ ...Object.keys(walletTitles).map(route => check(walletUrl(route), new RegExp('data-wallet-route="'+route+'"'))),
+ check('/wallet?tab=home', /data-wallet-route="overview"/),
+ check('/wallet?tab=invest', /data-wallet-route="investments"/),
+ check('/wallet?tab=account-new', /data-wallet-route="new-account"/),
+ check('/wallet?tab=pocket-new', /data-wallet-route="new-pocket"/),
+ check('/wallet?tab=card-new', /data-wallet-route="new-card"/),
+ check('/wallet?tab=card-spend', /data-wallet-route="card-activity"/),
  check('/chat',/SharkAI/),
  check('/login',/Вход в SharkAI/),
 ];

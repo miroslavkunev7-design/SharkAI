@@ -105,6 +105,10 @@ async function databaseChecks() {
   try {
     const first = await actor();
     const second = await actor();
+    if (process.argv.includes('--with-http')) {
+      const { createToken } = await import('../lib/auth');
+      await checkWiseHandoff(await createToken(first));
+    }
     const saved = await updateWalletSettings(first, input);
     assert.equal(saved.settings.authorized_amount_minor, input.authorized_amount_minor);
     assert.equal(saved.settings.target?.target_date, '2026-02-28');
@@ -169,10 +173,36 @@ async function databaseChecks() {
   }
 }
 
+async function checkWiseHandoff(token: string) {
+  const origin = new URL(process.env.SHARKAI_WALLET_TEST_URL ?? '');
+  assert.equal(origin.protocol, 'http:');
+  assert.equal(origin.hostname, '127.0.0.1');
+  const path = new URL('/api/wallet-investments/provider/transfer', origin);
+  const send = (headers: Record<string, string>) => fetch(path, {
+    method: 'POST', redirect: 'manual', headers, signal: AbortSignal.timeout(10_000),
+  });
+  const cookie = 'sharkai_token=' + token;
+  assert.equal((await fetch(path, { redirect: 'manual' })).status, 405);
+  assert.equal((await send({ cookie })).status, 403);
+  assert.equal((await send({ cookie, origin: 'https://foreign.invalid' })).status, 403);
+  const guest = await send({ origin: origin.origin });
+  assert.equal(guest.status, 303);
+  assert.equal(guest.headers.get('location'), '/login?next=%2Fwallet');
+  const handoff = () => send({ cookie, origin: origin.origin });
+  for (const response of await Promise.all([handoff(), handoff()])) {
+    assert.equal(response.status, 303);
+    assert.equal(response.headers.get('location'), 'https://wise.com/home/');
+    assert.match(response.headers.get('cache-control') ?? '', /no-store/);
+    assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
+    assert.equal(await response.text(), '');
+  }
+  console.log('Authenticated Wise handoff, concurrent retries, session and origin checks passed.');
+}
+
 async function main() {
   contractChecks();
   await transportChecks();
-  if (process.argv.includes('--with-database')) await databaseChecks();
+  if (process.argv.includes('--with-database') || process.argv.includes('--with-http')) await databaseChecks();
   console.log('Wallet + Investments money, target validation and mocked W01 transport passed.');
 }
 

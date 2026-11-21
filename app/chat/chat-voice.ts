@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-type VoiceAction = 'dictation' | 'conversation';
+type VoiceAction = 'dictation' | 'conversation' | 'attachment';
 type Language = 'auto' | 'bg' | 'en';
 type SpeechLanguage = Exclude<Language, 'auto'>;
 type Recording = { action: VoiceAction; controller: AbortController; recorder?: MediaRecorder; stream?: MediaStream; timer?: number };
@@ -113,14 +113,18 @@ export function useChatVoice(enabled: boolean, report: (error: string) => void) 
     setSpeechStage(null);
   }
 
-  async function listen(action: VoiceAction, onText: (text: string) => void) {
+  async function listen(action: 'dictation' | 'conversation', onResult: (text: string) => void): Promise<void>;
+  async function listen(action: 'attachment', onResult: (file: File) => void): Promise<void>;
+  async function listen(...[action, onResult]:
+    | ['dictation' | 'conversation', (text: string) => void]
+    | ['attachment', (file: File) => void]) {
     const active = recording.current;
     if (active) {
       if (active.action === action && active.recorder?.state === 'recording') active.recorder.stop();
       else stopListening();
       return;
     }
-    if (!codec || !capabilities.transcription) return;
+    if (!enabled || !codec || (action !== 'attachment' && !capabilities.transcription)) return;
     if (action === 'conversation') {
       const Context = audioContextClass();
       if (!Context) return;
@@ -148,14 +152,21 @@ export function useChatVoice(enabled: boolean, report: (error: string) => void) 
         window.clearTimeout(work.timer);
         stream.getTracks().forEach((track) => track.stop());
         if (recording.current !== work) return;
-        setRecordStage('transcribing');
         try {
           const type = recorder.mimeType || codec;
           const blob = new Blob(chunks, { type });
+          if (action === 'attachment') {
+            stopListening();
+            if (!blob.size) { report('Няма записан звук.'); return; }
+            const extension = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : 'webm';
+            onResult(new File([blob], `Shark-Audio-${Date.now()}.${extension}`, { type: type.split(';')[0] }));
+            return;
+          }
+          setRecordStage('transcribing');
           const result = await requestVoice(`action=transcribe&language=${language}`, blob, type, work.controller.signal);
           const decoded: { text?: string } = await result.json();
           if (!decoded.text?.trim()) throw new Error('Не беше разпозната реч.');
-          if (recording.current === work) { stopListening(); onText(decoded.text.trim()); }
+          if (recording.current === work) { stopListening(); onResult(decoded.text.trim()); }
         } catch (error) {
           if (recording.current === work) {
             stopListening();
@@ -217,7 +228,7 @@ export function useChatVoice(enabled: boolean, report: (error: string) => void) 
     : !capabilities.speech.length ? 'Липсва инсталиран глас за отговора.' : '');
 
   return {
-    language, setLanguage, dictation: !dictationReason, voice: !voiceReason, dictationReason, voiceReason,
+    language, setLanguage, recordingSupported: !!codec, dictation: !dictationReason, voice: !voiceReason, dictationReason, voiceReason,
     listening, recordStage, speaking: !!speechStage, speechStage, listen, stopListening, speak, stopSpeaking,
   };
 }

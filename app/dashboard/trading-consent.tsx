@@ -24,7 +24,7 @@ function MandateTerms({ terms }: { terms: OwnerOfferTerms }) {
   </dl>;
 }
 
-export function TradingConsent() {
+export function TradingConsent({readOnly=false}:{readOnly?:boolean}={}) {
   const [view,setView]=useState<OwnerMandateView|null>(null);
   const [selected,setSelected]=useState('');
   const [error,setError]=useState('');
@@ -42,7 +42,7 @@ export function TradingConsent() {
     return ()=>controller.abort();
   },[refresh]);
   async function accept(review:string) {
-    if (selected!==review || busy) return;
+    if (readOnly || selected!==review || busy) return;
     setBusy(true); setError('');
     try {
       const res=await fetch(route,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accepted:true,review})});
@@ -52,7 +52,7 @@ export function TradingConsent() {
       setError('Потвърждението е недостъпно. Провери статуса преди повторен опит.');
     } finally { setBusy(false); }
   }
-  return <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-label="Разрешение за автоматизирана търговия">
+  return <section className={readOnly?'panel':'ice-section module-panel module-wallet-panel'} data-ice-art={readOnly?undefined:'markets'} aria-label="Разрешение за автоматизирана търговия">
     <h2>Разрешение за автоматизирана търговия</h2>
     {error && <p role="alert">{error}</p>}
     {!view && !error && <p role="status">Проверка на разрешението…</p>}
@@ -60,8 +60,9 @@ export function TradingConsent() {
       <p>{view.active.valid?'Съгласието е активно.':'Автоматичните поръчки са спрени.'} Потвърдено на {date(view.active.accepted_at)} (София).</p>
       <MandateTerms terms={view.active.terms}/>
     </>}
-    {view && !view.active && view.offers.length===0 && <p>Условия за разрешение ще се покажат при одобрени брокерски права и потвърдена свободна реализирана печалба в отделена сметка.</p>}
-    {view?.offers.map(({terms,review})=><div key={terms.policy_id}>
+    {readOnly && view && !view.active && <p>Няма активно разрешение.</p>}
+    {!readOnly && view && !view.active && view.offers.length===0 && <p>Условия за разрешение ще се покажат при одобрени брокерски права и потвърдена свободна реализирана печалба в отделена сметка.</p>}
+    {!readOnly && view?.offers.map(({terms,review})=><div key={terms.policy_id}>
       <MandateTerms terms={terms}/>
       <p>Разрешаваш многократни покупки и продажби с отделената нетна печалба. Личният депозит остава извън сметката за търговия. Отчетена загуба може да спре нови покупки. Цената на отворените позиции продължава да се променя.</p>
       <p>В края на всеки избран период Shark AI начислява 10% само върху новата реализирана и уредена нетна печалба над последния таксуван максимум. Печалбите първо покриват натрупаните загуби. Сумите, върху които вече е начислена такса, се изключват. Таблото показва отделно начисляването и потвърденото от брокера постъпление.</p>

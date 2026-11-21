@@ -41,7 +41,7 @@ assert.ok(address && typeof address !== 'string');
 const { port }=address;
 await new Promise<void>((resolve,reject)=>listener.close(error=>error ? reject(error) : resolve()));
 const engine=new EmbeddedPostgres({databaseDir,port,user:owner,password,persistent:true,
-  postgresFlags:['-c','listen_addresses=127.0.0.1'],onLog:()=>{},onError:()=>{}});
+  postgresFlags:['-c','listen_addresses=127.0.0.1','-c','timezone=UTC'],onLog:()=>{},onError:()=>{}});
 let pool: any;
 let appDb: PrismaClient | undefined;
 let started=false;

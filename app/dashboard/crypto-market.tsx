@@ -13,7 +13,7 @@ function percent(n:number|null|undefined){
   return n==null?'—':new Intl.NumberFormat('bg-BG',{signDisplay:'exceptZero',maximumFractionDigits:2}).format(n)+'%';
 }
 
-function useMarket<T extends {status:'available'}>(url:string) {
+export function useMarket<T extends {status:'available'}>(url:string) {
   const [result,setResult]=useState<{url:string;data:T|null}|null>(null);
   useEffect(()=>{
     const controller=new AbortController();
@@ -38,7 +38,7 @@ function useMarket<T extends {status:'available'}>(url:string) {
   return result?.url===url?result.data:undefined;
 }
 
-function PriceChart({data}:{data:CryptoChart}) {
+export function PriceChart({data}:{data:CryptoChart}) {
   const [index,setIndex]=useState<number|null>(null);
   const title=useId(),id=useId(),rows=data.candles,step=data.interval_minutes*60;
   if(!rows.length)return <p className="crypto-status">За този период няма потвърдени завършени интервали със сделки.</p>;

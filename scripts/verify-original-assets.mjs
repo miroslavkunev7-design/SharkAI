@@ -15,7 +15,9 @@ const verified = [], missing = [], altered = [];
 const rootReal = realpathSync(root);
 
 for (const [relativePath, expected] of Object.entries(manifest)) {
-  if (!/^public\/sharkai\/(wallet|chat)\/[\w-]+\.webp$/.test(relativePath)) {
+  const sharedArtwork = /^public\/sharkai\/(wallet|chat)\/[\w-]+\.webp$/;
+  const archiveArtwork = /^public\/wallet-original\/(?:image-\d{2}\.(?:png|jpg)|original-font-[12]\.ttf|reference-avatar\.png)$/;
+  if (!sharedArtwork.test(relativePath) && !archiveArtwork.test(relativePath)) {
     throw new Error('Unsafe manifest path');
   }
   const file = resolve(root, relativePath);

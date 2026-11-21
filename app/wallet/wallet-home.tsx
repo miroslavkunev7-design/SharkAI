@@ -1,267 +1,187 @@
 'use client';
 
-import Link from 'next/link';
-import {useEffect,useState} from 'react';
-import {Activity,ArrowDownLeft,ArrowLeft,ArrowRight,ArrowUpRight,ArrowUpFromLine,ChartNoAxesCombined,ChevronRight,ChevronDown,Eye,EyeOff,
-  House,List,LockKeyhole,Plus,RefreshCw,Settings2,ShieldCheck,Wallet,Waypoints,Search,CreditCard,ArrowLeftRight,MoreHorizontal} from 'lucide-react';
-import {Logo} from '@/components/Logo';
-import {displayMinor,type WalletSettingsInput} from '@/lib/wallet-investments-contract';
-import type {WalletInvestmentsOwnerDashboard} from '@/lib/wallet-investments-server';
-import {isWalletOwnerDashboard} from '../dashboard/wallet-dashboard-shape';
-import {WalletProviderActions} from '../dashboard/wallet-provider-actions';
-import {WalletInvestmentsForm} from '../dashboard/wallet-investments-form';
-import {TradingConsent} from '../dashboard/trading-consent';
-import WalletForecast from '../dashboard/wallet-forecast';
-import {WalletReferenceConverter,WalletCardsReadOnly} from './wallet-premium-extras';
+import {useEffect, useRef, useState, useSyncExternalStore, type ReactNode} from 'react';
+import {useRouter} from 'next/navigation';
+import {ArrowLeft, ArrowRightLeft, ChartNoAxesColumn, ChartNoAxesCombined, ChevronDown, ChevronRight,
+  Ellipsis, Eye, EyeOff, House, MessageCircle, Plus, ReceiptText, Search, Shuffle, UserRound, Wallet, X} from 'lucide-react';
+import {accountBalance, accountLabel, useWalletData, type WalletData} from './wallet-data';
+import {WalletView, RecentRows} from './wallet-views';
+import {walletLogin, walletTitles, walletUrl, type WalletRoute} from './wallet-routes';
+import {WalletReferenceConverter} from './wallet-premium-extras';
 
-const tabs={
- overview:{label:'Начало',icon:House},
- transactions:{label:'Движения',icon:List},
- payments:{label:'Плащания',icon:ArrowLeftRight},
- currencies:{label:'Валути',icon:ArrowLeftRight},
- crypto:{label:'Крипто',icon:ArrowLeftRight},
- cards:{label:'Карти',icon:CreditCard},
- details:{label:'Детайли',icon:Wallet},
- forecast:{label:'Прогноза',icon:ChartNoAxesCombined},
- settings:{label:'Настройки',icon:Settings2}
-} as const;
-const desktopTabs=['overview','transactions','currencies','cards','settings'] as const;
-type Section=keyof typeof tabs;
-type Account={state:'loading'|'guest'|'unavailable';data:null}|{state:'ready';data:WalletInvestmentsOwnerDashboard};
-const tabLink=(section:Section)=>section==='overview'?'/wallet':'/wallet?tab='+section;
-const login=(section:Section)=>'/login?next='+encodeURIComponent(tabLink(section));
-const wise='https://wise.com/home/';
-function dateLabel(value:string|null,withTime=false){
-  if(!value||!Number.isFinite(Date.parse(value)))return 'Непотвърдено';
-  return new Intl.DateTimeFormat('bg-BG',{dateStyle:'medium',timeZone:'Europe/Sofia',...(withTime&&{timeStyle:'short'})}).format(new Date(value));
+type Go = (route: WalletRoute) => void;
+const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
+function subscribeViewport(listener: () => void) {
+  const media = window.matchMedia('(min-width: 1024px)');
+  media.addEventListener('change',listener);
+  return () => media.removeEventListener('change',listener);
 }
-const providerStatus={
-  verified:'Потвърден баланс в Wise',provider_unconfigured:'Предстои настройване на връзката с доставчика',
-  provider_unlinked:'Няма потвърдена сметка за избраната валута',stale:'Необходима е нова проверка при доставчика',unavailable:'Данните от доставчика са временно недостъпни',
-};
-const payments={
-  fund:{label:'Захрани',icon:Plus,title:'Добавяне на средства',body:'Избери сметка и начин на захранване в Wise. Доставчикът показва срока и приложимата такса преди потвърждение.'},
-  send:{label:'Изпрати',icon:ArrowUpRight,title:'Паричен превод',body:'Въведи получателя и сумата в Wise. Прегледай валутния курс, таксите и крайния размер преди потвърждение.'},
-  withdraw:{label:'Изтегли',icon:ArrowUpFromLine,title:'Теглене към банкова сметка',body:'В Wise избери собствената си сметка и сумата за банков превод. Потвърждаването става при доставчика.'},
-};
-type Payment=keyof typeof payments;
-type Movement={direction:'credit'|'debit';amount_minor:string;occurred_at:string;category:string};
-type Statement={currency:string;from:string;to:string;as_of:string;has_more:boolean;transactions:Movement[]};
+export function openSharkAssistant() { window.dispatchEvent(new Event('sharkai:open-chat')); }
 
-function Transactions({account,compact=false}:{account:Account;compact?:boolean}){
-  const [revision,setRevision]=useState(0);
-  const [query,setQuery]=useState('');
-  const [load,setLoad]=useState<{key:string;statement:Statement|null}|null>(null);
-  const currency=account.data?.wallet.currency??account.data?.settings.currency;
-  const allowed=account.data?.wallet_capabilities.deposit_statements===true;
-  const key=currency+'-'+revision;
-  useEffect(()=>{
-    if(!allowed||!currency)return;
-    const controller=new AbortController();
-    void fetch('/api/wallet-investments/provider/transactions',{method:'POST',signal:controller.signal,cache:'no-store'}).then(async response=>{
-      const data=await response.json();
-      if(!response.ok||data.status!=='available'||data.currency!==currency||!Array.isArray(data.transactions))throw Error();
-      if(!controller.signal.aborted)setLoad({key,statement:data});
-    }).catch(()=>{if(!controller.signal.aborted)setLoad({key,statement:null});});
-    return ()=>controller.abort();
-  },[allowed,currency,key]);
-  const current=load?.key===key?load:null,statement=current?.statement;
-  const needle=query.trim().toLocaleLowerCase('bg-BG');
-  const searched=statement?.transactions.filter(row=>
-    [row.category||'',row.occurred_at,displayMinor(row.amount_minor,statement.currency)]
-      .join(' ').toLocaleLowerCase('bg-BG').includes(needle)
-  )??[];
-  const title=compact?'Последни движения':'Движения по сметката';
-  return <section className="sw-panel"><div className="sw-section-head"><h2>{title}</h2>{compact?<Link href={tabLink('transactions')} aria-label="Всички движения"><ArrowRight/></Link>:
-    allowed&&<button type="button" onClick={()=>setRevision(n=>n+1)} aria-label="Обнови движенията"><RefreshCw/></button>}</div>
-    {!compact&&<label className="sw-transaction-search"><Search size={19} aria-hidden="true"/>
-      <input type="search" aria-label="Търси в движенията" placeholder="Търси в движенията" value={query}
-        onChange={event=>setQuery(event.target.value)} autoComplete="off"/>
-    </label>}
-    {account.state==='guest'?<p className="sw-hint"><LockKeyhole/> Влез, за да видиш движенията по своята сметка.</p>:
-      account.state==='loading'?<p role="status">Зареждане…</p>:
-      !allowed?<p>Извлечението ще се покаже след потвърдена връзка с право за четене на движенията.</p>:
-      !current?<p role="status">Зареждане на извлечението…</p>:!statement?<p role="alert">Доставчикът временно не предоставя извлечението.</p>:
-      <><p>{dateLabel(statement.from)} – {dateLabel(statement.to)} · Wise</p>{statement.transactions.length===0?
-        <p>Няма осчетоводени движения за периода.</p>:searched.length===0?
-        <p>Няма движения по зададеното търсене.</p>:<ul className="sw-movements">{searched.slice(0,compact?3:searched.length).map((row,i)=>{
-          const credit=row.direction==='credit',Icon=credit?ArrowDownLeft:ArrowUpRight;
-          const category=row.category||(credit?'Постъпление':'Плащане');
-          return <li key={row.occurred_at+'-'+i}><span className={'sw-movement-icon '+(credit?'is-credit':'')}><Icon/></span>
-            <div><strong>{category}</strong><small>{dateLabel(row.occurred_at,true)}</small></div><strong>{credit?'+':'−'}{displayMinor(row.amount_minor,statement.currency)}</strong></li>;
-        })}</ul>}{!compact && statement.has_more && <p>Показани са последните 100 движения. Цялото извлечение е достъпно в Wise.</p>}
-        <small>Потвърдено към {dateLabel(statement.as_of,true)} (София)</small></>}
+// The ZIP uses these filled glyphs alongside Lucide line icons.
+function CardIcon({size=24}) {
+  return <svg aria-hidden="true" className="reference-icon reference-card" width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path fillRule="evenodd" d="M4 3.8A2.8 2.8 0 0 0 1.2 6.6v1.8h21.6V6.6A2.8 2.8 0 0 0 20 3.8ZM1.2 11v6.4A2.8 2.8 0 0 0 4 20.2h16a2.8 2.8 0 0 0 2.8-2.8V11Zm3.4 4.5a1 1 0 0 1 1-1h5a1 1 0 1 1 0 2h-5a1 1 0 0 1-1-1Z"/></svg>;
+}
+function BankIcon({size=24}) {
+  return <svg aria-hidden="true" className="reference-icon reference-bank" width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 2 2 7v2h20V7Z"/><rect x="3" y="19" width="18" height="3" rx="1"/>
+    {[4,10.3,16.6].map(x=><rect key={x} x={x} y="8" width="3.4" height="12" rx=".7"/>)}</svg>;
+}
+function MoreIcon({size=24}) {
+  return <svg aria-hidden="true" className="reference-icon reference-more" width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
+    <path d="m12 1 9.4 5.5v11L12 23l-9.4-5.5v-11Z"/><path d="M8 12h8m-4-4v8" stroke="#5f259b" strokeWidth="2.5" strokeLinecap="round"/></svg>;
+}
+function BitcoinIcon({size=24}) {
+  return <svg aria-hidden="true" className="reference-icon reference-bitcoin" width={size} height={size} viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 13v1.25c0 .138.112.25.25.25h1a.25.25 0 0 0 .25-.25V13h.5v1.25c0 .138.112.25.25.25h1a.25.25 0 0 0 .25-.25V13h.084c1.992 0 3.416-1.033 3.416-2.82 0-1.502-1.007-2.323-2.186-2.44v-.088c.97-.242 1.683-.974 1.683-2.19C11.997 3.93 10.847 3 9.092 3H9V1.75a.25.25 0 0 0-.25-.25h-1a.25.25 0 0 0-.25.25V3h-.573V1.75a.25.25 0 0 0-.25-.25H5.75a.25.25 0 0 0-.25.25V3l-1.998.011a.25.25 0 0 0-.25.25v.989c0 .137.11.25.248.25l.755-.005a.75.75 0 0 1 .745.75v5.505a.75.75 0 0 1-.75.75l-.748.011a.25.25 0 0 0-.25.25v1c0 .138.112.25.25.25zm1.427-8.513h1.719c.906 0 1.438.498 1.438 1.312 0 .871-.575 1.362-1.877 1.362h-1.28zm0 4.051h1.84c1.137 0 1.756.58 1.756 1.524 0 .953-.626 1.45-2.158 1.45H6.927z"/></svg>;
+}
+const navigation = [
+  {route:'overview',icon:House}, {route:'investments',icon:ChartNoAxesCombined}, {route:'payments',icon:ArrowRightLeft},
+  {route:'crypto',icon:BitcoinIcon}, {route:'more',icon:MoreIcon},
+] as const;
+function parentTab(section:WalletRoute):WalletRoute {
+  if(navigation.some(tab=>tab.route===section))return section;
+  if(['move','transfer','withdraw','scheduled','request','add-money','exchange','currencies'].includes(section))return 'payments';
+  if(['asset','crypto-receive','crypto-send','crypto-send-review'].includes(section))return 'crypto';
+  if(['forecast','orders','order','trade','holdings','market-search'].includes(section))return 'investments';
+  if(['settings','privacy','security','help','notifications'].includes(section))return 'more';
+  return 'overview';
+}
+function Tabs({desktop,section,go}:{desktop:boolean;section:WalletRoute;go:Go}) {
+  return <nav className={desktop?'desktop-header-tabs':'bottom-dock'} aria-label="Основна навигация">
+    {navigation.map(({route,icon:Icon})=><button type="button" key={route} onClick={()=>go(route)}
+      aria-current={section===route?'page':undefined} className={section===route?(desktop?'is-selected':'selected'):''}>
+      <Icon size={desktop?23:25}/><span>{walletTitles[route]}</span></button>)}
+  </nav>;
+}
+function Avatar({desktop=false,toolbar=false}:{desktop?:boolean;toolbar?:boolean}) {
+  return <span className={desktop?'desktop-shark-avatar':'shark-avatar reference-avatar-exact'} aria-hidden="true">
+    {toolbar?<img src="/wallet-original/image-24.jpg" alt=""/>:
+      <img className="wallet-avatar-crop" src="/wallet-original/reference-avatar.png" alt=""/>}</span>;
+}
+function ChatButton({desktop=false,floating=false}:{desktop?:boolean;floating?:boolean}) {
+  if(desktop) return <div className="desktop-assistant-lane"><button type="button" className="desktop-assistant-launcher"
+    data-shark-chat-launcher onClick={openSharkAssistant} aria-label="Отвори Shark Assistant">
+    <Avatar desktop/><span className="desktop-assistant-online" aria-hidden="true"/><span>Shark Assistant</span><MessageCircle size={22}/></button></div>;
+  return <button type="button" className={'chat-launch'+(floating?' floating':'')} data-shark-chat-launcher
+    onClick={openSharkAssistant} aria-label="Отвори Shark Assistant" title="Shark Assistant"><Avatar/>
+    <span className="chat-mark"><Ellipsis size={16}/></span><i className="online-dot"/></button>;
+}
+function Header({desktop,section,go}:{desktop:boolean;section:WalletRoute;go:Go}) {
+  const controls=[{route:'search',icon:Search,label:'Търси'}, {route:'analytics',icon:ChartNoAxesColumn,label:'Анализи'},
+    {route:'cards',icon:CardIcon,label:'Карти'}, {route:'profile',icon:UserRound,label:'Профил'}] as const;
+  if(desktop) return <header className="desktop-wallet-header"><div className="desktop-header-main">
+    <button type="button" className="desktop-brand" aria-label="SharkAI — начало" onClick={()=>go('overview')}><Avatar desktop/>
+      <span className="desktop-brand-copy"><strong>Shark<span>AI</span></strong><span>Портфейл</span></span></button>
+    <div className="desktop-header-controls">{controls.map(({route,icon:Icon,label})=><button type="button" key={route}
+      className={'desktop-header-control'+(route==='search'?' desktop-header-search':'')} onClick={()=>go(route)}>
+      <Icon size={route==='search'?22:21}/><span>{label}</span></button>)}</div></div>
+    <Tabs desktop section={section} go={go}/></header>;
+  return <header className="home-header"><div className="top-toolbar">
+    <button type="button" className="profile-button" aria-label="Профил" onClick={()=>go('profile')}><Avatar toolbar/></button>
+    {controls.slice(0,3).map(({route,icon:Icon,label})=><button type="button" key={route} aria-label={label} onClick={()=>go(route)}
+      className={route==='search'?'search-button glass-pill':'toolbar-icon glass-circle'}><Icon size={23}/>{route==='search'&&<span>{label}</span>}</button>)}
+  </div></header>;
+}
+function QuickActions({desktop,go}:{desktop:boolean;go:Go}) {
+  const actions=[{route:'add-money',label:'Захрани',icon:Plus},{route:'move',label:'Прехвърли',icon:Shuffle},
+    {route:'details',label:'Детайли',icon:BankIcon},{route:'account-actions',label:'Още',icon:Ellipsis}] as const;
+  return <div className={desktop?'desktop-quick-actions':'home-actions'}>{actions.map(({route,label,icon:Icon})=>
+    <button key={route} type="button" className={desktop?'desktop-quick-action':'quick-action'} onClick={()=>go(route)}>
+      <span className={desktop?'desktop-action-disc':'glass-circle'}><Icon size={29}/></span><span>{label}</span></button>)}</div>;
+}
+function CurrencyMark({desktop,currency}:{desktop:boolean;currency:string}) {
+  if(currency==='EUR') return <span className={desktop?'desktop-currency-mark':'currency-emoji'} aria-hidden="true"><img src="/wallet-original/image-23.png" alt=""/></span>;
+  return <span className={desktop?'desktop-currency-symbol':undefined} aria-hidden="true">{currency==='GBP'?'£':currency==='USD'?'$':currency}</span>;
+}
+function Recent({desktop,go,data,hidden,detail}:{desktop:boolean;go:Go;data:WalletData;hidden:boolean;detail:(i:number)=>void}) {
+  const guest=data.account.state==='guest',hasRows=Boolean(data.statement?.transactions.length);
+  const button=<button type="button" className={desktop?'desktop-text-link':'button secondary'} onClick={()=>{
+    if(guest) window.location.assign(walletLogin('overview')); else if(data.account.state==='unavailable'||data.statement===null) data.refresh(); else go('wise-connection');
+  }}>{guest?'Вход в SharkAI':data.account.state==='unavailable'||data.statement===null?'Обнови':'Връзка с Wise'}{desktop&&<ChevronRight size={16}/>}</button>;
+  return <section className={desktop?'desktop-wallet-card desktop-transactions':'panel recent-panel'} aria-label="Последни транзакции">
+    {desktop&&<div className="desktop-card-art desktop-transactions-art" aria-hidden="true"/>}
+    <div className={desktop?'desktop-transactions-heading':'recent-heading'}><h2>Последни транзакции</h2><span className="badge">Wise</span>
+      <button type="button" className={desktop?'desktop-text-link':'see-all'} onClick={()=>go('transactions')}>Всички <ChevronRight size={16}/></button></div>
+    {hasRows&&data.statement?<RecentRows desktop={desktop} statement={data.statement} hidden={hidden} detail={detail}/>:
+      <div className={desktop?'desktop-transaction-empty':'no-transactions'}><ReceiptText size={desktop?29:24}/><p role="status">{data.historyStatus}</p>{button}</div>}
   </section>;
 }
-
-function WalletSettings({account,update}:{account:Account;update:(next:Account)=>void}){
-  const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
-  async function save(input?:WalletSettingsInput){
-    if(busy)return;setBusy(true);setMessage('');
-    try {
-      const res=await fetch('/api/wallet-investments'+(input?'':'/revoke'),input?{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)}:{method:'POST'});
-      if(res.status===401){update({state:'guest',data:null});return;}
-      const result=await res.json();if(!res.ok||!isWalletOwnerDashboard(result))throw Error();
-      update({state:'ready',data:result});setMessage(input?'Настройките са запазени.':'Автоматичният достъп е прекратен.');
-    }catch{setMessage('Промяната не е потвърдена. Провери настройките преди повторен опит.');}
-    finally{setBusy(false);}
-  }
-  if(account.state==='guest')return <section className="sw-panel"><h2>Настройки на профила</h2><p>Влез в Shark AI, за да управляваш сметката и разрешенията си.</p><Link href={login('settings')} className="sw-btn">Вход в Shark AI <ArrowRight/></Link></section>;
-  if(!account.data)return <section className="sw-panel"><p role="status">{account.state==='loading'?'Зареждане на настройките…':'Настройките са временно недостъпни.'}</p></section>;
-  const data=account.data;
-  return <div className="sw-stack">
-    <section className="sw-panel"><div className="sw-section-head"><h2>Връзка с доставчика</h2><ShieldCheck/></div>
-      <p>{providerStatus[data.wallet.status]}. Откриването и потвърждаването на платежната сметка се извършват в Wise.</p>
-      {!data.wallet_capabilities.hosted_kyc&&data.wallet.status!=='verified'&&<a className="sw-btn" href="https://wise.com/register" target="_blank" rel="noopener noreferrer">Открий сметка в Wise <ArrowUpRight/></a>}
-      <div className="sw-provider-actions"><WalletProviderActions data={data} action={null}/></div>
-    </section>
-    <details className="sw-panel sw-disclosure"><summary>Инвестиционни настройки и AI достъп <ChevronDown/></summary>
-      <WalletInvestmentsForm key={JSON.stringify(data.settings)} settings={data.settings} busy={busy} onSave={save}/>
-      {(data.settings.ai_access==='analysis_only'||data.broker_activity.status==='unavailable'||data.broker_activity.accounts.some(a=>!a.halted_at))&&
-        <button className="sw-btn sw-btn-secondary" disabled={busy} onClick={()=>void save()}>Прекрати автоматичния достъп</button>}
-      {message&&<p role="status">{message}</p>}
-    </details>
-    <TradingConsent key={JSON.stringify(data.settings)}/>
-  </div>;
+function Sheet({children,close,title}:{children:ReactNode;close:()=>void;title:string}) {
+  const ref=useRef<HTMLDialogElement>(null);
+  useEffect(()=>{const dialog=ref.current; dialog?.showModal(); return ()=>{dialog?.close();};},[]);
+  return <dialog className="sheet-overlay wallet-dialog" ref={ref} aria-label={title} onCancel={event=>{event.preventDefault();close();}}>
+    <button type="button" className="sheet-backdrop" aria-label="Затвори панела" onClick={close}/>
+    <div className="bottom-sheet"><div className="sheet-grip"/><button type="button" className="sheet-close" aria-label="Затвори" onClick={close}><X/></button>
+      {children}</div></dialog>;
 }
-
-export function WalletHome({section}:{section:Section}){
- const [account,setAccount]=useState<Account>({state:'loading',data:null}),[refresh,setRefresh]=useState(0);
- const [hideBalance,setHideBalance]=useState(false),[payment,setPayment]=useState<Payment|null>(null);
- const [showAccounts,setShowAccounts]=useState(false);
- useEffect(()=>{
-   const controller=new AbortController();
-   setAccount({state:'loading',data:null});
-   void fetch('/api/wallet-investments',{cache:'no-store',signal:controller.signal}).then(async res=>{
-     if(res.status===401){if(!controller.signal.aborted)setAccount({state:'guest',data:null});return;}
-     const body=await res.json();if(!res.ok||!isWalletOwnerDashboard(body))throw Error();
-     if(!controller.signal.aborted)setAccount({state:'ready',data:body});
-   }).catch(()=>{if(!controller.signal.aborted)setAccount({state:'unavailable',data:null});});
-   return ()=>controller.abort();
- },[refresh]);
- const data=account.data,wallet=data?.wallet,verified=wallet?.status==='verified';
- const currency=wallet?.currency??data?.settings.currency??'EUR';
- const source=wallet?providerStatus[wallet.status]:account.state==='loading'?'Зареждане на сметката…':account.state==='guest'?'Влез, за да видиш наличността си.':'Връзката със сметката е временно недостъпна.';
- const visible=verified?displayMinor(wallet.balance_minor,wallet.currency).replace(/ EUR$/,' €'):'—';
- const paymentState=payment?payments[payment]:null;
- return <div className="sw-root"><div className="sw-shell">
-   <header className="sw-header">
-     <img className="sw-header-muscular-shark" src="/sharkai/chat/shark-avatar.webp" alt="" aria-hidden="true"/>
-     <Link href="/wallet" className="sw-wordmark" aria-label="SharkAI Портфейл">
-       <img className="sw-header-avatar" src="/sharkai/chat/shark-avatar.webp" alt="Акула SharkAI"/>
-       <Logo size="sm"/><span>Shark<strong>AI</strong></span><i/>Портфейл
-     </Link>
-     <div className="sw-mobile-tools">
-       <Link className="sw-mobile-search" href={tabLink('transactions')} aria-label="Търси в движенията"><Search/><span>Търси</span></Link>
-       <Link href="/dashboard?view=investments" aria-label="Инвестиции"><ChartNoAxesCombined/></Link>
-       <Link href={tabLink('cards')} aria-label="Карти"><CreditCard/></Link>
-     </div>
-     <div className="sw-desktop-tools">
-       <Link href="/dashboard?view=investments"><ChartNoAxesCombined/> Инвестиции</Link>
-       <Link href="/dashboard?view=settings"><Settings2/> Профил</Link>
-       <Link href="/dashboard?view=investments" className="sw-return"><ArrowLeft/>Към Shark AI</Link>
-     </div>
-   </header>
-   <nav className="sw-navigation" aria-label="Десктоп навигация в портфейла">{desktopTabs.map(id=>{
-     const {label,icon:Icon}=tabs[id];return <Link key={id} className="sw-nav-item" href={tabLink(id)}
-     aria-current={section===id?'page':undefined}><Icon/>{label}</Link>;
-   })}</nav>
-   <main className="sw-main">
-     {section==='overview'?<>
-       <section className="sw-hero"><div className="sw-hero-copy">
-         <h1>Достъпни средства</h1>
-         <div className="sw-account-label"><Wallet/> Основна · {currency}</div>
-         <div className={'sw-provider-chip '+(verified?'is-connected':'')} aria-live="polite">
-           <ShieldCheck/>{verified?'Wise · Свързан':account.state==='loading'?'Проверка на Wise…':'Wise · Непотвърден'}
-         </div>
-         <div className="sw-balance"><strong>{hideBalance?'••••':visible}</strong>
-           {verified&&<button type="button" onClick={()=>setHideBalance(v=>!v)}
-             aria-label={hideBalance?'Покажи баланса':'Скрий баланса'}>{hideBalance?<EyeOff/>:<Eye/>}</button>}
-         </div>
-         <button type="button" className="sw-btn sw-account-toggle" aria-expanded={showAccounts}
-           aria-controls="sw-account-options" onClick={()=>setShowAccounts(v=>!v)}>Сметки <ChevronDown/></button>
-         {showAccounts&&<div className="sw-account-options" id="sw-account-options">
-           <div className="sw-account-option"><Wallet/> Основна · {currency}<span>{verified?'✓':'—'}</span></div>
-           <button type="button" className="sw-account-option" onClick={()=>setHideBalance(v=>!v)}>
-             {hideBalance?<Eye/>:<EyeOff/>}{hideBalance?'Покажи наличността':'Скрий наличността'}<small>Локално</small>
-           </button>
-           <div className="sw-account-option is-unavailable"><LockKeyhole/> Джобове / касички <small>Няма потвърдени данни</small></div>
-           <Link className="sw-account-option" href={tabLink('settings')}><Settings2/> Управление на Wise <ArrowRight/></Link>
-         </div>}
-         <p className="sw-balance-status" aria-live="polite">{source}{verified&&' · '+dateLabel(wallet.observed_at,true)+' (София)'}</p>
-         {account.state==='guest'?<Link className="sw-btn sw-auth-link" href={login('overview')}>Вход в портфейла <ArrowRight/></Link>:
-           account.state==='ready'&&!verified?<Link className="sw-btn sw-auth-link" href={tabLink('settings')}>Свържи сметка <ArrowRight/></Link>:
-           account.state==='unavailable'?<button type="button" className="sw-btn sw-auth-link" onClick={()=>setRefresh(n=>n+1)}>Провери отново <RefreshCw/></button>:null}
-       </div></section>
-       <div className="sw-grid">
-         <div className="sw-stack">
-           <div className="sw-actions" aria-label="Операции с пари">
-             <button type="button" aria-pressed={payment==='fund'} onClick={()=>setPayment(p=>p==='fund'?null:'fund')}><span><Plus/></span>Захрани</button>
-             <button type="button" aria-pressed={payment==='send'} onClick={()=>setPayment(p=>p==='send'?null:'send')}><span><ArrowLeftRight/></span>Прехвърли</button>
-             <button type="button" className="sw-desktop-action" aria-pressed={payment==='withdraw'} onClick={()=>setPayment(p=>p==='withdraw'?null:'withdraw')}><span><ArrowUpFromLine/></span>Изтегли</button>
-             <Link className="sw-mobile-action" href={tabLink('details')}><span><Wallet/></span>Детайли</Link>
-             <Link className="sw-mobile-action" href={tabLink('settings')}><span><MoreHorizontal/></span>Още</Link>
-           </div>
-           {paymentState&&<section className="sw-panel sw-pay-state" aria-live="polite"><h2>{paymentState.title}</h2>
-             {verified?<><p>{paymentState.body}</p><a href={wise} target="_blank" rel="noopener noreferrer" className="sw-btn">Продължи в Wise <ArrowUpRight/></a></>:
-               <><p>{account.state==='guest'?'Влез и свържи платежна сметка, за да използваш тази операция.':'Тази операция изисква потвърдена сметка при доставчика.'}</p>
-                 <Link href={account.state==='guest'?login('settings'):tabLink('settings')} className="sw-btn sw-btn-secondary">{account.state==='guest'?'Вход в SharkAI':'Към настройките'} <ChevronRight/></Link></>}
-           </section>}
-           <Transactions account={account} compact/>
-         </div>
-         <WalletReferenceConverter compact/>
-       </div>
-     </>:section==='transactions'?<>
-       <div className="sw-page-heading"><span><Activity/> Личен портфейл</span><h1>Движения</h1></div>
-       <Transactions account={account}/>
-     </>:section==='payments'?<>
-       <div className="sw-page-heading"><span><ArrowLeftRight/> Личен портфейл</span><h1>Плащания</h1></div>
-       <section className="sw-panel sw-payment-hub" aria-label="Плащания чрез Wise">
-         <h2>Плащания чрез Wise</h2>
-         <p>Прегледай желаното действие. Финалното потвърждение на паричен превод се извършва само в Wise.</p>
-         <div className="sw-payment-options">{(Object.keys(payments) as Payment[]).map(id=>{
-           const {label,icon:Icon}=payments[id];
-           return <button type="button" key={id} aria-pressed={payment===id}
-             onClick={()=>setPayment(current=>current===id?null:id)}><Icon/>{label}</button>;
-         })}</div>
-         {paymentState?<div className="sw-payment-detail" aria-live="polite">
-           <h3>{paymentState.title}</h3>
-           <p>{verified?paymentState.body:account.state==='guest'?'Влез в профила си и свържи Wise, за да продължиш.':'Това действие изисква потвърден Wise акаунт.'}</p>
-           {verified?<a className="sw-btn" href={wise} target="_blank" rel="noopener noreferrer">Продължи в Wise <ArrowUpRight/></a>:
-             <Link className="sw-btn sw-btn-secondary" href={account.state==='guest'?login('settings'):tabLink('settings')}>Към настройките <ChevronRight/></Link>}
-         </div>:<p>Избери действие, за да видиш начина на изпълнение.</p>}
-       </section>
-     </>:section==='currencies'?<>
-       <div className="sw-page-heading"><span><ArrowLeftRight/> Личен портфейл</span><h1>Валути</h1></div>
-       <WalletReferenceConverter/>
-     </>:section==='crypto'?<>
-       <div className="sw-page-heading"><span><ArrowLeftRight/> Личен портфейл</span><h1>Крипто справка</h1></div>
-       <p className="sw-crypto-notice">Само информативно сравнение. Не се купуват и продават активи; курс се показва само при потвърден източник.</p>
-       <WalletReferenceConverter initialPair="crypto"/>
-     </>:section==='cards'?<>
-       <div className="sw-page-heading"><span><CreditCard/> Личен портфейл</span><h1>Карти</h1></div>
-       <WalletCardsReadOnly/>
-     </>:section==='details'?<>
-       <div className="sw-page-heading"><span><Wallet/> Личен портфейл</span><h1>Детайли</h1></div>
-       <section className="sw-panel sw-account-details"><h2>Основна сметка · {currency}</h2>
-         <p>{source}</p><strong>{hideBalance?'••••':visible}</strong>
-         <p>{verified?'Данните са потвърдени към '+dateLabel(wallet.observed_at,true):'Няма потвърдена наличност.'}</p>
-         <Link className="sw-btn" href={tabLink('settings')}>Управление на Wise <ArrowRight/></Link>
-       </section>
-     </>:section==='forecast'?<>
-       <div className="sw-page-heading"><span><Waypoints/> Личен портфейл</span><h1>Прогноза</h1></div>
-       <WalletForecast currency={currency} initialAmountMinor={verified?wallet.balance_minor:null}/>
-     </>:<>
-       <div className="sw-page-heading"><span><Settings2/> Личен портфейл</span><h1>Настройки</h1></div>
-       <WalletSettings account={account} update={setAccount}/>
-     </>}
-   </main>
-   <nav className="sw-mobile-navigation" aria-label="Главна мобилна навигация">
-     <Link className={section==='overview'?'is-active':''} aria-current={section==='overview'?'page':undefined} href="/wallet"><House/>Начало</Link>
-     <Link href="/dashboard?view=investments"><ChartNoAxesCombined/>Инвестиции</Link>
-     <Link className={section==='payments'?'is-active':''} href={tabLink('payments')}><ArrowLeftRight/>Плащания</Link>
-     <Link className={section==='crypto'?'is-active':''} href={tabLink('crypto')}><span className="sw-crypto-symbol">₿</span>Крипто</Link>
-     <Link className={section==='settings'?'is-active':''} href={tabLink('settings')}><MoreHorizontal/>Още</Link>
-   </nav>
- </div></div>;
+export function WalletHome({section,transferUnavailable,pair,equities=false}:{section:WalletRoute;transferUnavailable:boolean;pair:string|null;equities?:boolean}) {
+  const data=useWalletData(),router=useRouter(),desktop=useSyncExternalStore(subscribeViewport,isDesktop,()=>false);
+  const [hidden,setHidden]=useState(false);
+  const [selected,setSelected]=useState<{index:number;statement:WalletData['statement']}|null>(null);
+  const visited=useRef<WalletRoute[]>([section]);
+  const sheetParents=useRef<Partial<Record<WalletRoute,WalletRoute>>>({});
+  const originatingTabs=useRef<Partial<Record<WalletRoute,WalletRoute>>>({});
+  const activeTab=originatingTabs.current[section]??(equities?'investments':section==='market-search'?'crypto':parentTab(section));
+  const scroll=useRef<HTMLDivElement>(null);
+  const go:Go=route=>{
+    if(route==='chat'){openSharkAssistant();return;}
+    if(route!==section){
+      originatingTabs.current[route]=navigation.some(tab=>tab.route===route)?route:activeTab;
+      if(['accounts','move','account-actions'].includes(route))sheetParents.current[route]=sheetParents.current[section]??section;
+      const marketContext=route==='market-search'&&activeTab==='investments'?'&kind=invest':'';
+      router.push(walletUrl(route)+marketContext,{scroll:false});
+    }
+  };
+  useEffect(()=>{
+    const trail=visited.current;
+    if(trail.at(-1)===section)return;
+    if(trail.at(-2)===section)trail.pop();else trail.push(section);
+  },[section]);
+  useEffect(()=>{
+    if(section!=='chat')return;
+    const frame=requestAnimationFrame(openSharkAssistant);
+    return ()=>cancelAnimationFrame(frame);
+  },[section]);
+  const back=()=>{if(visited.current.length>1)router.back();else router.replace('/wallet',{scroll:false});};
+  const sheet=['accounts','move','account-actions'].includes(section);
+  const base=sheet?(sheetParents.current[section]??'overview'):section;
+  const home=base==='overview';
+  const tabRoot=navigation.some(tab=>tab.route===base);
+  useEffect(()=>{if(!sheet)scroll.current?.scrollTo(0,0);},[section,sheet]);
+  const currency=data.account.data?.wallet.currency??data.account.data?.settings.currency??'EUR';
+  const accountName=data.account.data?.wallet.status==='verified'?'Основна':'Портфейл';
+  const balance=hidden?'••••':accountBalance(data.account),toggle=()=>setHidden(v=>!v);
+  const detail=(index:number)=>{setSelected({index,statement:data.statement});go('transaction');};
+  const view=(route:WalletRoute)=><WalletView key={route} route={route} pair={pair} equities={equities} go={go} data={data} currency={currency} hidden={hidden}
+    transaction={selected&&selected.statement===data.statement?selected.index:null} detail={detail}/>;
+  return <div className="zip-wallet" data-wallet-route={section}><div className={'workspace'+(desktop?' desktop-layout':'')}><div
+    className={'app-shell '+(home?'home-view':'page-view')+(desktop?' desktop-layout':'')}>
+    <div className="landscape"/><div className="scene-shade"/><div className="scroll-area" ref={scroll}>
+      <Header desktop={desktop} section={activeTab} go={go}/>
+      {!home&&<div className="page-context"><button type="button" className="page-back" onClick={tabRoot?()=>go('overview'):back}><span className="glass-circle"><ArrowLeft size={21}/></span><span>{tabRoot?'Начало':'Назад'}</span></button>
+        <span className="page-context-brand">Shark<span>AI</span></span><span className="badge">WISE</span></div>}
+      <main className="route-container forward" data-route={base} key={base}>
+        {transferUnavailable&&<p role="alert" className="wallet-transfer-error">Wise е временно недостъпен. Превод не е създаден.</p>}
+        {home?desktop?<section className="desktop-wallet" aria-label="Начало">
+        <section className="desktop-wallet-card desktop-funds"><div className="desktop-card-art desktop-funds-art" aria-hidden="true"/>
+            <div className="desktop-funds-copy"><div className="desktop-funds-heading"><h1>Достъпни средства</h1>
+              <span className="badge">{accountLabel(data.account)}</span></div><p className="desktop-account-name">{accountName} <span>· {currency}</span></p>
+              <div className="desktop-balance-line"><span className="desktop-balance-number">{balance}</span>
+                <span className="desktop-balance-currency"><CurrencyMark desktop currency={currency}/>{currency}</span>
+                <button type="button" className="desktop-balance-toggle" onClick={toggle} aria-label={hidden?'Покажи баланса':'Скрий баланса'}>{hidden?<EyeOff/>:<Eye/>}</button></div>
+              <button type="button" className="desktop-account-picker" onClick={()=>go('accounts')}><Wallet size={20}/><span>Сметки и джобове</span><ChevronDown size={19}/></button></div>
+            <QuickActions desktop go={go}/></section><Recent desktop data={data} hidden={hidden} go={go} detail={detail}/>
+          <WalletReferenceConverter compact/><ChatButton desktop/></section>:
+          <section className="home" aria-label="Начало"><div className="home-hero"><p className="account-label">{accountName} · <CurrencyMark desktop={false} currency={currency}/> {currency}</p>
+            <button type="button" className="home-balance" onClick={toggle} aria-label={hidden?'Покажи баланса':'Скрий баланса'}><span>{balance}</span>
+              <small>{{EUR:'€',USD:'$',GBP:'£'}[currency]??currency}</small></button>
+            <button type="button" className="glass-pill account-switch" onClick={()=>go('accounts')}>Сметки</button></div>
+            <QuickActions desktop={false} go={go}/><div className="home-chat-lane"><ChatButton/></div>
+            <Recent desktop={false} go={go} data={data} hidden={hidden} detail={detail}/></section>:view(base)}
+      </main></div>
+    {!desktop&&!sheet&&<Tabs desktop={false} section={activeTab} go={go}/>}
+    {!home&&!sheet&&<ChatButton floating/>}
+    {sheet&&<Sheet close={back} title={walletTitles[section]}>{view(section)}</Sheet>}
+  </div></div></div>;
 }

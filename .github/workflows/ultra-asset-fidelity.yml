@@ -8,6 +8,7 @@ on:
       - 'app/quick-chat-widget.tsx'
       - 'app/chat/chat-workspace.tsx'
       - 'public/sharkai/wallet/**'
+      - 'public/wallet-original/**'
       - 'public/sharkai/chat/**'
       - 'assets-sha256.json'
       - 'scripts/verify-original-assets.mjs'

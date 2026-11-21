@@ -6,16 +6,20 @@ import {resolve} from 'node:path';
 
 const file=(name)=>readFileSync(resolve(process.cwd(),name),'utf8');
 
-test('desktop header mascot resolves to already approved transparent asset',()=>{
-  const component=file('app/wallet/wallet-home.tsx');
-  assert.match(component,/className="sw-header-muscular-shark" src="\/sharkai\/chat\/shark-avatar\.webp"/);
-  assert.ok(existsSync(resolve('public/sharkai/chat/shark-avatar.webp')),'Original mascot asset must exist');
+test('Wallet uses the supplied header and fonts in mobile and desktop layouts', () => {
+  const css=file('app/wallet/wallet.css');
+  assert.match(css, /@media\s*\(min-width:\s*1024px\)/);
+  for (const name of ['original-font-1.ttf', 'original-font-2.ttf', 'reference-avatar.png']) {
+    assert.ok(existsSync(resolve('public/wallet-original', name)), name);
+  }
 });
 
-test('mobile header hides textual wordmark nodes without hiding the accessible logo image',()=>{
-  const css=file('app/wallet/wallet-premium-layout.css');
-  assert.match(css,/@media\(max-width:699px\)[\s\S]*?\.sw-wordmark\s*\{[^}]*font-size\s*:\s*0(?:px|rem)?\s*!important/);
-  assert.match(css,/\.sw-header-avatar\s*\{[^}]*display:block/);
+test('Floating chat uses its original portrait and scene on every page with the global launcher', () => {
+  const css=file('app/quick-chat.css');
+  const widget=file('app/quick-chat-widget.tsx');
+  assert.match(css, /\/wallet-original\/image-09\.png/);
+  assert.match(css + widget, /\/wallet-original\/image-22\.png/);
+  assert.ok(widget.includes("import('./chat/chat-workspace')"));
 });
 
 test('full-size chat reuses the approved coastal art and glowing wave header',()=>{

@@ -1,27 +1,31 @@
 #!/usr/bin/env node
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {tsImport} from 'tsx/esm/api';
 
-const wallet=readFileSync('app/wallet/wallet-home.tsx','utf8');
-const page=readFileSync('app/wallet/page.tsx','utf8');
+const router = await tsImport('../app/wallet/wallet-routes.ts', import.meta.url);
+const data = await tsImport('../app/wallet/wallet-data.ts', import.meta.url);
+const {readWalletRoute, walletUrl, walletLogin, walletTitles} = router.default ?? router;
+const {accountBalance} = data.default ?? data;
 
-test('mobile Payments goes to its own safe Wise operations screen',()=>{
-  assert.match(wallet,/section==='payments'/);
-  assert.match(page,/tab==='payments'/);
-  assert.match(wallet,/href=\{tabLink\('payments'\)\}/);
-  assert.match(wallet,/Плащания чрез Wise/);
-  assert.match(wallet,/Продължи в Wise/);
+test('Payments, crypto, currencies and search have distinct, shareable destinations', () => {
+  for (const tab of ['payments','crypto','currencies','search','transactions','cards','details','settings','forecast']) {
+    const url = new URL(walletUrl(tab), 'https://shark.invalid');
+    assert.equal(readWalletRoute(url.searchParams.get('tab')), tab);
+    assert.equal(new URL(walletLogin(tab), url).searchParams.get('next'), url.pathname + url.search);
+  }
+  assert.equal(readWalletRoute('invest'), 'investments');
+  for (const invalid of ['toString', '__proto__', ['payments','crypto'], null]) {
+    assert.equal(readWalletRoute(invalid), 'overview');
+  }
+  assert.equal(Object.keys(walletTitles).filter(route => readWalletRoute(route) !== route).length, 0);
 });
-test('mobile Crypto does not masquerade as EUR/GBP currencies screen',()=>{
-  assert.match(wallet,/section==='crypto'/);
-  assert.match(page,/tab==='crypto'/);
-  assert.match(wallet,/href=\{tabLink\('crypto'\)\}/);
-  assert.match(wallet,/Крипто справка/);
-});
-test('Search opens a real filter for existing authorized transactions',()=>{
-  assert.match(wallet,/type="search"/);
-  assert.match(wallet,/Търси в движенията/);
-  assert.match(wallet,/\.filter\(row=>/);
-  assert.match(wallet,/Няма движения по зададеното търсене/);
+
+test('Only a provider-confirmed zero appears as a zero balance', () => {
+  const owner = (status, balance_minor) => ({state:'ready',data:{wallet:{status,currency:'EUR',balance_minor}}});
+  for (const state of ['loading','guest','unavailable']) assert.equal(accountBalance({state,data:null}), '—');
+  for (const status of ['provider_unlinked','stale','unavailable']) assert.equal(accountBalance(owner(status, '12345')), '—');
+  assert.equal(accountBalance(owner('verified',null)), '—');
+  assert.match(accountBalance(owner('verified','0')), /^0[,.]00$/);
+  assert.match(accountBalance(owner('verified','12345')), /^123[,.]45$/);
 });

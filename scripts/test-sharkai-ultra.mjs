@@ -13,21 +13,24 @@ test('The original global agent is mounted exactly once',()=>{
   assert.match(layout,/import '.\/sharkai-ultra\.css';/);
 });
 test('Wallet keeps original Wise endpoints and authenticated data handling',()=>{
-  const original=read('app/wallet/wallet-home.tsx');
-  assert.match(original,/fetch\('\/api\/wallet-investments'/);
-  assert.match(original,/fetch\('\/api\/wallet-investments\/provider\/transactions'/);
-  assert.match(original,/isWalletOwnerDashboard/);
-  assert.match(original,/wallet\?\.status==='verified'/);
-  assert.match(original,/displayMinor\(wallet\.balance_minor,wallet\.currency\)/);
-  assert.doesNotMatch(original,/const visible=['"]0,00/);
+  const data = read('app/wallet/wallet-data.ts');
+  assert.match(data, /fetch\('\/api\/wallet-investments'/);
+  assert.match(data, /fetch\('\/api\/wallet-investments\/provider\/transactions'/);
+  assert.match(data, /isWalletOwnerDashboard/);
+  assert.match(data, /status\s*===\s*'verified'/);
+  assert.match(data, /displayMinor\(wallet\.balance_minor,\s*wallet\.currency\)/);
 });
-test('Wallet styling is additive and loaded after base CSS',()=>{
-  const page=read('app/wallet/page.tsx');
-  assert.match(page,/import '.\/wallet\.css';\s*import '.\/wallet-approved-theme\.css';/);
-  const css=read('app/wallet/wallet-approved-theme.css');
-  for(const filename of ['coast-day.webp','ice-fullbleed.webp','euro-cash.webp','transactions.webp','investments.webp']) assert.ok(css.includes(filename),filename);
-  assert.match(css,/inset:0;z-index:-2/);
+
+test('Wallet loads archive artwork and styles within the wallet screen', () => {
+  const page = read('app/wallet/page.tsx');
+  const css = read('app/wallet/wallet.css');
+  assert.ok(page.includes("import './wallet.css'"));
+  assert.ok(css.includes('.zip-wallet .desktop-wallet-header'));
+  for (const file of ['image-01.png', 'image-02.png', 'image-03.png']) {
+    assert.ok(css.includes('/wallet-original/' + file), file);
+  }
 });
+
 test('Global theme and locked assistant colors stay consistent',()=>{
   const css=read('app/sharkai-ultra.css');
   for(const color of ['#071c39','#073ca2','#6b29d2','#4317a2','#22dcff','#b9ff19']) assert.ok(css.includes(color),color);

@@ -9,6 +9,7 @@ export interface Message {
   content: string;
   imagePath?: string | null;
   attachmentMime?: string | null;
+  attachmentName?: string;
   toolResult?: ChatToolResult | null;
   replySource?: 'shark' | 'fallback';
 }
@@ -103,7 +104,7 @@ export function messageAttachment(message: Message): Attachment | null {
   const extension = message.attachmentMime ? FILE_EXTENSIONS[message.attachmentMime] : undefined;
   const label = isImage ? 'Прикачено изображение' : AUDIO_MIME_TYPES.includes(mimeType) ? 'Прикачен запис' : 'Прикачен файл';
   return {
-    id: message.imagePath, mimeType, name: extension ? `${label}.${extension}` : label,
+    id: message.imagePath, mimeType, name: message.attachmentName || (extension ? `${label}.${extension}` : label),
     previewUrl: isImage ? uploadUrl(message.imagePath) : undefined,
   };
 }
