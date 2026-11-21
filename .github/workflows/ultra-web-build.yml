@@ -48,7 +48,7 @@ jobs:
           node scripts/verify-original-assets.mjs
           SHARKAI_REQUIRE_LOCKED_ASSETS=1 node --test scripts/test-sharkai-ultra.mjs
           node --test scripts/test-ultra-visual-clarity.mjs
-          node --test scripts/test-ultra-route-regressions.mjs
+          node --import tsx --test scripts/test-ultra-route-regressions.mjs
           node --import tsx --test scripts/test-ultra-live-rates.mts scripts/test-auth-return.mts scripts/test-equity-markets.mts scripts/test-wise-wallet.mts
       - name: Build production Next.js app (no live credentials)
         run: npm run build
