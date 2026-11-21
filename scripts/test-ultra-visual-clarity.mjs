@@ -65,3 +65,15 @@ test('Every premium module uses the same half-glacier and half-photo surface', (
   assert.match(surface, /\[data-scene-tone="light"\]/);
   assert.match(surface, /prefers-reduced-motion/);
 });
+
+
+test('The app shell repeats the midnight sapphire and violet header palette', () => {
+  const css = file('app/site-scenes.css');
+  const shell = css.split('/* ULTRA midnight shell and navigation */')[1];
+  assert.ok(shell, 'A shared dark premium shell is required');
+  assert.match(shell, /site-daylight::after/);
+  assert.match(shell, /module-sidebar\.ice-section/);
+  assert.match(shell, /module-topbar\[data-scene\]/);
+  assert.match(shell, /shark-admin-topbar\[data-scene\]/);
+  assert.match(shell, /#071739/);
+});
