@@ -53,4 +53,4 @@ jobs:
       - name: Build production Next.js app (no live credentials)
         run: npm run build
       - name: Verify public routes, Wallet screens and their aliases in a production build
-        run: node scripts/test-ultra-route-smoke.mjs
+        run: node --import tsx scripts/test-ultra-route-smoke.mjs
