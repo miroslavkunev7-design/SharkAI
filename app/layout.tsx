@@ -6,6 +6,8 @@ import { QuickChatWidget } from './quick-chat-widget';
 import './quick-chat.css';
 import './sharkai-ultra.css';
 import './site-scenes.css';
+import { SessionBoundary } from './session-boundary';
+import './session-boundary.css';
 
 export const metadata: Metadata = {
   title: 'SharkAI — AI чат и работно пространство',
@@ -40,11 +42,13 @@ export default function RootLayout({
     <html lang="bg">
       <body className="shark-site font-sans min-h-screen">
         <div className="site-daylight" aria-hidden="true" />
-        {children}
-        <div className="shark-overlay-stack">
-          <DesktopWebUpdate revision={desktopWebRevision()} />
-          <QuickChatWidget />
-        </div>
+        <SessionBoundary>
+          {children}
+          <div className="shark-overlay-stack">
+            <DesktopWebUpdate revision={desktopWebRevision()} />
+            <QuickChatWidget />
+          </div>
+        </SessionBoundary>
       </body>
     </html>
   );

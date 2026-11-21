@@ -115,6 +115,11 @@ export async function readWalletTransactions(owner:WalletOwnerRequest,now?:Date,
   return {status:'unavailable' as const,currency:owner.currency,from:null,to:null,as_of:null,transactions:[],has_more:false};
 }
 
+export async function wiseAccountHandoff(owner:WalletOwnerRequest,now?:Date,env=process.env,transport?:WiseTransport) {
+  const wallet=await resolveWalletStatus(owner,now,env,transport);
+  return wallet.status==='verified' ? 'https://wise.com/home/' : '/wallet?tab=wise-connection';
+}
+
 export async function walletKyc(owner: WalletOwnerRequest, start: boolean, now?: Date, env = process.env, transport?: WiseTransport) {
   const connection = wiseWalletConnection(owner,now,env,transport);
   if (connection.status !== 'connected' || !connection.binding.hosted_review) return null;

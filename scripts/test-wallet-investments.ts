@@ -187,11 +187,11 @@ async function checkWiseHandoff(token: string) {
   assert.equal((await send({ cookie, origin: 'https://foreign.invalid' })).status, 403);
   const guest = await send({ origin: origin.origin });
   assert.equal(guest.status, 303);
-  assert.equal(guest.headers.get('location'), '/login?next=%2Fwallet');
+  assert.equal(guest.headers.get('location'), '/login?next=%2Fwallet%3Ftab%3Dtransfer');
   const handoff = () => send({ cookie, origin: origin.origin });
   for (const response of await Promise.all([handoff(), handoff()])) {
     assert.equal(response.status, 303);
-    assert.equal(response.headers.get('location'), 'https://wise.com/home/');
+    assert.equal(response.headers.get('location'), '/wallet?tab=wise-connection');
     assert.match(response.headers.get('cache-control') ?? '', /no-store/);
     assert.equal(response.headers.get('referrer-policy'), 'no-referrer');
     assert.equal(await response.text(), '');

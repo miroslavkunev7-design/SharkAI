@@ -2,22 +2,12 @@
 
 import Link from 'next/link';
 import {useEffect, useState} from 'react';
-import {Bitcoin, ChevronRight, Coins, Search, TrendingUp} from 'lucide-react';
+import {Bitcoin, ChevronRight, Coins, Search} from 'lucide-react';
 import {cryptoRanges,cryptoUnit,type CryptoCatalog,type CryptoChart,type CryptoRange} from '@/lib/markets/crypto';
 import {PriceChart,useMarket} from '../dashboard/crypto-market';
 import {dateLabel} from './wallet-data';
 
-const equities = [{symbol:'AAPL',name:'Apple'},{symbol:'MSFT',name:'Microsoft'},{symbol:'VWCE',name:'FTSE All-World ETF'}] as const;
-export function EquityMarkets({searchable=false,symbol=null}:{searchable?:boolean;symbol?:string|null}) {
-  const [term,setTerm]=useState('');
-  const rows=equities.filter(row=>(!symbol||row.symbol===symbol)&&(row.name+' '+row.symbol).toLowerCase().includes(term.trim().toLowerCase()));
-  return <div className="panel" data-scene="investments" data-scene-tone="light"><h2 className="section-title">Акции и ETF</h2>
-    {searchable&&<label className="field"><span>Търси инструмент</span><input type="search" value={term} onChange={e=>setTerm(e.target.value)}/></label>}
-    <div className="list">{rows.map(row=>{
-      const contents=<><span className="row-icon"><TrendingUp size={22}/></span><span className="row-label"><strong>{row.name}</strong><small>{row.symbol} · няма потвърдена котировка</small></span><span className="row-end">—</span></>;
-      return symbol?<div key={row.symbol} className="item-row">{contents}</div>:<Link className="item-row clickable" key={row.symbol} href={'/wallet?tab=asset&kind=invest&pair='+row.symbol}>{contents}</Link>;
-    })}</div>{!rows.length&&<p>Няма намерени инструменти.</p>}</div>;
-}
+export {EquityMarkets} from './equity-markets';
 function PortfolioQuote({symbol,name}:{symbol:string;name:string}) {
   const quote=useMarket<CryptoCatalog>('/api/markets/crypto?'+new URLSearchParams({q:symbol+'/EUR',page:'1'}));
   const row=quote?.rows.find(p=>p.base===symbol&&p.quote==='EUR');

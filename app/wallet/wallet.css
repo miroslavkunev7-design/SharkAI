@@ -610,6 +610,17 @@
 }
 .zip-wallet .wallet-site-back:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
 .zip-wallet .home-chat-lane .wallet-site-back { margin-left: 6px; }
+.zip-wallet a.account-switch, .zip-wallet a.desktop-account-picker {
+  color: #fff;
+  text-decoration: none;
+}
+.zip-wallet .home-hero form .account-switch,
+.zip-wallet .home-hero a.account-switch {
+  width: fit-content;
+  min-width: calc(230 * var(--u));
+  padding-inline: 14px;
+  font-size: clamp(14px, 4vw, 18px);
+}
 
 body.shark-site .zip-wallet .desktop-transactions[data-scene] {
   background: linear-gradient(114deg, #e1f5fff2, #c4dcf5e8 48%, #d6cff3eb);

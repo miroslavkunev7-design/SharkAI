@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { displayMinor } from '@/lib/wallet-investments-contract';
 import type { WalletDepositSummary } from '@/lib/investments/wallet-operations.server';
 import type { WalletInvestmentsOwnerDashboard } from '@/lib/wallet-investments-server';
+import Link from 'next/link';
+import { WiseReviewForm, WiseWindowLink } from '../wallet/wise-window';
 
 const reviews: Record<string,string> = {
   NEW: 'Предстои преглед от Wise', PASSED: 'Потвърден от Wise', PASSED_WITH_REQUIREMENTS: 'Потвърден с допълнителни изисквания',
@@ -11,8 +13,8 @@ const reviews: Record<string,string> = {
 };
 const api = '/api/wallet-investments/provider/';
 
-export function WalletProviderActions({ data, action }: {
-  data: WalletInvestmentsOwnerDashboard; action: 'funding' | 'withdrawal' | null;
+export function WalletProviderActions({ data, action, inWallet=false }: {
+  data: WalletInvestmentsOwnerDashboard; action: 'funding' | 'withdrawal' | null; inWallet?:boolean;
 }) {
   const actionSection = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -56,13 +58,13 @@ export function WalletProviderActions({ data, action }: {
       За {action === 'funding' ? 'зареждане' : 'теглене'} е необходим потвърден портфейл в Wise.
     </p>}
     {capable.hosted_kyc && <p role="status">Проверка на самоличността · {review === null ? 'Зареждане…' : reviews[review] ?? 'Временно недостъпна'}</p>}
-    {review === 'WAITING_CUSTOMER_INPUT' && <form method="POST" action={api+'onboarding'}>
-      <button className="shark-action-secondary" type="submit">{data.wallet.status === 'verified' ? 'Продължи проверката в Wise' : 'Създай портфейл в Wise'}</button>
-    </form>}
-    {!capable.hosted_kyc && data.wallet.status !== 'verified' && <a className="shark-action-secondary" href="/wallet">Към портфейла</a>}
-    {data.wallet.status === 'verified' && <a href="https://wise.com/home/" data-provider-action className="shark-action-secondary" target="_blank" rel="noopener noreferrer">
-      {action ? actionLabel + ' в Wise' : 'Зареждане или теглене в Wise'}
-    </a>}
+    {capable.hosted_kyc && review === 'WAITING_CUSTOMER_INPUT' && <WiseReviewForm className="shark-action-secondary">
+      Продължи проверката в Wise
+    </WiseReviewForm>}
+    {!inWallet && !capable.hosted_kyc && data.wallet.status !== 'verified' && <Link className="shark-action-secondary" href="/wallet?tab=wise-connection">Връзка с Wise</Link>}
+    {data.wallet.status === 'verified' && (action === 'withdrawal'
+      ? <form method="POST" action={api+'withdrawal'}><button type="submit" data-provider-action className="shark-action-secondary">Теглене в Wise</button></form>
+      : <WiseWindowLink className="shark-action-secondary">{action ? actionLabel + ' в Wise' : 'Отвори моя Wise'}</WiseWindowLink>)}
     {capable.deposit_statements && <button className="shark-action-secondary" type="button" onClick={()=>void checkDeposits()} disabled={busy}>
       {busy ? 'Проверка…' : 'Постъпления за последните 7 дни'}
     </button>}

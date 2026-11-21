@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Ellipsis, Minus } from 'lucide-react';
+import { consumeQuickChat, currentReturnPath } from '@/lib/auth-return';
 
 const ChatWorkspace = lazy(() => import('./chat/chat-workspace'));
 
@@ -23,6 +24,7 @@ function Launcher() {
 
   useEffect(() => {
     window.addEventListener('sharkai:open-chat', launch);
+    if (consumeQuickChat(currentReturnPath('/chat'))) launch();
     return () => window.removeEventListener('sharkai:open-chat', launch);
   }, [launch]);
 

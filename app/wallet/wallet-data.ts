@@ -22,8 +22,11 @@ export function accountLabel(account: Account) {
   if (account.state === 'loading') return 'Зареждане на сметката…';
   if (account.state === 'unavailable') return 'Временно недостъпно';
   const status = account.data?.wallet.status;
+  const capabilities=account.data?.wallet_capabilities;
+  if(capabilities?.currencies?.length && !capabilities.selected_currency) return 'Избери валута на сметката';
   if (status === 'verified') return 'Данни от Wise';
   if (status === 'stale') return 'Необходима е нова проверка';
+  if (status === 'provider_unconfigured') return 'Връзката с Wise не е настроена';
   return status === 'unavailable' ? 'Временно недостъпно' : 'Не е свързано';
 }
 
@@ -50,8 +53,10 @@ export function useWalletData() {
     const clear = () => { setAccount({state:'loading', data:null}); setLoaded(null); };
     // A restored document can belong to a previous sign-in on a shared device.
     const restore = (event: PageTransitionEvent) => { if (event.persisted) { clear(); setRevision(n => n+1); } };
+    const reload = () => { clear(); setRevision(n => n+1); };
     window.addEventListener('pageshow', restore);
     window.addEventListener('pagehide', clear);
+    window.addEventListener('sharkai:wise-return',reload);
     fetch('/api/wallet-investments', {cache:'no-store', signal:AbortSignal.any([controller.signal, AbortSignal.timeout(20000)])})
       .then(async response => {
         if (response.status === 401) return {state:'guest', data:null} as const;
@@ -64,11 +69,12 @@ export function useWalletData() {
       controller.abort();
       window.removeEventListener('pageshow',restore);
       window.removeEventListener('pagehide',clear);
+      window.removeEventListener('sharkai:wise-return',reload);
     };
   }, [revision]);
   useEffect(() => {
     if (!account.data?.wallet_capabilities.deposit_statements) return;
-    const currency = account.data.wallet.currency ?? account.data.settings.currency;
+    const currency = account.data.wallet.currency ?? account.data.wallet_capabilities.selected_currency ?? account.data.settings.currency;
     const controller = new AbortController();
     fetch('/api/wallet-investments/provider/transactions', {
       method:'POST', cache:'no-store', signal:AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]),

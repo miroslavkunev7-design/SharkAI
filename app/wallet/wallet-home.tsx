@@ -9,6 +9,7 @@ import {accountBalance, accountLabel, useWalletData, type WalletData} from './wa
 import {WalletView, RecentRows} from './wallet-views';
 import {walletLogin, walletTitles, walletUrl, type WalletRoute} from './wallet-routes';
 import {WalletReferenceConverter} from './wallet-premium-extras';
+import {WiseReviewForm,WiseWindowLink} from './wise-window';
 
 type Go = (route: WalletRoute) => void;
 const isDesktop = () => window.matchMedia('(min-width: 1024px)').matches;
@@ -101,9 +102,11 @@ function CurrencyMark({desktop,currency}:{desktop:boolean;currency:string}) {
 }
 function Recent({desktop,go,data,hidden,detail}:{desktop:boolean;go:Go;data:WalletData;hidden:boolean;detail:(i:number)=>void}) {
   const guest=data.account.state==='guest',hasRows=Boolean(data.statement?.transactions.length);
-  const button=<button type="button" className={desktop?'desktop-text-link':'button secondary'} onClick={()=>{
-    if(guest) window.location.assign(walletLogin('overview')); else if(data.account.state==='unavailable'||data.statement===null) data.refresh(); else go('wise-connection');
-  }}>{guest?'Вход в SharkAI':data.account.state==='unavailable'||data.statement===null?'Обнови':'Връзка с Wise'}{desktop&&<ChevronRight size={16}/>}</button>;
+  const loading=data.account.state==='loading' || (data.account.data?.wallet_capabilities.deposit_statements && data.statement===undefined);
+  const retry=data.account.state==='unavailable' || data.statement===null || data.account.data?.wallet.status==='verified';
+  const button=!loading&&<button type="button" className={desktop?'desktop-text-link':'button secondary'} onClick={()=>{
+    if(guest) window.location.assign(walletLogin('overview')); else if(retry) data.refresh(); else go('wise-connection');
+  }}>{guest?'Вход в SharkAI':retry?'Обнови':'Връзка с Wise'}{desktop&&<ChevronRight size={16}/>}</button>;
   return <section className={desktop?'desktop-wallet-card desktop-transactions':'panel recent-panel'} data-scene="transactions" data-scene-tone="light" aria-label="Последни транзакции">
     {desktop&&<div className="desktop-card-art desktop-transactions-art" aria-hidden="true"/>}
     <div className={desktop?'desktop-transactions-heading':'recent-heading'}><h2>Последни транзакции</h2><span className="badge">Wise</span>
@@ -154,8 +157,20 @@ export function WalletHome({section,transferUnavailable,pair,equities=false}:{se
   const home=base==='overview';
   const tabRoot=navigation.some(tab=>tab.route===base);
   useEffect(()=>{if(!sheet)scroll.current?.scrollTo(0,0);},[section,sheet]);
-  const currency=data.account.data?.wallet.currency??data.account.data?.settings.currency??'EUR';
+  const currency=data.account.data?.wallet.currency??data.account.data?.wallet_capabilities.selected_currency??data.account.data?.settings.currency??'EUR';
   const accountName=data.account.data?.wallet.status==='verified'?'Основна':'Портфейл';
+  const pickerClass=desktop?'desktop-account-picker':'glass-pill account-switch';
+  const accountDetails=data.account.data;
+  const caps=accountDetails?.wallet_capabilities;
+  const selectCurrency=Boolean(caps?.currencies?.length && !caps.selected_currency);
+  let accountPicker=<button type="button" className={pickerClass} onClick={()=>go('accounts')}>{desktop&&<Wallet size={20}/>}
+    <span>{desktop?'Сметки и джобове':'Сметки'}</span>{desktop&&<ChevronDown size={19}/>}</button>;
+  if(accountDetails && accountDetails.wallet.status!=='verified') {
+    if(selectCurrency) accountPicker=<button type="button" className={pickerClass} onClick={()=>go('wise-connection')}>Избери валута</button>;
+    else if(caps?.hosted_kyc) accountPicker=<WiseReviewForm className={pickerClass}>Проверка в Wise</WiseReviewForm>;
+    else accountPicker=<WiseWindowLink className={pickerClass}>Отвори моя Wise</WiseWindowLink>;
+  }
+  if(data.account.state==='guest') accountPicker=<WiseWindowLink className={pickerClass}>Отвори моя Wise</WiseWindowLink>;
   const balance=hidden?'••••':accountBalance(data.account),toggle=()=>setHidden(v=>!v);
   const detail=(index:number)=>{setSelected({index,statement:data.statement});go('transaction');};
   const view=(route:WalletRoute)=><WalletView key={route} route={route} pair={pair} equities={equities} go={go} data={data} currency={currency} hidden={hidden}
@@ -175,13 +190,13 @@ export function WalletHome({section,transferUnavailable,pair,equities=false}:{se
               <div className="desktop-balance-line"><span className="desktop-balance-number">{balance}</span>
                 <span className="desktop-balance-currency"><CurrencyMark desktop currency={currency}/>{currency}</span>
                 <button type="button" className="desktop-balance-toggle" onClick={toggle} aria-label={hidden?'Покажи баланса':'Скрий баланса'}>{hidden?<EyeOff/>:<Eye/>}</button></div>
-              <button type="button" className="desktop-account-picker" onClick={()=>go('accounts')}><Wallet size={20}/><span>Сметки и джобове</span><ChevronDown size={19}/></button></div>
+              {accountPicker}</div>
             <QuickActions desktop go={go}/></section><Recent desktop data={data} hidden={hidden} go={go} detail={detail}/>
           <WalletReferenceConverter compact/><ChatButton desktop/></section>:
           <section className="home" aria-label="Начало"><div className="home-hero"><p className="account-label">{accountName} · <CurrencyMark desktop={false} currency={currency}/> {currency}</p>
             <button type="button" className="home-balance" onClick={toggle} aria-label={hidden?'Покажи баланса':'Скрий баланса'}><span>{balance}</span>
               <small>{{EUR:'€',USD:'$',GBP:'£'}[currency]??currency}</small></button>
-            <button type="button" className="glass-pill account-switch" onClick={()=>go('accounts')}>Сметки</button></div>
+            {accountPicker}</div>
             <QuickActions desktop={false} go={go}/><div className="home-chat-lane"><SiteLink/><ChatButton/></div>
             <Recent desktop={false} go={go} data={data} hidden={hidden} detail={detail}/></section>:view(base)}
       </main></div>

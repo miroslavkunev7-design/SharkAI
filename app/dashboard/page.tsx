@@ -1,4 +1,5 @@
 'use client';
+import { announceSessionChange } from '../session-boundary';
 
 import { Suspense, useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Image from 'next/image';
@@ -620,6 +621,7 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
     setLogoutError('');
     try {
       await json('/api/auth/logout', { method: 'POST' });
+      announceSessionChange();
       router.push('/login');
       router.refresh();
     } catch {

@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { PublicShell } from '@/components/PublicShell';
+import { rememberQuickChat, safeReturnPath } from '@/lib/auth-return';
+import { announceSessionChange } from '../session-boundary';
 import '../entry.css';
 
 export default function LoginPage() {
@@ -37,9 +39,11 @@ export default function LoginPage() {
         setError('SharkAI не потвърди входа. Опитай отново.');
         return;
       }
-      const next = new URLSearchParams(window.location.search).get('next');
-      const allowedReturn = next && /^\/(chat|dashboard|pricing|wallet|tests)(\?|$)/.test(next);
-      window.location.replace(allowedReturn ? next : '/chat');
+      const query = new URLSearchParams(window.location.search);
+      const next = safeReturnPath(query.get('next')) ?? '/chat';
+      announceSessionChange();
+      if (query.get('quickChat') === '1' && new URL(next, location.origin).pathname !== '/chat') rememberQuickChat(next);
+      window.location.replace(next);
     } catch {
       setError('Връзката със SharkAI прекъсна. Опитай отново.');
     } finally {

@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { test } from 'node:test';
-import { resolveWalletStatus } from '../lib/investments/wallet-status.server';
-import { projectWiseDeposits, projectWiseTransactions, readWalletDeposits, walletKyc } from '../lib/investments/wallet-operations.server';
+import { jsx } from 'react/jsx-runtime';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { WiseWindowLink, WiseReviewForm } from '../app/wallet/wise-window';
+import { resolveWalletStatus, walletOwnerCapabilities } from '../lib/investments/wallet-status.server';
+import { projectWiseDeposits, projectWiseTransactions, readWalletDeposits, walletKyc, wiseAccountHandoff } from '../lib/investments/wallet-operations.server';
 import type { WiseTransport } from '../lib/investments/wise-wallet.server';
 
 const now = new Date('2026-11-19T11:00:00.000Z');
@@ -26,6 +29,17 @@ const makeEnv = (changes: Partial<typeof binding> = {}): NodeJS.ProcessEnv => ({
   WISE_WALLET_SERVER_CA_PEM: 'fixture-ca-only',
   WISE_WALLET_CLIENT_CERT_PEM: 'fixture-cert-only',
   WISE_WALLET_CLIENT_KEY_PEM: 'fixture-key-only',
+});
+
+test('personal Wise access is a real isolated link; enrolled identity checks submit to the owner-only endpoint',()=>{
+  const link=renderToStaticMarkup(jsx(WiseWindowLink,{className:'button',children:'Отвори моя Wise'}));
+  assert.match(link,/href="https:\/\/wise\.com\/home\/"/);
+  assert.match(link,/target="_blank"/);
+  assert.match(link,/rel="noopener noreferrer"/);
+  assert.match(link,/Отвори моя Wise/);
+  const review=renderToStaticMarkup(jsx(WiseReviewForm,{className:'button',children:'Проверка в Wise'}));
+  assert.match(review,/action="\/api\/wallet-investments\/provider\/onboarding"/);
+  assert.match(review,/method="POST"/i);
 });
 
 test('statement credits are bound to the selected balance, currency and exact seven-day window', async()=>{
@@ -147,13 +161,36 @@ test('disabled, unsupported or incomplete provider contracts make no reads', asy
 });
 
 test('unlinked user or unapproved currency yields no amount and cannot reach Wise', async () => {
-  for (const actor of [{ ...owner, userId: 'wrong-owner' }, { ...owner, currency: 'GBP' }, { ...owner, currency: null }]) {
+  for (const actor of [{ ...owner, userId: 'wrong-owner' }, { ...owner, currency: 'GBP' }]) {
     const result = await resolveWalletStatus(actor, now, makeEnv(), failIfCalled);
     assert.equal(result.status, 'provider_unlinked');
     assert.equal(result.balance_minor, null);
   }
   const env = { ...makeEnv(), WISE_WALLET_OWNER_BINDING: undefined };
   assert.equal((await resolveWalletStatus(owner, now, env, failIfCalled)).status, 'provider_unlinked');
+});
+
+test('a single approved owner currency resolves automatically; multiple currencies require an explicit choice',async()=>{
+  const firstVisit={...owner,currency:null};
+  const env=makeEnv();
+  assert.equal((await resolveWalletStatus(firstVisit,now,env,fixtureTransport().transport)).currency,'EUR');
+  assert.equal(await wiseAccountHandoff(firstVisit,now,env,fixtureTransport().transport),'https://wise.com/home/');
+  assert.equal(await wiseAccountHandoff({...firstVisit,userId:'other'},now,env,failIfCalled),'/wallet?tab=wise-connection');
+  const sterling={...binding,currency:'GBP',balance_id:'304',statement_approval_ref:'fixture-statements'};
+  const multiple={...env,WISE_WALLET_OWNER_BINDING:undefined,WISE_WALLET_USER_TOKEN_ONLY:fixtureToken,
+    WISE_WALLET_ENROLLMENTS:JSON.stringify([binding,sterling].map(row=>({binding:row,token_secret_name:'WISE_WALLET_USER_TOKEN_ONLY'})))};
+  const options=walletOwnerCapabilities(firstVisit,now,multiple);
+  assert.deepEqual(options,{currencies:['EUR','GBP'],selected_currency:null,deposit_statements:false,hosted_kyc:false});
+  assert.equal((await resolveWalletStatus(firstVisit,now,multiple,failIfCalled)).status,'provider_unlinked');
+  assert.equal(await wiseAccountHandoff(firstVisit,now,multiple,failIfCalled),'/wallet?tab=wise-connection');
+  assert.deepEqual(walletOwnerCapabilities({...firstVisit,userId:'stranger'},now,multiple).currencies,[]);
+  assert.equal(walletOwnerCapabilities({...firstVisit,currency:'GBP'},now,multiple).deposit_statements,true);
+  assert.equal(walletOwnerCapabilities({...firstVisit,currency:'USD'},now,multiple).selected_currency,null);
+  const read=fixtureTransport({'/2026Q4/profiles/202/balances/304':{...suppliedBalance,id:304,currency:'GBP',amount:{value:21,currency:'GBP'}}});
+  const chosen=await resolveWalletStatus({...owner,currency:'GBP'},now,multiple,read.transport);
+  assert.equal(chosen.currency,'GBP');
+  assert.equal(chosen.balance_minor,'2100');
+  assert.equal(read.calls.length,3);
 });
 
 test('expired production token does not contact provider', async () => {

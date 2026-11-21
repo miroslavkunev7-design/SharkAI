@@ -62,30 +62,36 @@ const approvedEnrollments=z.array(z.object({
   binding:ownerBinding, token_secret_name:z.string().regex(/^WISE_WALLET_USER_TOKEN_[A-Z0-9_]{1,60}$/),
 }).strict()).max(256);
 
-function selectWalletEnrollment(userId:string, currency:string|null, env:NodeJS.ProcessEnv) {
+function ownerEnrollments(userId:string, env:NodeJS.ProcessEnv) {
+  if (env.WALLET_PROVIDER !== 'wise') return null;
   const raw=env.WISE_WALLET_ENROLLMENTS;
   if (!raw) {
-    if (!env.WISE_WALLET_OWNER_BINDING) return empty('provider_unlinked');
+    if (!env.WISE_WALLET_OWNER_BINDING) return [];
     const binding=bindingFromConfig(env.WISE_WALLET_OWNER_BINDING);
-    return binding ? { status:'enrolled' as const,binding,token:env.WISE_WALLET_OAUTH_ACCESS_TOKEN } : empty('provider_unconfigured');
+    if (!binding) return null;
+    return binding.owner_id===userId ? [{binding,token:env.WISE_WALLET_OAUTH_ACCESS_TOKEN}] : [];
   }
-  if (raw.length>256*1024 || env.WISE_WALLET_OWNER_BINDING) return empty('provider_unconfigured');
+  if (raw.length>256*1024 || env.WISE_WALLET_OWNER_BINDING) return null;
   try {
     const rows=approvedEnrollments.parse(JSON.parse(raw));
     const ownersByProvider=new Map<string,string>();
     const ownerCurrencies=new Set<string>();
     for (const {binding} of rows) {
       const pair=JSON.stringify([binding.owner_id,binding.currency]);
-      if (ownerCurrencies.has(pair)) return empty('provider_unconfigured');
+      if (ownerCurrencies.has(pair)) return null;
       ownerCurrencies.add(pair);
       for (const id of ['user:'+binding.provider_user_id,'profile:'+binding.profile_id,...(binding.balance_id?['balance:'+binding.balance_id]:[])]) {
-        if (ownersByProvider.has(id) && ownersByProvider.get(id)!==binding.owner_id) return empty('provider_unconfigured');
+        if (ownersByProvider.has(id) && ownersByProvider.get(id)!==binding.owner_id) return null;
         ownersByProvider.set(id,binding.owner_id);
       }
     }
-    const match=rows.find(({binding})=>binding.owner_id===userId && binding.currency===currency);
-    return match ? {status:'enrolled' as const,binding:match.binding,token:env[match.token_secret_name]} : empty('provider_unlinked');
-  } catch { return empty('provider_unconfigured'); }
+    return rows.filter(({binding})=>binding.owner_id===userId)
+      .map(({binding,token_secret_name})=>({binding,token:env[token_secret_name]}));
+  } catch { return null; }
+}
+
+export function enrolledWalletCurrencies(userId:string, env:NodeJS.ProcessEnv=process.env) {
+  return (ownerEnrollments(userId,env)??[]).map(({binding})=>binding.currency).sort();
 }
 
 export function wiseWalletConnection(
@@ -96,10 +102,11 @@ export function wiseWalletConnection(
 ) {
   // OpenPayd requires a separately approved end-user account and credential model.
   if (env.WALLET_PROVIDER !== 'wise') return empty('provider_unconfigured');
-  const enrollment = selectWalletEnrollment(userId,currency,env);
-  if (enrollment.status!=='enrolled') return enrollment;
+  const rows = ownerEnrollments(userId,env);
+  if (!rows) return empty('provider_unconfigured');
+  const enrollment = currency===null && rows.length===1 ? rows[0] : rows.find(({binding})=>binding.currency===currency);
+  if (!enrollment) return empty('provider_unlinked');
   const { binding,token } = enrollment;
-  if (binding.owner_id !== userId || binding.currency !== currency) return empty('provider_unlinked');
   const ca = env.WISE_WALLET_SERVER_CA_PEM;
   const cert = env.WISE_WALLET_CLIENT_CERT_PEM;
   const key = env.WISE_WALLET_CLIENT_KEY_PEM;
@@ -141,9 +148,14 @@ export async function resolveWalletStatus(
   };
 }
 
-export function walletOwnerCapabilities(owner: WalletOwnerRequest) {
-  const c = wiseWalletConnection(owner);
-  return c.status === 'connected'
-    ? { deposit_statements:Boolean(c.binding.balance_id && c.binding.statement_approval_ref), hosted_kyc:Boolean(c.binding.hosted_review) }
-    : { deposit_statements:false, hosted_kyc:false };
+export function walletOwnerCapabilities(owner: WalletOwnerRequest, now?:Date, env:NodeJS.ProcessEnv=process.env) {
+  const c = wiseWalletConnection(owner,now,env);
+  const currencies=enrolledWalletCurrencies(owner.userId,env);
+  const selected=owner.currency===null && currencies.length===1 ? currencies[0] :
+    currencies.find(code=>code===owner.currency)??null;
+  return {
+    currencies, selected_currency:selected,
+    deposit_statements:c.status==='connected' && Boolean(c.binding.balance_id && c.binding.statement_approval_ref),
+    hosted_kyc:c.status==='connected' && Boolean(c.binding.hosted_review),
+  };
 }

@@ -1,0 +1,4 @@
+/* A background tab may share a device with the next person signing in. */
+html[data-session-checking] :is(.zip-wallet main, .zip-wallet dialog, .shark-chat-shell, .original-chat-dialog, .module-workspace, .operator-admin, .shark-admin) {
+  visibility: hidden;
+}

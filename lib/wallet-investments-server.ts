@@ -35,7 +35,7 @@ export function readPeriod(profile: WalletInvestmentSettings | null) {
   return calendar ? { ...target, ...calendar } : null;
 }
 
-export async function walletDashboard(profile: WalletInvestmentSettings | null, account: WalletActor, now?: Date) {
+export async function walletDashboard(profile: WalletInvestmentSettings | null, account: WalletActor, now?: Date, walletCurrency?: string) {
   const period = readPeriod(profile);
   const horizon = period ? {
     period: period.period, days: period.days, start_date: period.start_date,
@@ -57,7 +57,7 @@ export async function walletDashboard(profile: WalletInvestmentSettings | null, 
   };
 
   const [wallet, broker] = await Promise.all([
-    resolveWalletStatus({ userId: account.id, currency: settings.currency }),
+    resolveWalletStatus({ userId: account.id, currency: walletCurrency ?? settings.currency }),
     readBrokerForecastInput(account.id, {
       currency: settings.currency, instrumentCode: settings.instrument_code, strategyLabel: settings.strategy_label,
     }, now),
@@ -82,7 +82,7 @@ export async function walletDashboard(profile: WalletInvestmentSettings | null, 
 
 export type WalletInvestmentsDashboard = Awaited<ReturnType<typeof walletDashboard>>;
 
-export async function withBrokerOwnerActivity(dashboard: WalletInvestmentsDashboard, userId: string) {
+export async function withBrokerOwnerActivity(dashboard: WalletInvestmentsDashboard, userId: string, walletCurrency?: string) {
   const { investments, settings } = dashboard;
   const [broker_activity, performance_fee, portfolio_valuations] = await Promise.all([
     readBrokerOwnerState(userId), readOwnerPerformanceFee(userId),
@@ -90,12 +90,12 @@ export async function withBrokerOwnerActivity(dashboard: WalletInvestmentsDashbo
       ? readPortfolioValuations(userId, settings, investments.provider) : Promise.resolve([]),
   ]);
   return { ...dashboard, broker_activity, performance_fee, portfolio_valuations,
-    wallet_capabilities: walletOwnerCapabilities({userId,currency:dashboard.settings.currency}) };
+    wallet_capabilities: walletOwnerCapabilities({userId,currency:walletCurrency ?? dashboard.settings.currency}) };
 }
 
 export type WalletInvestmentsOwnerDashboard = Awaited<ReturnType<typeof withBrokerOwnerActivity>>;
 
-export async function updateWalletSettings(account: WalletActor, input: WalletSettingsInput) {
+export async function updateWalletSettings(account: WalletActor, input: WalletSettingsInput, walletCurrency?:string) {
   const userId = account.id;
   const { target } = input;
   const data = {
@@ -115,10 +115,10 @@ export async function updateWalletSettings(account: WalletActor, input: WalletSe
     create: { userId, ...data, accessRevision: 1 },
     update: { ...data, accessRevision: { increment: 1 } },
   });
-  return walletDashboard(row, account);
+  return walletDashboard(row, account, undefined, walletCurrency);
 }
 
-export async function revokeWalletAccess(account: WalletActor, now = new Date()) {
+export async function revokeWalletAccess(account: WalletActor, now = new Date(), walletCurrency?:string) {
   const userId = account.id;
   const data = { aiAccess: 'OFF' as const, tradingConsentRevokedAt: now };
   const row = await prisma.$transaction(async (tx) => {
@@ -129,5 +129,5 @@ export async function revokeWalletAccess(account: WalletActor, now = new Date())
       update: { ...data, accessRevision: { increment: 1 } },
     });
   }, { timeout: 5000 });
-  return walletDashboard(row, account, now);
+  return walletDashboard(row, account, now, walletCurrency);
 }

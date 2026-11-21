@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Logo } from '@/components/Logo';
+import { currentReturnPath } from '@/lib/auth-return';
+import { announceSessionChange } from '../session-boundary';
 import type { ChatTool } from '@/lib/chat-tools';
 import { accountPlanLabel } from '../account-plan';
 import { QuickChatHeader } from '../quick-chat-header';
@@ -184,7 +186,7 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
   const awaitingProjects = projects.some(projectInProgress);
   const showStart = !loading && !loadProblem && messages.length === 0 && !optimistic;
   const { scrollRef, following, followLatest, onScroll } = useChatScroll(!showStart && !loading && !loadProblem);
-  const signInHref = `/login?next=${encodeURIComponent(`/chat${compact || typeof window === 'undefined' ? '' : window.location.search}`)}`;
+  const signInHref = '/login?next=' + encodeURIComponent(currentReturnPath('/chat')) + (compact ? '&quickChat=1' : '');
   useEffect(() => { visible.current = active; }, [active]);
   useEffect(() => () => {
     if (utterance.current) {
@@ -971,6 +973,7 @@ export default function ChatWorkspace({ compact = false, active = true, onMinimi
     void fetch('/api/auth/logout', { method: 'POST' }).then((response) => {
       if (!response.ok) throw new Error();
       writePendingChatTurn(null, compact);
+      announceSessionChange();
       window.location.assign('/login');
     }).catch(() => setProblem('Изходът от акаунта не успя.'));
   }

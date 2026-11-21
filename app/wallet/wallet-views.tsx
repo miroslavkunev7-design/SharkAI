@@ -188,7 +188,7 @@ function Content(props:Props) {
       description="За тази сметка няма потвърдени картови данни от Wise."/></div>{menu(['wise-connection'])}<WiseLink/></>;
     case 'pockets':case 'hidden':return <><div className="panel" data-scene={route==='hidden'?'savings':'pockets'} data-scene-tone="light"><Unavailable icon={PiggyBank}
       description="Свързаната услуга не предоставя списък на тези сметки."/></div><WiseLink/>{menu(['accounts','wise-connection'])}</>;
-    case 'settings':case 'wise-connection':return <WalletSettings account={account} update={data.setAccount}/>;
+    case 'settings':case 'wise-connection':return <WalletSettings route={route} account={account} update={data.setAccount} refresh={data.refresh}/>;
     case 'profile':return <>{account.state==='guest'&&signIn}{menu(['wise-connection','settings','notifications','security','privacy','help'])}
       <Link className="button secondary" href="/">Към SharkAI <ArrowUpRight size={18}/></Link></>;
     case 'privacy':case 'security':return <><div className="panel" data-scene={routeScenes[route]} data-scene-tone="light"><p>Достъпът до сметката се проверява чрез твоя профил в SharkAI.
@@ -207,8 +207,10 @@ function Content(props:Props) {
   if(instruction)return <><div className="panel" data-scene={routeScenes[route]} data-scene-tone="light"><p>{instruction}</p></div>
     {route==='exchange'&&menu(['currencies'])}
     {account.state==='guest'?signIn:account.state==='loading'||account.state==='unavailable'?<div className="panel" data-scene="verification" data-scene-tone="light"><p role="status">{accountLabel(account)}</p></div>:
-      route==='transfer'?<form method="POST" action="/api/wallet-investments/provider/transfer">
-        <button className="button primary" type="submit"><Send size={19}/>Продължи в Wise</button></form>:<WiseLink/>}
+      route==='transfer'||route==='withdraw'?account.data?.wallet.status==='verified'?
+        <form method="POST" action={'/api/wallet-investments/provider/'+(route==='withdraw'?'withdrawal':'transfer')}>
+          <button className="button primary" type="submit"><Send size={19}/>Продължи в Wise</button></form>:
+        <p role="status">Потвърди връзката със своята сметка, за да продължиш към Wise.</p>:<WiseLink/>}
     {menu(['wise-connection'])}</>;
   if(['trade','trade-review','trade-result','investment-fund','crypto-send','crypto-send-review','crypto-receive'].includes(route))return <>
     <div className="panel" data-scene={routeScenes[route]} data-scene-tone="light"><Unavailable description="За тази операция няма разрешена интеграция за изпълнение. Потвърдените позиции и поръчки са достъпни в портфолиото."/></div>

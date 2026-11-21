@@ -1,3 +1,5 @@
+import { currentReturnPath } from '@/lib/auth-return';
+
 export const walletTitles = {
   overview: 'Начало', transactions: 'Последни транзакции', transaction: 'Транзакция', payments: 'Плащания',
   currencies: 'Конвертор', crypto: 'Крипто', cards: 'Карти', details: 'Детайли на сметката',
@@ -33,4 +35,8 @@ export function readWalletRoute(value: unknown): WalletRoute {
   return Object.hasOwn(aliases, value) ? aliases[value] : 'overview';
 }
 export const walletUrl = (route: WalletRoute) => route === 'overview' ? '/wallet' : '/wallet?tab='+route;
-export const walletLogin = (route: WalletRoute) => '/login?next='+encodeURIComponent(walletUrl(route));
+export function walletLogin(route: WalletRoute) {
+  const current = typeof window !== 'undefined' && window.location.pathname === '/wallet'
+    ? currentReturnPath(walletUrl(route)) : walletUrl(route);
+  return '/login?next=' + encodeURIComponent(current);
+}
