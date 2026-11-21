@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {tsImport} from 'tsx/esm/api';
-
-const router = await tsImport('../app/wallet/wallet-routes.ts', import.meta.url);
-const data = await tsImport('../app/wallet/wallet-data.ts', import.meta.url);
+const router = await import('../app/wallet/wallet-routes.ts');
+const data = await import('../app/wallet/wallet-data.ts');
 const {readWalletRoute, walletUrl, walletLogin, walletTitles} = router.default ?? router;
 const {accountBalance} = data.default ?? data;
 
