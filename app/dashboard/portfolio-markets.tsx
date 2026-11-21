@@ -159,7 +159,7 @@ function AssetDetails({ symbol, market, failed, loading, preferences, refresh, c
     node?.showModal();
     return () => node?.close();
   }, []);
-  return <dialog className="pfm-dialog" ref={dialog} aria-labelledby={heading} onCancel={e => { e.preventDefault(); close(); }} onClick={e => { if (e.target === e.currentTarget) {
+  return <dialog className="pfm-dialog" data-scene="markets" ref={dialog} aria-labelledby={heading} onCancel={e => { e.preventDefault(); close(); }} onClick={e => { if (e.target === e.currentTarget) {
     const bounds = e.currentTarget.getBoundingClientRect();
     if (e.clientX < bounds.left || e.clientX > bounds.right || e.clientY < bounds.top || e.clientY > bounds.bottom) close();
   } }}>
@@ -175,7 +175,7 @@ function AssetDetails({ symbol, market, failed, loading, preferences, refresh, c
     {preferences.notice && <p className="pfm-notice" role="status">{preferences.notice}</p>}
     <div className="pfm-trade"><a href={'https://pro.kraken.com/app/trade/' + symbol.toLowerCase() + '-eur'} target="_blank" rel="noopener noreferrer">Купи или продай в Kraken <ExternalLink size={16} aria-hidden="true"/></a>
       <small>Поръчката се потвърждава в твоя Kraken акаунт.</small></div>
-    <section className="pfm-alert"><div className="pfm-alert-head"><span><Bell size={17}/> Известие за цена</span>
+    <section className="pfm-alert" data-scene="notifications"><div className="pfm-alert-head"><span><Bell size={17}/> Известие за цена</span>
       {!rule && !editing && <button type="button" disabled={!ready || !price?.session || failed} onClick={() => setEditing(true)}>Добави</button>}</div>
       {rule ? <div className="pfm-rule"><span>При цена {rule.direction === 'above' ? 'над или равна на' : 'под или равна на'} <b>{euro.format(rule.target)}</b><small>{rule.reachedAt ? 'Достигната на ' + clock.format(rule.reachedAt) + ' (София)' : 'Активно, докато тази страница е отворена.'}</small></span>
         <button type="button" aria-label="Изтрий известието" disabled={!ready} onClick={() => setAlert(symbol, null)}><Trash2 size={16}/></button></div>
@@ -220,7 +220,7 @@ export function PortfolioMarkets({ initialView = 'watchlist', feedUrl = '/invest
   const heading = useId();
   const shown = symbols.filter(s => (view === 'markets' || prefs.stars.includes(s)) && (assets[s] + ' ' + s + ' EUR').toLowerCase().includes(query.toLowerCase().trim()));
   const reached = symbols.filter(s => prefs.alerts[s]?.reachedAt);
-  return <section className="pfm" aria-labelledby={heading}>
+  return <section className="pfm" data-scene="overview" aria-labelledby={heading}>
     <div className="pfm-header"><h2 id={heading}>Пазарен обзор</h2><button className="pfm-tool" type="button" aria-label="Обнови котировките" title="Обнови котировките" disabled={loading} onClick={refresh}><RefreshCw size={17} className={loading ? 'pfm-spinning' : ''}/></button></div>
     <div className="pfm-controls"><div className="pfm-tabs" role="group" aria-label="Списък с активи">
       <button type="button" aria-pressed={view === 'markets'} onClick={() => setTab('markets')}>Всички</button>

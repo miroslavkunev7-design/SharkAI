@@ -109,7 +109,7 @@ function Forecast({ data }: { data: WalletInvestmentsDashboard }) {
   const budget=data.investments.profit_budget;
   const available = forecast.status === 'available';
   return (
-    <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-forecast-title">
+    <section className="ice-section module-panel module-wallet-panel" data-scene="forecast" data-scene-tone="light" aria-labelledby="wallet-forecast-title">
       <h2 id="wallet-forecast-title">{available ? 'Исторически диапазон на печалба или загуба' : 'Очакван диапазон на печалба или загуба'}</h2>
       <p>Агентът може да използва само вече реализирана нетна печалба, потвърдена като отделени и разполагаеми средства при брокера. Личният депозит е извън търговския бюджет.</p>
       <dl className="module-wallet-metrics">
@@ -234,7 +234,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
     const authHref=tab==='overview'?signInHref:'/login?next='+encodeURIComponent('/dashboard?view=investments&tab='+tab);
     if(tab==='crypto')return <CryptoMarketPanel/>;
     if(tab==='calculator')return <>
-      <WalletForecast currency={owner?.settings.currency??'EUR'} initialAmountMinor={owner?.wallet.status==='verified'?owner.wallet.balance_minor:null}/>
+      <WalletForecast withScene currency={owner?.settings.currency??'EUR'} initialAmountMinor={owner?.wallet.status==='verified'?owner.wallet.balance_minor:null}/>
       {owner&&<Forecast data={owner}/>}
       <InvestmentFeeCalculator data={owner}/>
       {owner&&<FeeReport fee={owner.performance_fee}/>}
@@ -243,14 +243,14 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
       <p role="status">Зареждане на портфейла и инвестициите…</p></>;
     if(tab==='opportunities'&&state==='signed_out')return <InvestmentOpportunities publicOnly/>;
     if (state === 'signed_out') return (
-      <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
+      <section className="ice-section module-panel module-wallet-panel" data-scene="profile" data-scene-tone="light">
         <h2>Достъп до профила</h2>
         <Link className="shark-action" href="/wallet">Създай портфейл</Link>
         <Link className="shark-action" href={authHref}>Вход</Link>
       </section>
     );
     if (state === 'unavailable' || !data) return (
-      <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
+      <section className="ice-section module-panel module-wallet-panel" data-scene="health" data-scene-tone="light">
         <p role="alert">Данните временно са недостъпни.</p>
         <Link className="shark-action" href="/wallet">Отвори портфейла</Link>
         <button className="shark-action-secondary" type="button" onClick={() => void load()}>Опитай отново</button>
@@ -273,7 +273,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
       <>
         <InvestmentProgress/>
         <div className="module-wallet-split">
-          <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-account-title">
+          <section className="ice-section module-panel module-wallet-panel" data-scene="wallet" data-scene-tone="light" aria-labelledby="wallet-account-title">
             <h2 id="wallet-account-title">Портфейл</h2>
             <Link className="shark-action" href="/wallet">{wallet.status==='verified'?'Отвори портфейла':'Създай портфейл'}</Link>
             <p>{walletProviderCopy[wallet.status]}</p>
@@ -284,7 +284,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
             </dl>
             <WalletProviderActions data={data} action={walletAction} key={settings.currency ?? ''} />
           </section>
-          <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="broker-account-title">
+          <section className="ice-section module-panel module-wallet-panel" data-scene="holdings" data-scene-tone="light" aria-labelledby="broker-account-title">
             <h2 id="broker-account-title">Инвестиции</h2>
             <p>{brokerCashStatus}</p>
             <dl className="module-wallet-metrics">
@@ -297,7 +297,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
             <BrokerActivityPanel activity={data.broker_activity} />
           </section>
         </div>
-        <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-settings-title">
+        <section className="ice-section module-panel module-wallet-panel" data-scene="settings" data-scene-tone="light" aria-labelledby="wallet-settings-title">
           <h2 id="wallet-settings-title">Настройки</h2>
           <WalletInvestmentsForm key={JSON.stringify(settings)} settings={settings} busy={saving} onSave={change} />
           {canRevoke && <>
@@ -308,7 +308,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
           {error && <p className="module-error" role="alert">{error}</p>}
         </section>
         <TradingConsent key={JSON.stringify(settings)} />
-        <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-weekly-title">
+        <section className="ice-section module-panel module-wallet-panel" data-scene="performance" data-scene-tone="light" aria-labelledby="wallet-weekly-title">
           <h2 id="wallet-weekly-title">Резултат за последната завършена седмица</h2>
           {data.weekly_report.status === 'available' ? <>
             <p>Период от {dateLabel(data.weekly_report.window_start)} до {dateLabel(new Date(Date.parse(data.weekly_report.window_end)-1).toISOString())} (UTC)</p>
@@ -333,7 +333,7 @@ export function WalletInvestments({ signInHref }: { signInHref: string }) {
 }
 
 function FeeReport({fee}:{fee:WalletInvestmentsOwnerDashboard['performance_fee']}) {
-  return <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets" aria-labelledby="wallet-fee-title">
+  return <section className="ice-section module-panel module-wallet-panel" data-scene="commission" data-scene-tone="light" aria-labelledby="wallet-fee-title">
     <h2 id="wallet-fee-title">Последна отчетена такса върху печалбата</h2>
     {fee.status==='available' ? <>
       <p>{fee.fee_minor==='0' ? 'Периодът е приключен с нулева такса.'

@@ -103,7 +103,7 @@ export function PerformanceFeesPanel() {
         <p>От {dateLabel.format(new Date(from+'T12:00:00Z'))} до {dateLabel.format(new Date(to+'T12:00:00Z'))}, по софийско време. Обновено в {timeLabel.format(current.updated)}.</p>
         <h3>Регистрации за периода · {report.totalRegistrations}</h3>
         <p>По текущ план · {plans.map(plan=>plan+' '+(report.registrations.find(row=>row.plan===plan)?.count ?? 0)).join(' · ')}</p>
-        {(report.members.length>0 || page>1) && <details className="shark-admin-members" open={membersOpen}
+        {(report.members.length>0 || page>1) && <details className="shark-admin-members" data-scene="registrations" data-scene-tone="light" open={membersOpen}
           onToggle={event=>setMembersOpen(event.currentTarget.open)}><summary>Потребители за периода</summary>
           <div className="operator-table shark-admin-table"><table>
           <thead><tr><th scope="col">Потребител</th><th scope="col">План при регистрация</th><th scope="col">Текущ план</th><th scope="col">Регистрация</th></tr></thead>
@@ -119,7 +119,7 @@ export function PerformanceFeesPanel() {
         <h3>Комисиони от инвестиции</h3>
         {report.currencies.length===0 ? <p>Няма отчетени комисиони за периода.</p> : <>
           <p>Начислените суми са по последния ден на периода за търговия. Постъпленията и сторниранията са по датата на брокерския запис в София.</p>
-          {report.currencies.map(row=><section key={row.currency} aria-label={'Комисиони в '+row.currency}>
+          {report.currencies.map(row=><section key={row.currency} data-scene="commission" data-scene-tone="light" aria-label={'Комисиони в '+row.currency}>
             <h4>{row.currency}</h4><dl className="shark-admin-fee-metrics">
               <div><dt>Начислени за периода</dt><dd>{displayMinor(row.earned_minor,row.currency)}</dd></div>
               <div><dt>Остават за получаване</dt><dd>{displayMinor(row.accrued_minor,row.currency)}</dd></div>

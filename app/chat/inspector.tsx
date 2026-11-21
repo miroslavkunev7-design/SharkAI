@@ -179,13 +179,18 @@ function AudioInspector({ item }: { item: Extract<InspectorItem, { type: 'audio'
   );
 }
 
-export function Inspector({ item, close, talk, save, disabled, reminders, createReminder }: {
+const inspectorScenes: Record<InspectorItem['type'], string> = {
+  project: 'projects', reminders: 'reminders', text: 'canvas', audio: 'attachments', image: 'library',
+};
+
+export function Inspector({ item, illustrated, close, talk, save, disabled, reminders, createReminder }: {
+  illustrated?: boolean;
   item: InspectorItem; close: () => void; talk?: (project: string) => void; save?: SaveCanvas; disabled?: boolean;
   reminders: ReminderStore; createReminder?: (input: ReminderInput) => Promise<void>;
 }) {
   return (
     <aside className="shark-chat-inspector" aria-label={item.title}>
-      <header className="ice-section" data-ice-art={item.type === 'project' ? 'studio' : item.type === 'reminders' ? 'team' : 'agent'}>
+      <header className="ice-section" data-ice-art={item.type === 'project' ? 'studio' : item.type === 'reminders' ? 'team' : 'agent'} data-scene={illustrated ? inspectorScenes[item.type] : undefined}>
         <h2>{item.title}</h2>
         <button className="shark-chat-icon" type="button" aria-label="Затвори прегледа" onClick={close}><X size={19} /></button>
       </header>

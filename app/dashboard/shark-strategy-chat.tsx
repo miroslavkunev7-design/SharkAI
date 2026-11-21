@@ -60,7 +60,7 @@ function StrategyThread({strategyId,strategyLabel,currency,horizonDays}:Props) {
     } catch (failure) {if (!controller.signal.aborted) setError(failure instanceof Error?failure.message:'Изпращането прекъсна.');}
     finally {if (!controller.signal.aborted){setPending(false);active.current=null;}}
   }
-  return <section className="shark-strategy-thread" aria-label="Разговор за стратегията">
+  return <section className="shark-strategy-thread" data-scene="assistant" data-scene-tone="light" aria-label="Разговор за стратегията">
     <h3>Обсъди със Shark</h3>
     <div role="log" aria-live="polite">{lines.map(line=><p key={line.id}><strong>{line.role==='assistant'?'Shark AI':'Ти'}</strong><br/>{line.content}</p>)}</div>
     {guest ? <a className="shark-action-secondary" href={'/login?next='+encodeURIComponent('/dashboard?view=investments&tab=strategies')}>Влез за разговор</a> :

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowRight, Download } from 'lucide-react';
 import type { Metadata } from 'next';
-import { Logo } from '@/components/Logo';
+import { PublicShell } from '@/components/PublicShell';
 import { getInstallerInfo } from '@/lib/installer';
 import '../entry.css';
 
@@ -16,13 +16,9 @@ export default function DownloadPage() {
   const installer = getInstallerInfo();
 
   return (
-    <main className="shark-entry-page shark-entry-download">
-      <section className="ice-section shark-entry-feature" data-ice-art="studio" aria-labelledby="download-title">
+    <PublicShell mainClassName="shark-entry-page shark-entry-download">
+      <section className="ice-section shark-entry-feature" data-scene="desktop" data-scene-tone="light" aria-labelledby="download-title">
         <div className="shark-entry-feature-copy shark-entry-download-copy">
-          <Link href="/" className="shark-wordmark w-fit" aria-label="SharkAI, начало">
-            <Logo size="sm" />
-            <span aria-hidden="true">SharkAI</span>
-          </Link>
           <h1 id="download-title">SharkAI <span>за Windows</span></h1>
           <p className="shark-entry-lede">
             Влез със съществуващия си SharkAI акаунт. Чатът и проектите използват интернет връзка.
@@ -40,6 +36,6 @@ export default function DownloadPage() {
           </Link>
         </div>
       </section>
-    </main>
+    </PublicShell>
   );
 }

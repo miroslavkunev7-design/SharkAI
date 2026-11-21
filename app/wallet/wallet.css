@@ -587,6 +587,91 @@
 .zip-wallet { line-height: normal; }
 .zip-wallet :is(h1,h2,h3) { font-family: inherit; }
 .zip-wallet .currency-emoji img { max-width:none; }
+
+.zip-wallet a.desktop-brand, .zip-wallet a.page-context-brand {
+  color: #fff;
+  text-decoration: none;
+}
+.zip-wallet .wallet-site-back {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 6px;
+  min-height: 36px;
+  margin-right: auto;
+  padding: 5px 13px;
+  border: 1px solid #d7e8fa8c;
+  border-radius: 99px;
+  background: linear-gradient(110deg, #243b68ed, #4b3872ed);
+  color: #f6faff;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.zip-wallet .wallet-site-back:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.zip-wallet .home-chat-lane .wallet-site-back { margin-left: 6px; }
+
+body.shark-site .zip-wallet .desktop-transactions[data-scene] {
+  background: linear-gradient(114deg, #e1f5fff2, #c4dcf5e8 48%, #d6cff3eb);
+  color: #100e40;
+}
+.zip-wallet .desktop-transactions[data-scene] .desktop-transactions-art {
+  left: 42%;
+  background-image: linear-gradient(90deg, #deecf69e, #e0edf77d), var(--scene-image);
+  opacity: 1;
+}
+
+/* Keep the ZIP's ice texture on the reading side. The scene fills its own
+   frame so a long statement never stretches the photograph. */
+body.shark-site .zip-wallet .panel[data-scene][data-scene-tone="light"] {
+  position: relative;
+  isolation: isolate;
+  color: #141e43;
+  background: linear-gradient(125deg, #e4f5ff, #dce9fa 48%, #cee7f2);
+}
+
+.zip-wallet .panel[data-scene][data-scene-tone="light"]::before {
+  opacity: .76;
+  mask-image: linear-gradient(90deg, #000 28%, transparent 72%);
+}
+
+.zip-wallet .panel[data-scene][data-scene-tone="light"]::after {
+  position: absolute;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+  inset: 0 0 0 42%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #deedfa 0%, #e4f2fb94 39%, #e1f0fb66), var(--scene-image) center / cover no-repeat;
+  mask-image: linear-gradient(90deg, transparent, #000 27%);
+}
+
+.zip-wallet .panel[data-scene] :is(.row-end, .recent-value, .badge) {
+  text-shadow: 0 0 5px #f5fbff;
+}
+
+.zip-wallet .panel[data-scene] .empty p {
+  max-width: 52ch;
+  margin-inline: auto;
+}
+
+@media (min-width: 1024px) {
+  .zip-wallet .desktop-layout .screen:is([data-wallet-section="payments"], [data-wallet-section="more"]) > .stack {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    align-items: start;
+  }
+  .zip-wallet .desktop-layout .screen[data-wallet-section="payments"] > .stack > .grid-2 {
+    grid-column: 1 / -1;
+  }
+  .zip-wallet .desktop-layout .wallet-site-link { justify-self: start; }
+}
+
+@media (forced-colors: active) {
+  body.shark-site .zip-wallet .panel[data-scene][data-scene-tone="light"] { color: CanvasText; background: Canvas; }
+  .zip-wallet .panel[data-scene]::before, .zip-wallet .panel[data-scene]::after { display: none; }
+}
+
 .zip-wallet .wallet-dialog {
   width: 100%;
   max-width: none;

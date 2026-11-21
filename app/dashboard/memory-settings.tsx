@@ -97,7 +97,7 @@ export function MemorySettings() {
   const busy = loading || pending;
 
   return (
-    <section className="ice-section module-panel module-memory" data-ice-art="agent" aria-labelledby="personal-memory-title">
+    <section className="ice-section module-panel module-memory" data-scene="memory" data-scene-tone="light" aria-labelledby="personal-memory-title">
       <div className="module-heading"><h2 id="personal-memory-title"><Brain size={20} /> Лични бележки</h2></div>
       <p>Запиши предпочитания за език, тон и формат. Когато са включени, асистентът ги използва в общите разговори за този акаунт.</p>
       {loading && <p role="status">Зареждане на личните бележки…</p>}

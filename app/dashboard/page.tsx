@@ -7,7 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowRight, ArrowUpRight, CarFront, Code2, Download, FolderOpen, Gauge,
   ImageIcon, LayoutDashboard, LoaderCircle, Menu, MessageSquare, Mic, Plus,
-  Search, Settings, ShoppingBag, Sparkles, TrendingUp, Upload, Users, X,
+  Search, Settings, ShoppingBag, Sparkles, TrendingUp, Upload, Users, Wallet, X,
 } from 'lucide-react';
 import { Logo } from '@/components/Logo';
 import {
@@ -27,20 +27,35 @@ const VIEWS = {
   studio: { label: 'Студио', icon: Code2, href: '/dashboard?view=studio' },
   agents: { label: 'Архив на агентите', icon: Users, href: '/dashboard?view=agents' },
   automotive: { label: 'Автомобили', icon: CarFront, href: '/dashboard?view=automotive' },
-  investments: { label: 'Портфейл и инвестиции', icon: TrendingUp, href: '/dashboard?view=investments' },
+  investments: { label: 'Инвестиции', icon: TrendingUp, href: '/dashboard?view=investments' },
   commerce: { label: 'Магазин и препродажба', icon: ShoppingBag, href: '/dashboard?view=commerce' },
   settings: { label: 'Настройки', icon: Settings, href: '/dashboard?view=settings' },
 };
 
 type View = keyof typeof VIEWS;
-const WORKSPACE_ART: Partial<Record<View, string>> = {
-  chat: 'agent', studio: 'studio', agents: 'team', investments: 'markets', commerce:'studio', automotive: 'car', settings: 'shark',
+const DESTINATIONS = { ...VIEWS, wallet: { label: 'Портфейл', icon: Wallet, href: '/wallet' } };
+const NAV_GROUPS = [
+  { label: 'Работно пространство', ids: ['overview', 'chat', 'studio'] },
+  { label: 'Финанси и търговия', ids: ['wallet', 'investments', 'commerce'] },
+  { label: 'Още', ids: ['automotive', 'settings'] },
+] as const;
+const WORKSPACE_SCENES: Record<keyof typeof DESTINATIONS, string> = {
+  overview: 'overview', chat: 'assistant', studio: 'studio', agents: 'team', wallet: 'wallet',
+  investments: 'markets', commerce: 'commerce', automotive: 'automotive', settings: 'settings',
+};
+const ROLE_SCENES: Record<string, string> = {
+  eye: 'assistant', layout: 'studio', server: 'connections', database: 'archive',
+  cloud: 'workspace', shield: 'security', zap: 'performance', check: 'verification',
+  bug: 'diagnostics', wrench: 'tools', rocket: 'health', brain: 'models',
+  palette: 'products', search: 'analytics', code: 'documents',
 };
 const MODULES = [
   { view: 'chat', description: 'Разговори и работа с файлове.' },
   { view: 'studio', description: 'Проекти от описание и скрийншоти.' },
-  { view: 'investments', description: 'Пазарни графики, личен портфейл и инвестиционни цели.' },
+  { view: 'wallet', description: 'Сметки, карти и движения в Wise.' },
+  { view: 'investments', description: 'Пазарни графики, стратегии и инвестиционни цели.' },
   { view: 'commerce', description: 'Поръчки, оперативен капитал и реализиран марж.' },
+  { view: 'automotive', description: 'Автомобилни материали и диагностика.' },
 ] as const;
 const PROJECT_STATUS: Record<string, string> = {
   ANALYZING: 'Анализира се', BUILDING: 'Създават се файлове', RUNNING: 'Изпълнява се',
@@ -102,11 +117,17 @@ function RoleStatus({ status }: { status: AgentRunActivity }) {
 function WorkspaceNav({ view, onNavigate }: { view: View; onNavigate?: () => void }) {
   return (
     <nav className="module-nav" aria-label="Работно пространство">
-      {Object.entries(VIEWS).filter(([key]) => key !== 'agents').map(([key, item]) => (
-        <Link key={key} href={item.href} aria-current={view === key ? 'page' : undefined}
-          onClick={onNavigate} title={item.label}>
-          <item.icon size={19} aria-hidden="true" /><span>{item.label}</span>
-        </Link>
+      {NAV_GROUPS.map(({ label, ids }) => (
+        <div key={label} className="module-nav-group" role="group" aria-label={label}>
+          <span className="module-nav-caption" aria-hidden="true">{label}</span>
+          {ids.map((key) => {
+            const item = DESTINATIONS[key];
+            return <Link key={key} href={item.href} aria-current={view === key ? 'page' : undefined}
+              onClick={onNavigate} title={item.label}>
+              <item.icon size={19} aria-hidden="true" /><span>{item.label}</span>
+            </Link>;
+          })}
+        </div>
       ))}
     </nav>
   );
@@ -124,7 +145,7 @@ function WorkspaceBrand({ mobile = false }: { mobile?: boolean }) {
 function Banner({ view, children }: { view: View; children?: ReactNode }) {
   const { icon: Icon, label } = VIEWS[view];
   return (
-    <section className="ice-section module-banner" data-ice-art={WORKSPACE_ART[view]}>
+    <section className="ice-section module-banner" data-scene={WORKSPACE_SCENES[view]} data-scene-tone="light">
       <div>
         <Icon size={24} aria-hidden="true" />
         <h1>{label}</h1>
@@ -140,7 +161,7 @@ function WorkspaceSearch({ projects }: { projects: Project[] }) {
   const [term, setTerm] = useState('');
   const query = term.trim().normalize('NFKC').toLocaleLowerCase('bg');
   const entries = [
-    ...Object.values(VIEWS).map(({ label, href, icon }) => ({ label, href, icon })),
+    ...Object.values(DESTINATIONS).map(({ label, href, icon }) => ({ label, href, icon })),
     ...projects.map(({ name, id }) => ({ label: name, href: `/dashboard?project=${encodeURIComponent(id)}`, icon: FolderOpen })),
   ].filter(({ label }) => label.normalize('NFKC').toLocaleLowerCase('bg').includes(query));
 
@@ -154,7 +175,7 @@ function WorkspaceSearch({ projects }: { projects: Project[] }) {
       <button className="module-utility-button" type="button" aria-label="Търси в работното пространство" aria-haspopup="dialog" onClick={open}>
         <Search size={17} />
       </button>
-      <dialog ref={dialog} className="ice-section module-search-dialog" data-ice-art="agent" aria-labelledby="module-search-title"
+      <dialog ref={dialog} className="ice-section module-search-dialog" data-scene="workspace" data-scene-tone="light" aria-labelledby="module-search-title"
         onClose={() => setTerm('')}
         onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}
         onKeyDown={(event) => {
@@ -188,7 +209,7 @@ function ProjectList({ projects, error, isLoading, onRetry }: {
   projects: Project[]; error?: string; isLoading?: boolean; onRetry: () => void;
 }) {
   return (
-    <section className="ice-section module-panel" data-ice-art="studio" aria-labelledby="module-projects-title">
+    <section className="ice-section module-panel" data-scene="projects" data-scene-tone="light" aria-labelledby="module-projects-title">
       <div className="module-heading">
         <h2 id="module-projects-title">Последни проекти</h2>
         <Link className="module-link" href={VIEWS.studio.href}>Студио <ArrowRight size={16} /></Link>
@@ -215,14 +236,14 @@ function Overview({ data, loading, error, onRetry }: { data: Projects | null; lo
   const projects = data?.projects ?? [];
   const summary = data?.user && !error ? data.summary : null;
   const metrics = [
-    { label: 'Проекти', icon: FolderOpen, value: summary?.total },
-    { label: 'AI роли', icon: Users, value: AGENTS.length },
-    { label: 'В работа', icon: Gauge, value: summary?.active },
-    { label: 'Завършени', icon: Sparkles, value: summary?.completed },
+    { label: 'Проекти', icon: FolderOpen, scene: 'projects', value: summary?.total },
+    { label: 'AI роли', icon: Users, scene: 'roles', value: AGENTS.length },
+    { label: 'В работа', icon: Gauge, scene: 'activity', value: summary?.active },
+    { label: 'Завършени', icon: Sparkles, scene: 'verification', value: summary?.completed },
   ];
   return (
     <>
-      <section className="module-overview-hero">
+      <section className="module-overview-hero" data-scene="overview">
         <div className="module-hero-copy">
           <h1>Команден <span>център</span></h1>
           <p>Твоето работно пространство за AI чат, проекти и задачи.</p>
@@ -233,8 +254,8 @@ function Overview({ data, loading, error, onRetry }: { data: Projects | null; lo
         </div>
       </section>
       <dl className="ice-section module-metrics" aria-label="Проекти и AI роли" aria-busy={loading}>
-        {metrics.map(({ label, icon: Icon, value }) => (
-          <div className="module-metric" key={label}>
+        {metrics.map(({ label, icon: Icon, value, scene }) => (
+          <div className="module-metric" key={label} data-scene={scene} data-scene-tone="light">
             <dt><span className="module-metric-icon" aria-hidden="true"><Icon size={19} /></span>{label}</dt>
             <dd>{value ?? <span aria-label={loading ? 'Зареждане' : 'Недостъпни данни'}>{loading ? '…' : '—'}</span>}</dd>
           </div>
@@ -244,10 +265,10 @@ function Overview({ data, loading, error, onRetry }: { data: Projects | null; lo
         <h2 className="module-section-title" id="module-cards-title">Модули</h2>
         <div className="module-tiles">
           {MODULES.map(({ view, description }) => {
-            const { href, label } = VIEWS[view];
+            const { href, label, icon: Icon } = DESTINATIONS[view];
             return (
-              <Link key={view} href={href} className="ice-section module-tile" data-ice-art={WORKSPACE_ART[view]}>
-                <div><strong>{label}</strong><p>{description}</p></div>
+              <Link key={view} href={href} className="ice-section module-tile" data-scene={WORKSPACE_SCENES[view]} data-scene-tone="light">
+                <div><Icon className="module-tile-icon" size={22} aria-hidden="true" /><strong>{label}</strong><p>{description}</p></div>
               </Link>
             );
           })}
@@ -370,7 +391,7 @@ function StudioForm({ featureParam, user, loading, onCreated }: {
 
   return (
     <div className="module-columns">
-      <section className="ice-section module-panel module-panel--form" data-ice-art="studio">
+      <section className="ice-section module-panel module-panel--form" data-scene="studio" data-scene-tone="light">
         <div className="module-heading"><h2>Нов проект</h2></div>
         {loading ? <p role="status">Зареждане на акаунта…</p> : !user ? (
           <>
@@ -415,14 +436,14 @@ function StudioForm({ featureParam, user, loading, onCreated }: {
               {saving ? <LoaderCircle size={17} className="animate-spin" /> : <Plus size={17} />}
               {saving ? 'Проектът стартира…' : 'Създай проект'}
             </button>
-            <details className="module-disclosure">
+            <details className="module-disclosure" data-scene="tools" data-scene-tone="light">
               <summary>Липсващи инструменти в Студиото</summary>
               <ul>{FEATURES.filter(({ id }) => getStudioFeatureAvailability(id)).map(({ id, title }) => <li key={id}><strong>{title}</strong><p>{getStudioFeatureAvailability(id)}</p></li>)}</ul>
             </details>
           </form>
         )}
       </section>
-      <section className="ice-section module-panel" data-ice-art="agent">
+      <section className="ice-section module-panel" data-scene="documents" data-scene-tone="light">
         <div className="module-heading"><h2>Визуална референция</h2></div>
         <div className={`module-upload-preview${upload?.previewUrl ? '' : ' module-upload-preview--empty'}`}>
           {upload?.previewUrl
@@ -441,7 +462,7 @@ function Result({ detail, error, onRetry }: { detail: ProjectDetail | null; erro
   const active = agents.find(({ activity }) => activity === 'running');
   const awaiting = detail?.project.statusUnknown || !!error;
   return (
-    <section className="ice-section module-panel" data-ice-art="studio" aria-labelledby="studio-result">
+    <section className="ice-section module-panel" data-scene="projects" data-scene-tone="light" aria-labelledby="studio-result">
       <div className="module-heading">
         <h2 id="studio-result">{detail?.project.name || 'Резултат от Студиото'}</h2>
         {detail && <span role="status"><ProjectStatus project={awaiting ? { ...detail.project, statusUnknown: !isTerminalStudioStatus(detail.project.status) } : detail.project} /></span>}
@@ -460,7 +481,7 @@ function Result({ detail, error, onRetry }: { detail: ProjectDetail | null; erro
             {detail.downloadUrl && <a href={detail.downloadUrl} download className="shark-action">Изтегли ZIP <Download size={17} /></a>}
           </div>
           {detail.files.length > 0 && (
-            <details className="module-disclosure">
+            <details className="module-disclosure" data-scene="documents" data-scene-tone="light">
               <summary>Файлове</summary>
               <ul className="module-file-list">{detail.files.map((file) => <li key={file}><code>{file}</code></li>)}</ul>
             </details>
@@ -468,7 +489,7 @@ function Result({ detail, error, onRetry }: { detail: ProjectDetail | null; erro
         </>
       )}
       {agents.length > 0 && (
-        <details className="module-disclosure" open={agents.some(({ activity }) => activity !== 'completed') || undefined}>
+        <details className="module-disclosure" data-scene="activity" data-scene-tone="light" open={agents.some(({ activity }) => activity !== 'completed') || undefined}>
           <summary>Резултати от изпълнението</summary>
           <ul>{agents.map(({ id, activity, agentName, output }) => (
             <li key={id}>
@@ -536,7 +557,7 @@ function Agents({ user, loading }: { user: User | null; loading: boolean }) {
         Задачи в Студиото и последни резултати от твоите проекти.
         {' '}<Link className="module-link" href={VIEWS.chat.href}>Чат с Шарк агент <ArrowRight size={14} aria-hidden="true" /></Link>
       </Banner>
-      <section className="ice-section module-panel module-brain-panel" id="supreme-brain" data-ice-art="agent" aria-labelledby="supreme-brain-title">
+      <section className="ice-section module-panel module-brain-panel" id="supreme-brain" data-scene="assistant" data-scene-tone="light" aria-labelledby="supreme-brain-title">
         <div className="module-heading">
           <div className="module-brain"><Logo size="md" /><div><h2 id="supreme-brain-title">{SUPREME_BRAIN.name}</h2><p>{SUPREME_BRAIN.description}</p></div></div>
         </div>
@@ -560,7 +581,7 @@ function Agents({ user, loading }: { user: User | null; loading: boolean }) {
             const action = STUDIO_AGENT_ACTIONS[agent.id];
             return (
               <li key={agent.id} className="ice-section module-panel module-role-card"
-                data-ice-art={agent.id === 'agent-1' || agent.id === 'agent-14' ? 'agent' : action ? 'studio' : 'team'}>
+                data-scene={ROLE_SCENES[agent.icon] ?? 'team'} data-scene-tone="light">
                 <div className="module-role-heading">
                   <span className="module-agent-icon" aria-hidden="true"><Users size={18} /></span>
                   <div>
@@ -611,7 +632,7 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
   return (
     <>
       <Banner view="settings">Акаунт, права и абонамент.</Banner>
-      <section className="ice-section module-panel module-profile" data-ice-art="shark">
+      <section className="ice-section module-panel module-profile" data-scene="profile" data-scene-tone="light">
         <div className="module-heading"><h2>Профил</h2></div>
         {loading ? <p role="status">Зареждане на профила…</p> : error ? <p role="alert">{error}</p> : !user
           ? <Link className="shark-action" href={signIn(VIEWS.settings.href)}>Вход <ArrowRight size={17} /></Link>
@@ -636,7 +657,7 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
           )}
       </section>
       {user && <MemorySettings />}
-      <details className="module-disclosure"><summary>Архив на агентите</summary>
+      <details className="module-disclosure" data-scene="archive" data-scene-tone="light"><summary>Архив на агентите</summary>
         <Link className="module-link" href={VIEWS.agents.href}>Специализирани роли и предишни изпълнения <ArrowUpRight size={14}/></Link>
       </details>
     </>
@@ -646,16 +667,16 @@ function Account({ user, loading, error }: { user: User | null; loading: boolean
 function Automotive() {
   return (
     <>
-      <section className="ice-section module-banner module-banner-automotive" data-ice-art="car">
+      <section className="ice-section module-banner module-banner-automotive" data-scene="automotive" data-scene-tone="light">
         <div><CarFront size={26} /><h1>Автомобили</h1><p>Автомобилни изображения от проектните материали на SharkAI.</p></div>
         <Image src="/assets/image-1.png" className="module-car" alt="Сребрист автомобил от проектните материали на SharkAI" width={420} height={420} />
       </section>
       <div className="module-columns">
-        <section className="ice-section module-panel module-note module-diagnostics" data-ice-art="car">
+        <section className="ice-section module-panel module-note module-diagnostics" data-scene="diagnostics" data-scene-tone="light">
           <div className="module-heading"><h2>Диагностика</h2></div>
           <p>Няма свързан източник за VIN, OBD диагностичен адаптер или интерактивен 3D модел.</p>
         </section>
-        <figure className="ice-section module-panel module-engine">
+        <figure className="ice-section module-panel module-engine" data-scene="tools" data-scene-tone="light">
           <figcaption><strong>Двигател</strong><span>Изображение от проектните материали</span></figcaption>
           <Image src="/assets/image-2.png" alt="Изображение на червен и сребрист двигател" width={320} height={320} />
         </figure>
@@ -742,7 +763,7 @@ function DashboardContent() {
   return (
     <div className="module-workspace" data-ultra-view={view}>
       <a className="module-skip" href="#workspace-content">Към съдържанието</a>
-      <aside className="module-sidebar ice-section ice-section--dark" data-ice-art={WORKSPACE_ART[view] ?? 'shark'}>
+      <aside className="module-sidebar ice-section ice-section--dark" data-scene={WORKSPACE_SCENES[view]}>
         <WorkspaceBrand />
         <WorkspaceNav view={view} />
         <Link className="module-sidebar-account" href={data?.user ? VIEWS.settings.href : signIn('/dashboard')}>
@@ -750,7 +771,7 @@ function DashboardContent() {
         </Link>
       </aside>
       <div className="module-main">
-        <header className="module-topbar">
+        <header className="module-topbar" data-scene="workspace">
           <button type="button" className="module-menu module-utility-button" onClick={() => dialog.current?.showModal()} aria-label="Отвори менюто" aria-haspopup="dialog"><Menu size={18} /></button>
           <WorkspaceBrand mobile />
           <span className="module-breadcrumb"><Link href="/dashboard">Работно пространство</Link><span aria-hidden="true">/</span><strong>{VIEWS[view].label}</strong></span>
@@ -770,7 +791,7 @@ function DashboardContent() {
             <Banner view="studio">Създай проект от описание или визуална референция.</Banner>
             {error && <p className="module-error" role="alert">{error} <button type="button" className="module-link" onClick={() => void fetchProjects()}>Опитай отново</button></p>}
             {projectId && data?.user && <Result detail={details} error={projectError} onRetry={() => setReload((value) => value + 1)} />}
-            {projectId && !loading && !data?.user && <section className="ice-section module-panel" data-ice-art="studio">
+            {projectId && !loading && !data?.user && <section className="ice-section module-panel" data-scene="profile" data-scene-tone="light">
               <div className="module-heading"><h2>Проект</h2></div>
               <p>Влез в акаунта си, за да отвориш проекта.</p>
               <Link className="shark-action" href={signIn(`/dashboard?project=${encodeURIComponent(projectId)}`)}>Вход <ArrowRight size={17} /></Link>
@@ -785,7 +806,7 @@ function DashboardContent() {
           {view === 'settings' && <Account user={data?.user ?? null} loading={loading} error={error} />}
         </main>
       </div>
-      <dialog ref={dialog} className="module-drawer ice-section ice-section--dark" data-ice-art={WORKSPACE_ART[view] ?? 'shark'} aria-label="Навигация" onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
+      <dialog ref={dialog} className="module-drawer ice-section ice-section--dark" data-scene={WORKSPACE_SCENES[view]} aria-label="Навигация" onClick={(event) => { if (event.target === event.currentTarget) dialog.current?.close(); }}>
         <div className="module-drawer-content">
           <div className="module-drawer-head">
             <WorkspaceBrand />

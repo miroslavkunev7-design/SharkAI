@@ -84,7 +84,7 @@ function CommerceChart({data}:{data:Dashboard}) {
   const dailyMargins=data.daily.map(margin);
   const realized=dailyMargins.length && dailyMargins.every(value=>value!==null)
     ? dailyMargins.reduce<bigint>((total,value)=>total+(value??BigInt(0)),BigInt(0)) : null;
-  return <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
+  return <section className="ice-section module-panel module-wallet-panel" data-scene="margins" data-scene-tone="light">
     <h2>Поръчки и реализиран марж по дни</h2>
     <div className="commerce-actions"><button type="button" className="shark-action-secondary" aria-pressed={mode==='orders'} onClick={()=>setMode('orders')}>Поръчки</button>
       <button type="button" className="shark-action-secondary" aria-pressed={mode==='margin'} onClick={()=>setMode('margin')}>Реализиран марж</button></div>
@@ -138,7 +138,7 @@ function CapitalForm({capital,currency,refresh}:{capital:Capital;currency:string
     } catch {setNotice('Настройките временно не могат да бъдат запазени.');}
     finally {setBusy(false);}
   }
-  return <section className="ice-section module-panel module-wallet-panel" data-ice-art="studio">
+  return <section className="ice-section module-panel module-wallet-panel" data-scene="capital" data-scene-tone="light">
     <h2>Капитал за магазина</h2>
     <dl className="module-wallet-metrics">
       <div><dt>Потвърдена търговска наличност</dt><dd>{displayMinor(capital.cash_minor,currency)}</dd></div>
@@ -212,7 +212,7 @@ export function Commerce({signInHref}:{signInHref:string}) {
   const data=current?.data;
   const refresh=()=>setTick(n=>n+1);
   return <>
-    <section className="ice-section module-panel module-wallet-panel" data-ice-art="studio">
+    <section className="ice-section module-panel module-wallet-panel" data-scene="sales" data-scene-tone="light">
       <h2>Отчет за магазина</h2>
       <div className="commerce-actions">
         <label>От (UTC) <input type="date" value={from} max={to} onChange={e=>setFrom(e.target.value)}/></label>
@@ -237,10 +237,10 @@ export function Commerce({signInHref}:{signInHref:string}) {
       <CommerceSettlement key={currency} currency={currency} onAllocated={refresh}/>
       <CommerceChart key={key} data={data}/>
       <Procurement key={'stock-'+currency} currency={currency} refreshCapital={refresh}/>
-      <section className="ice-section module-panel module-wallet-panel" data-ice-art="studio">
+      <section className="ice-section module-panel module-wallet-panel" data-scene="orders" data-scene-tone="light">
         <h2>Поръчки на клиенти</h2>
         {data.orders.length===0?<p>{data.shop.connected?'Няма потвърдени поръчки за периода.':'Поръчките ще се покажат след свързване на магазин.'}</p>
-          : data.orders.map(order=><details className="commerce-candidate" key={order.order_ref}>
+          : data.orders.map(order=><details className="commerce-candidate" data-scene="fulfillment" data-scene-tone="light" key={order.order_ref}>
             <summary>{order.order_ref} · {states[order.status]} · {displayMinor(order.total_minor,currency)}</summary>
             <dl className="module-wallet-metrics">
               <div><dt>Поръчана на</dt><dd>{seen(order.ordered_at)}</dd></div>

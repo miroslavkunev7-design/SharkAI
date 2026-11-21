@@ -62,7 +62,7 @@ function HistoryChart({ history, currency }: Pick<PortfolioAccount, 'history' | 
   const ranges = [7, 30, 90, 365].filter(period =>
     history[0].time < end - period * dayMs &&
     history.filter(point => point.time >= end - period * dayMs).length > 1);
-  return <section className="pf-home-history" aria-label="История на потвърдените оценки">
+  return <section className="pf-home-history" data-scene="performance" aria-label="История на потвърдените оценки">
     <div className="pf-home-history-title">
       <h2>Стойност във времето</h2>
       {ranges.length > 0 && <div className="pf-home-ranges" role="group" aria-label="Период на оценките">
@@ -113,7 +113,7 @@ function AccountLists({ account, hidden, onOpenAccount }: {
     : 'Няма регистрирани движения.';
   const EmptyIcon = holdings ? Layers3 : History;
   const prefix = useId();
-  return <section className="pf-home-account" aria-label="Позиции и движения">
+  return <section className="pf-home-account" data-scene="holdings" aria-label="Позиции и движения">
     <div className="pf-home-tabs" role="group" aria-label="Съдържание на сметката">
       {(['holdings', 'activity'] as const).map((name, index) => <button type="button" key={name}
         aria-pressed={view === name} aria-controls={prefix + '-list'} onClick={() => { setView(name); setExpanded(false); }}>
@@ -160,7 +160,7 @@ export function PortfolioHome({ account, market, onOpenMarkets, onOpenAccount, o
     : 'Изчаква се потвърдена оценка от брокера.';
   return <div className="pf-home">
     <div className="pf-home-overview">
-      <section className="pf-home-hero" aria-labelledby="pf-home-title">
+      <section className="pf-home-hero" data-scene="wallet" aria-labelledby="pf-home-title">
         <div className="pf-home-hero-content">
           <div className="pf-home-topline">
             <h1 id="pf-home-title" className={account.value ? 'has-value' : undefined}>Моят портфейл</h1>
@@ -188,7 +188,7 @@ export function PortfolioHome({ account, market, onOpenMarkets, onOpenAccount, o
             {account.weeklyResult && <div><dt>Последен седмичен резултат</dt><dd>{value(account.weeklyResult)}</dd></div>}
           </dl>}
         </div>
-        <div className="pf-home-actions" role="group" aria-label="Действия с портфейла">
+        <div className="pf-home-actions" data-scene="activity" role="group" aria-label="Действия с портфейла">
           <ActionButton label="Захранване" icon={ArrowDownLeft}
             description={guest ? 'Вход за захранване на портфейла' : account.canFund ? 'Захранване на портфейла' : 'Условия за захранване на сметката'}
             onClick={() => onAction('funding')}/>

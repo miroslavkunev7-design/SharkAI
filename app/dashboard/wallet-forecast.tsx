@@ -125,7 +125,7 @@ function RangeResult({ data }: { data: Forecast }) {
   </>;
 }
 
-export default function WalletForecast({ currency = 'EUR', initialAmountMinor = null }: { currency?: string; initialAmountMinor?: string | null }) {
+export default function WalletForecast({ currency = 'EUR', initialAmountMinor = null, withScene = false }: { currency?: string; initialAmountMinor?: string | null; withScene?: boolean }) {
   const id = useId();
   const [entry, setEntry] = useState<{ unit: string; amount: string } | null>(null);
   const unit = entry?.unit ?? (currencies.includes(currency) ? currency : 'EUR');
@@ -164,7 +164,7 @@ export default function WalletForecast({ currency = 'EUR', initialAmountMinor = 
 
   const invalid = Boolean(touched && amount.trim() && !minor);
   const data = current?.data;
-  return <section className="wallet-projection" aria-labelledby={id + '-title'}>
+  return <section className="wallet-projection" data-scene={withScene ? 'forecast' : undefined} data-scene-tone={withScene ? 'light' : undefined} aria-labelledby={id + '-title'}>
     <h2 id={id + '-title'}>Прогноза за сума и период</h2>
     <p>Виж какъв резултат би дала въведената сума за същия период в проверената история на стратегията.</p>
     <div className="wallet-projection-fields">

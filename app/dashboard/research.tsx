@@ -52,7 +52,7 @@ export function ResearchPanel({domain,currency,horizonDays,onStrategy}:{domain:D
   const report=active?.report;
   const investment=domain==='investments';
   const leader=report?.candidates.find(candidate=>candidate.id===report.leader_id);
-  return <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
+  return <section className="ice-section module-panel module-wallet-panel" data-scene={investment ? 'strategy' : 'products'} data-scene-tone="light">
     <h2>{investment?'Сравнение на инвестиционни стратегии':'Продукти с потенциал'}</h2>
     {investment && <label className="commerce-day">Хоризонт за сравнение <select value={horizon}
       onChange={e=>setHorizonOverride(Number(e.target.value))}>
@@ -65,7 +65,7 @@ export function ResearchPanel({domain,currency,horizonDays,onStrategy}:{domain:D
         <p>{leader ? 'Водещ кандидат по проверените показатели · '+leader.label
           : 'Проверените резултати още не определят водещ кандидат.'} Справка към {moment(report.as_of)} (София).</p>
         {report.criteria.length>0 && <details><summary>Критерии за класиране</summary><ul>{report.criteria.map(c=><li key={c}>{c}</li>)}</ul></details>}
-        {report.candidates.map(candidate=><details key={candidate.id} className="commerce-candidate">
+        {report.candidates.map(candidate=><details key={candidate.id} className="commerce-candidate" data-scene={investment ? 'holdings' : 'inventory'} data-scene-tone="light">
           <summary>{candidate.rank!==null ? candidate.rank+'. ' : ''}{candidate.label} · {candidate.status==='eligible'?'С достатъчни данни':
             candidate.status==='validation_candidate'?'За проверка с поръчки':'Недостатъчно данни'}</summary>
           <p>Период на данните · {date(candidate.metrics.window_start)} – {date(candidate.metrics.window_end)} (UTC).

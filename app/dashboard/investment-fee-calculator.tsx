@@ -22,7 +22,7 @@ export function InvestmentFeeCalculator({data}:{data:WalletInvestmentsOwnerDashb
   const lower=eligible===null?null:eligible/BigInt(10),upper=eligible===null?null:(eligible+BigInt(9))/BigInt(10);
   const money=(n:bigint)=>displayMinor(n.toString(),currency);
   const format=(lo:bigint,hi:bigint)=>lo===hi?money(lo):money(lo)+' – '+money(hi);
-  return <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
+  return <section className="ice-section module-panel module-wallet-panel" data-scene="estimate" data-scene-tone="light">
     <h2>Изчисли таксата и сумата за собственика</h2>
     <p>Таксата е 10% върху новата уредена нетна печалба над предишния таксуван връх. Въведи стойностите за края на един отчетен период.</p>
     <div className="investment-calc-inputs">

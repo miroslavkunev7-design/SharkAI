@@ -16,6 +16,31 @@
   text-decoration: none;
 }
 .portfolio-return:hover { color: white; }
+.investment-intro {
+  display: grid;
+  gap: clamp(16px,2vw,24px);
+  align-content: center;
+  min-height: clamp(152px,18vw,210px);
+  padding: clamp(18px,3vw,36px);
+  border: 1px solid #b4c9fa88;
+  border-radius: 22px;
+  color: #f6f9ff;
+  box-shadow: inset 0 1px #ffffff30, 0 12px 33px #17253b38;
+}
+.investment-intro h1 {
+  margin: 0;
+  font: 650 clamp(2rem,4.4vw,3.5rem)/1.06 var(--font-display,var(--font-body));
+  letter-spacing: -.035em;
+}
+.investment-intro .investment-account-links { margin: 0; }
+.module-workspace .crypto-market[data-scene] {
+  padding: clamp(14px,2vw,24px);
+  border: 1px solid #aac0ea75;
+  border-radius: 20px;
+}
+.module-workspace .pf-home-hero[data-scene]::before,
+.module-workspace .pf-home-hero[data-scene]::after { content: none; }
+.module-workspace .pfm-alert[data-scene] { border-radius: 12px; padding: 14px; }
 .portfolio-return:focus-visible { outline: 2px solid #a9d8ff; outline-offset: 3px; }
 .portfolio-section-heading {
   margin: 0;

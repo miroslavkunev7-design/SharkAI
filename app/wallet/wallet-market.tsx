@@ -11,7 +11,7 @@ const equities = [{symbol:'AAPL',name:'Apple'},{symbol:'MSFT',name:'Microsoft'},
 export function EquityMarkets({searchable=false,symbol=null}:{searchable?:boolean;symbol?:string|null}) {
   const [term,setTerm]=useState('');
   const rows=equities.filter(row=>(!symbol||row.symbol===symbol)&&(row.name+' '+row.symbol).toLowerCase().includes(term.trim().toLowerCase()));
-  return <div className="panel"><h2 className="section-title">Акции и ETF</h2>
+  return <div className="panel" data-scene="investments" data-scene-tone="light"><h2 className="section-title">Акции и ETF</h2>
     {searchable&&<label className="field"><span>Търси инструмент</span><input type="search" value={term} onChange={e=>setTerm(e.target.value)}/></label>}
     <div className="list">{rows.map(row=>{
       const contents=<><span className="row-icon"><TrendingUp size={22}/></span><span className="row-label"><strong>{row.name}</strong><small>{row.symbol} · няма потвърдена котировка</small></span><span className="row-end">—</span></>;
@@ -29,7 +29,7 @@ function PortfolioQuote({symbol,name}:{symbol:string;name:string}) {
 }
 export function PublicMarkets({compact=false}:{compact?:boolean}) {
   if(!compact)return <MarketSearch/>;
-  return <div className="panel"><h2 className="section-title">Криптовалути</h2><div className="list">
+  return <div className="panel" data-scene="crypto" data-scene-tone="light"><h2 className="section-title">Криптовалути</h2><div className="list">
     <PortfolioQuote symbol="BTC" name="Bitcoin"/><PortfolioQuote symbol="ETH" name="Ethereum"/><PortfolioQuote symbol="SOL" name="Solana"/>
   </div></div>;
 }
@@ -38,7 +38,7 @@ function MarketSearch() {
   useEffect(()=>{const delay=setTimeout(()=>{setQuery(term.trim());setPage(1);},250);return ()=>clearTimeout(delay);},[term]);
   const catalog=useMarket<CryptoCatalog>('/api/markets/crypto?'+new URLSearchParams({q:query,page:String(page)}));
   const rows=catalog?.rows;
-  return <div className="panel"><h2 className="section-title">Криптовалути</h2>
+  return <div className="panel" data-scene="search" data-scene-tone="light"><h2 className="section-title">Криптовалути</h2>
     <label className="field"><span><Search size={15}/> Търсене на пазари</span><input type="search" maxLength={60}
       value={term} onChange={e=>setTerm(e.target.value)} placeholder="Име, символ или валутна двойка"/></label>
     <div className="list">{rows?.map(row=><Link className="item-row clickable" key={row.id}
@@ -60,7 +60,7 @@ export function PublicAsset({pair}:{pair:string|null}) {
 function AssetChart({pair,range,change}:{pair:string;range:CryptoRange;change:(range:CryptoRange)=>void}) {
   const result=useMarket<CryptoChart>('/api/markets/crypto/chart?'+new URLSearchParams({pair,range}));
   const data=result?.pair.id===pair&&result.range===range?result:null;
-  return <div className="panel"><div className="row"><h2>{data?data.pair.base+' / '+data.pair.quote:pair}</h2><span className="badge">Kraken Spot</span></div>
+  return <div className="panel" data-scene="performance" data-scene-tone="light"><div className="row"><h2>{data?data.pair.base+' / '+data.pair.quote:pair}</h2><span className="badge">Kraken Spot</span></div>
     <p className="amount">{data?.ticker&&data.ticker_at?cryptoUnit(Number(data.ticker.price))+' '+data.pair.quote:'—'}</p>
     {data?.ticker_at&&<p className="micro">Котировка към {dateLabel(data.ticker_at,true)} (София)</p>}
     <div className="chips">{(Object.keys(cryptoRanges) as CryptoRange[]).map(k=><button key={k} type="button"

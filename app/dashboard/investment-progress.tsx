@@ -64,7 +64,7 @@ export function InvestmentProgress(){
   const [start,setStart]=useState('');
   const {data,error,refresh}=useReport<InvestmentProgressReport>('/api/wallet-investments/progress'+(start?'?start='+encodeURIComponent(start):''),30000);
   const last=data?.points.at(-1);
-  return <section className="ice-section module-panel module-wallet-panel investment-progress" data-ice-art="markets">
+  return <section className="ice-section module-panel module-wallet-panel investment-progress" data-scene="targets" data-scene-tone="light">
     <div className="investment-progress-heading"><h2>Изпълнение на инвестиционната цел</h2>
       <button type="button" className="shark-action-secondary" onClick={refresh}>Обнови отчетите</button></div>
     {error&&<p role="status">Справката не успя да се обнови.</p>}
@@ -94,16 +94,16 @@ export function InvestmentOpportunities({currency,publicOnly=false}:{currency?:s
   const query=new URLSearchParams({days:String(days),...(currency&&!publicOnly?{currency}:{})});
   const path=publicOnly?'/api/market/opportunities':'/api/wallet-investments/progress/opportunities';
   const {data,error,refresh}=useReport<Partial<Pick<OpportunitiesReport,'currency'|'strategies'>>&Pick<OpportunitiesReport,'briefs'|'unavailable_sources'>>(path+'?'+query,300000);
-  return <section className="ice-section module-panel module-wallet-panel investment-opportunities" data-ice-art="markets">
+  return <section className="ice-section module-panel module-wallet-panel investment-opportunities" data-scene="analytics" data-scene-tone="light">
     <div className="investment-progress-heading"><h2>Инвестиционни възможности за анализ</h2>
       <button type="button" className="shark-action-secondary" onClick={refresh}>Обнови анализа</button></div>
     <label>Период за сравнение <select value={days} onChange={e=>setDays(Number(e.target.value))}>{[1,7,14,21,28].map(n=><option key={n} value={n}>{n} {n===1?'ден':'дни'}</option>)}</select></label>
     {error&&<p role="status">Справката не успя да се обнови.</p>}
     {!data&&!error&&<p role="status">Зареждане на наблюденията…</p>}
     {data&&<>
-      {data.briefs.map(b=><article key={b.category} className="investment-idea"><h3>{b.title}</h3><strong>{b.metric} · {b.value}</strong>
+      {data.briefs.map(b=><article key={b.category} className="investment-idea" data-scene={b.category === 'housing' ? 'holdings' : 'capital'} data-scene-tone="light"><h3>{b.title}</h3><strong>{b.metric} · {b.value}</strong>
         <p>{b.assessment}</p><p>{b.risk}</p><p>{b.source} · {b.period} · {shortDate(b.as_of)}. <a href={b.evidence_url} target="_blank" rel="noreferrer">Данни от източника</a></p></article>)}
-      {(data.strategies??[]).map(s=><article key={s.id} className="investment-idea"><h3>{s.rank!==null?s.rank+'. ':''}{s.label}</h3>
+      {(data.strategies??[]).map(s=><article key={s.id} className="investment-idea" data-scene="strategy" data-scene-tone="light"><h3>{s.rank!==null?s.rank+'. ':''}{s.label}</h3>
         <small>{s.category==='ETF'?'Борсово търгуван фонд':s.category==='STOCK'?'Акция':'Брокерска стратегия'} · {s.instrument} · {data.currency}</small>
         <p>{s.assessment}</p><dl className="module-wallet-metrics"><div><dt>Медиана след разходите</dt><dd>{percentage(s.median_bps/100)}</dd></div>
           <div><dt>Медиана при проверка</dt><dd>{percentage(s.holdout_bps/100)}</dd></div><div><dt>Най-слаб период</dt><dd>{percentage(s.worst_bps/100)}</dd></div>

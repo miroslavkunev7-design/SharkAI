@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Logo } from '@/components/Logo';
-import { Check, Zap, ArrowLeft, ArrowRight, CreditCard } from 'lucide-react';
+import { PublicShell } from '@/components/PublicShell';
+import { Check, Zap, ArrowRight, CreditCard } from 'lucide-react';
 import { PLANS } from '@/lib/agents';
 import { accountPlanLabel, hasLifetimeUltra, type AccountPlan } from '../account-plan';
 import '../entry.css';
@@ -22,8 +22,8 @@ type Transfer = { plan: Plan; iban: string; bank: string; accountName: string | 
 const periodDate = new Intl.DateTimeFormat('bg-BG', { dateStyle: 'medium', timeStyle: 'short' });
 const euro = new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' });
 const planDetails = [
-  { key: 'PRO', art: 'agent', icon: Check, features: ['Месечен лимит за AI чат', 'Разширен модел при наличен доставчик', 'Файлове, история и проекти', 'Преглед и експортиране от Студио'] },
-  { key: 'ULTRA', art: 'team', icon: Zap, features: ['Без токенов лимит от SharkAI', 'Разширен модел при наличен доставчик', 'Инструменти в чата и Студио'] },
+  { key: 'PRO', scene: 'pro', icon: Check, features: ['Месечен лимит за AI чат', 'Разширен модел при наличен доставчик', 'Файлове, история и проекти', 'Преглед и експортиране от Студио'] },
+  { key: 'ULTRA', scene: 'ultra', icon: Zap, features: ['Без токенов лимит от SharkAI', 'Разширен модел при наличен доставчик', 'Инструменти в чата и Студио'] },
 ] as const;
 
 export default function PricingPage() {
@@ -134,25 +134,19 @@ export default function PricingPage() {
   }
 
   return (
-    <main className="shark-entry-page shark-entry-pricing">
-      <header className="shark-entry-return">
-        <Link href="/" className="shark-wordmark" aria-label="SharkAI, начало">
-          <ArrowLeft size={17} aria-hidden="true" /><Logo size="sm" />
-          <span aria-hidden="true">SharkAI</span>
-        </Link>
-      </header>
-      <section className="ice-section shark-entry-price-intro" data-ice-art="agent" aria-labelledby="plans-title">
+    <PublicShell mainClassName="shark-entry-page shark-entry-pricing">
+      <section className="ice-section shark-entry-price-intro" data-scene="plans" data-scene-tone="light" aria-labelledby="plans-title">
         <div className="shark-entry-price-lede">
           <h1 id="plans-title">Планове</h1>
           <p>{lifetime ? <><Check size={17} aria-hidden="true" /> Достъп без плащане</> : <><CreditCard size={17} aria-hidden="true" /> Месечни абонаменти</>}</p>
           <Link className="shark-entry-inline-link" href="/chat">{lifetime ? 'Към чата' : 'Започни без абонамент'} <ArrowRight size={16} aria-hidden="true" /></Link>
         </div>
       </section>
-      {(notice || error) && <div className="shark-entry-price-message ice-section" data-ice-art="agent">
+      {(notice || error) && <div className="shark-entry-price-message ice-section" data-scene="billing" data-scene-tone="light">
         {notice && <p role="status">{notice}</p>}
         {error && <p role="alert" className="shark-entry-error">{error}</p>}
       </div>}
-      {transfer && <section ref={transferSection} tabIndex={-1} className="ice-section p-4 sm:p-6" aria-labelledby="bank-transfer-title">
+      {transfer && <section ref={transferSection} tabIndex={-1} className="ice-section p-4 sm:p-6" data-scene="transfer" data-scene-tone="light" aria-labelledby="bank-transfer-title">
         <h2 id="bank-transfer-title" className="font-bold">Банков превод за {transfer.plan}</h2>
         <dl className="mt-2 grid grid-cols-[minmax(6rem,auto)_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm">
           {transfer.accountName && <><dt>Получател</dt><dd className="break-words font-semibold">{transfer.accountName}</dd></>}
@@ -163,9 +157,9 @@ export default function PricingPage() {
         </dl>
         <p className="mt-3 text-sm">Използвай точно посоченото основание. Достъпът започва след потвърждение на получения превод.</p>
       </section>}
-      <div className="shark-entry-price-grid">
-        {planDetails.map(({ key, art, icon: Icon, features }) => (
-          <article key={key} className="ice-section shark-entry-plan" data-ice-art={art}>
+      <section className="shark-entry-price-grid" aria-label="Сравнение на плановете">
+        {planDetails.map(({ key, scene, icon: Icon, features }) => (
+          <article key={key} className="ice-section shark-entry-plan" data-scene={scene} data-scene-tone="light">
             <div className="shark-entry-plan-copy">
               <h2><Icon size={19} aria-hidden="true" /> {PLANS[key].name}</h2>
               <p className="shark-entry-plan-price">{lifetime && key === 'ULTRA' ? 'Без такса' : <>€{PLANS[key].price}<span> / месец</span></>}</p>
@@ -187,7 +181,7 @@ export default function PricingPage() {
             </div>
           </article>
         ))}
-      </div>
-    </main>
+      </section>
+    </PublicShell>
   );
 }

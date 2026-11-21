@@ -76,12 +76,12 @@ export function WalletReferenceConverter({compact=false,initialPair='fiat'}:{com
   const body=<div className={compact?'desktop-converter-form':undefined}>
     <div className="screen"><div className="stack">
       <form className="stack" action="/wallet" method="GET">
-        <div className="panel"><label className="field"><span>От валута</span>
+        <div className="panel" data-scene={compact?undefined:'currencies'} data-scene-tone="light"><label className="field"><span>От валута</span>
           <select value={base} aria-label="От валута" onChange={e=>select(e.target.value,'base')}>{options}</select></label>
           <p className="micro">Сума за справка · <button type="button" className="wallet-rate-tool" onClick={()=>changePair(quote,base)} aria-label="Размени валутите"><ArrowLeftRight size={13}/></button></p>
           <label className="field"><span>Обменяш {base}</span>
             <input inputMode="decimal" aria-label="Сума за справка" placeholder="0,00" value={rawAmount} onChange={e=>setRawAmount(e.target.value)}/></label></div>
-        <div className="panel"><label className="field"><span>Към валута</span>
+        <div className="panel" data-scene={compact?undefined:'exchange'} data-scene-tone="light"><label className="field"><span>Към валута</span>
           <select value={quote} aria-label="Към валута" onChange={e=>select(e.target.value,'quote')}>{options}</select></label>
           <p className="micro">Ориентировъчна стойност</p><strong className="amount" aria-live="polite">{result}</strong>
           <p className="micro" role="status">{current?(base===quote?'Една и съща валута.':

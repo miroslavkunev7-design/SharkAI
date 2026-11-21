@@ -1,6 +1,7 @@
 'use client';
 
 import {useEffect, useRef, useState, useSyncExternalStore, type ReactNode} from 'react';
+import Link from 'next/link';
 import {useRouter} from 'next/navigation';
 import {ArrowLeft, ArrowRightLeft, ChartNoAxesColumn, ChartNoAxesCombined, ChevronDown, ChevronRight,
   Ellipsis, Eye, EyeOff, House, MessageCircle, Plus, ReceiptText, Search, Shuffle, UserRound, Wallet, X} from 'lucide-react';
@@ -47,8 +48,12 @@ function parentTab(section:WalletRoute):WalletRoute {
   if(['settings','privacy','security','help','notifications'].includes(section))return 'more';
   return 'overview';
 }
+function SiteLink() {
+  return <Link className="wallet-site-back" href="/"><ArrowLeft size={16} aria-hidden="true"/>Към SharkAI</Link>;
+}
 function Tabs({desktop,section,go}:{desktop:boolean;section:WalletRoute;go:Go}) {
   return <nav className={desktop?'desktop-header-tabs':'bottom-dock'} aria-label="Основна навигация">
+    {desktop&&<SiteLink/>}
     {navigation.map(({route,icon:Icon})=><button type="button" key={route} onClick={()=>go(route)}
       aria-current={section===route?'page':undefined} className={section===route?(desktop?'is-selected':'selected'):''}>
       <Icon size={desktop?23:25}/><span>{walletTitles[route]}</span></button>)}
@@ -71,8 +76,8 @@ function Header({desktop,section,go}:{desktop:boolean;section:WalletRoute;go:Go}
   const controls=[{route:'search',icon:Search,label:'Търси'}, {route:'analytics',icon:ChartNoAxesColumn,label:'Анализи'},
     {route:'cards',icon:CardIcon,label:'Карти'}, {route:'profile',icon:UserRound,label:'Профил'}] as const;
   if(desktop) return <header className="desktop-wallet-header"><div className="desktop-header-main">
-    <button type="button" className="desktop-brand" aria-label="SharkAI — начало" onClick={()=>go('overview')}><Avatar desktop/>
-      <span className="desktop-brand-copy"><strong>Shark<span>AI</span></strong><span>Портфейл</span></span></button>
+    <Link className="desktop-brand" href="/" aria-label="Към началната страница на SharkAI" title="Към SharkAI"><Avatar desktop/>
+      <span className="desktop-brand-copy"><strong>Shark<span>AI</span></strong><span>Портфейл</span></span></Link>
     <div className="desktop-header-controls">{controls.map(({route,icon:Icon,label})=><button type="button" key={route}
       className={'desktop-header-control'+(route==='search'?' desktop-header-search':'')} onClick={()=>go(route)}>
       <Icon size={route==='search'?22:21}/><span>{label}</span></button>)}</div></div>
@@ -99,7 +104,7 @@ function Recent({desktop,go,data,hidden,detail}:{desktop:boolean;go:Go;data:Wall
   const button=<button type="button" className={desktop?'desktop-text-link':'button secondary'} onClick={()=>{
     if(guest) window.location.assign(walletLogin('overview')); else if(data.account.state==='unavailable'||data.statement===null) data.refresh(); else go('wise-connection');
   }}>{guest?'Вход в SharkAI':data.account.state==='unavailable'||data.statement===null?'Обнови':'Връзка с Wise'}{desktop&&<ChevronRight size={16}/>}</button>;
-  return <section className={desktop?'desktop-wallet-card desktop-transactions':'panel recent-panel'} aria-label="Последни транзакции">
+  return <section className={desktop?'desktop-wallet-card desktop-transactions':'panel recent-panel'} data-scene="transactions" data-scene-tone="light" aria-label="Последни транзакции">
     {desktop&&<div className="desktop-card-art desktop-transactions-art" aria-hidden="true"/>}
     <div className={desktop?'desktop-transactions-heading':'recent-heading'}><h2>Последни транзакции</h2><span className="badge">Wise</span>
       <button type="button" className={desktop?'desktop-text-link':'see-all'} onClick={()=>go('transactions')}>Всички <ChevronRight size={16}/></button></div>
@@ -160,7 +165,7 @@ export function WalletHome({section,transferUnavailable,pair,equities=false}:{se
     <div className="landscape"/><div className="scene-shade"/><div className="scroll-area" ref={scroll}>
       <Header desktop={desktop} section={activeTab} go={go}/>
       {!home&&<div className="page-context"><button type="button" className="page-back" onClick={tabRoot?()=>go('overview'):back}><span className="glass-circle"><ArrowLeft size={21}/></span><span>{tabRoot?'Начало':'Назад'}</span></button>
-        <span className="page-context-brand">Shark<span>AI</span></span><span className="badge">WISE</span></div>}
+        <Link className="page-context-brand" href="/" aria-label="Към началната страница на SharkAI">Shark<span>AI</span></Link><span className="badge">WISE</span></div>}
       <main className="route-container forward" data-route={base} key={base}>
         {transferUnavailable&&<p role="alert" className="wallet-transfer-error">Wise е временно недостъпен. Превод не е създаден.</p>}
         {home?desktop?<section className="desktop-wallet" aria-label="Начало">
@@ -177,7 +182,7 @@ export function WalletHome({section,transferUnavailable,pair,equities=false}:{se
             <button type="button" className="home-balance" onClick={toggle} aria-label={hidden?'Покажи баланса':'Скрий баланса'}><span>{balance}</span>
               <small>{{EUR:'€',USD:'$',GBP:'£'}[currency]??currency}</small></button>
             <button type="button" className="glass-pill account-switch" onClick={()=>go('accounts')}>Сметки</button></div>
-            <QuickActions desktop={false} go={go}/><div className="home-chat-lane"><ChatButton/></div>
+            <QuickActions desktop={false} go={go}/><div className="home-chat-lane"><SiteLink/><ChatButton/></div>
             <Recent desktop={false} go={go} data={data} hidden={hidden} detail={detail}/></section>:view(base)}
       </main></div>
     {!desktop&&!sheet&&<Tabs desktop={false} section={activeTab} go={go}/>}

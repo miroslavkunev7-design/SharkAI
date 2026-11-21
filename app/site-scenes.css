@@ -1,0 +1,185 @@
+/* Scene images are decorative. All values, charts, messages and controls remain HTML. */
+[data-scene="assistant"] { --scene-image: url('/sharkai/scenes/assistant.webp'); }
+[data-scene="studio"] { --scene-image: url('/sharkai/scenes/studio.webp'); }
+[data-scene="workspace"] { --scene-image: url('/sharkai/scenes/workspace.webp'); }
+[data-scene="projects"] { --scene-image: url('/sharkai/scenes/projects.webp'); }
+[data-scene="desktop"] { --scene-image: url('/sharkai/scenes/desktop.webp'); }
+[data-scene="plans"] { --scene-image: url('/sharkai/scenes/plans.webp'); }
+[data-scene="pro"] { --scene-image: url('/sharkai/scenes/pro.webp'); }
+[data-scene="ultra"] { --scene-image: url('/sharkai/scenes/ultra.webp'); }
+[data-scene="team"] { --scene-image: url('/sharkai/scenes/team.webp'); }
+[data-scene="wallet"] { --scene-image: url('/sharkai/scenes/wallet.webp'); }
+[data-scene="payments"] { --scene-image: url('/sharkai/scenes/payments.webp'); }
+[data-scene="cards"] { --scene-image: url('/sharkai/scenes/cards.webp'); }
+[data-scene="exchange"] { --scene-image: url('/sharkai/scenes/exchange.webp'); }
+[data-scene="transactions"] { --scene-image: url('/sharkai/scenes/transactions.webp'); }
+[data-scene="pockets"] { --scene-image: url('/sharkai/scenes/pockets.webp'); }
+[data-scene="accounts"] { --scene-image: url('/sharkai/scenes/accounts.webp'); }
+[data-scene="transfer"] { --scene-image: url('/sharkai/scenes/transfer.webp'); }
+[data-scene="statements"] { --scene-image: url('/sharkai/scenes/statements.webp'); }
+[data-scene="investments"] { --scene-image: url('/sharkai/scenes/investments.webp'); }
+[data-scene="markets"] { --scene-image: url('/sharkai/scenes/markets.webp'); }
+[data-scene="crypto"] { --scene-image: url('/sharkai/scenes/crypto.webp'); }
+[data-scene="strategy"] { --scene-image: url('/sharkai/scenes/strategy.webp'); }
+[data-scene="analytics"] { --scene-image: url('/sharkai/scenes/analytics.webp'); }
+[data-scene="targets"] { --scene-image: url('/sharkai/scenes/targets.webp'); }
+[data-scene="performance"] { --scene-image: url('/sharkai/scenes/performance.webp'); }
+[data-scene="orders"] { --scene-image: url('/sharkai/scenes/orders.webp'); }
+[data-scene="holdings"] { --scene-image: url('/sharkai/scenes/holdings.webp'); }
+[data-scene="overview"] { --scene-image: url('/sharkai/scenes/overview.webp'); }
+[data-scene="automotive"] { --scene-image: url('/sharkai/scenes/automotive.webp'); }
+[data-scene="memory"] { --scene-image: url('/sharkai/scenes/memory.webp'); }
+[data-scene="documents"] { --scene-image: url('/sharkai/scenes/documents.webp'); }
+[data-scene="calendar"] { --scene-image: url('/sharkai/scenes/calendar.webp'); }
+[data-scene="archive"] { --scene-image: url('/sharkai/scenes/archive.webp'); }
+[data-scene="code"] { --scene-image: url('/sharkai/scenes/code.webp'); }
+[data-scene="canvas"] { --scene-image: url('/sharkai/scenes/canvas.webp'); }
+[data-scene="library"] { --scene-image: url('/sharkai/scenes/library.webp'); }
+[data-scene="security"] { --scene-image: url('/sharkai/scenes/security.webp'); }
+[data-scene="settings"] { --scene-image: url('/sharkai/scenes/settings.webp'); }
+[data-scene="profile"] { --scene-image: url('/sharkai/scenes/profile.webp'); }
+[data-scene="support"] { --scene-image: url('/sharkai/scenes/support.webp'); }
+[data-scene="access"] { --scene-image: url('/sharkai/scenes/access.webp'); }
+[data-scene="identity"] { --scene-image: url('/sharkai/scenes/identity.webp'); }
+[data-scene="notifications"] { --scene-image: url('/sharkai/scenes/notifications.webp'); }
+[data-scene="connections"] { --scene-image: url('/sharkai/scenes/connections.webp'); }
+[data-scene="activity"] { --scene-image: url('/sharkai/scenes/activity.webp'); }
+[data-scene="commerce"] { --scene-image: url('/sharkai/scenes/commerce.webp'); }
+[data-scene="products"] { --scene-image: url('/sharkai/scenes/products.webp'); }
+[data-scene="supplier"] { --scene-image: url('/sharkai/scenes/supplier.webp'); }
+[data-scene="fulfillment"] { --scene-image: url('/sharkai/scenes/fulfillment.webp'); }
+[data-scene="sales"] { --scene-image: url('/sharkai/scenes/sales.webp'); }
+[data-scene="inventory"] { --scene-image: url('/sharkai/scenes/inventory.webp'); }
+[data-scene="shipping"] { --scene-image: url('/sharkai/scenes/shipping.webp'); }
+[data-scene="margins"] { --scene-image: url('/sharkai/scenes/margins.webp'); }
+[data-scene="capital"] { --scene-image: url('/sharkai/scenes/capital.webp'); }
+[data-scene="customers"] { --scene-image: url('/sharkai/scenes/customers.webp'); }
+[data-scene="subscriptions"] { --scene-image: url('/sharkai/scenes/subscriptions.webp'); }
+[data-scene="commission"] { --scene-image: url('/sharkai/scenes/commission.webp'); }
+[data-scene="registrations"] { --scene-image: url('/sharkai/scenes/registrations.webp'); }
+[data-scene="billing"] { --scene-image: url('/sharkai/scenes/billing.webp'); }
+[data-scene="audit"] { --scene-image: url('/sharkai/scenes/audit.webp'); }
+[data-scene="roles"] { --scene-image: url('/sharkai/scenes/roles.webp'); }
+[data-scene="health"] { --scene-image: url('/sharkai/scenes/health.webp'); }
+[data-scene="diagnostics"] { --scene-image: url('/sharkai/scenes/diagnostics.webp'); }
+[data-scene="tests"] { --scene-image: url('/sharkai/scenes/tests.webp'); }
+[data-scene="network"] { --scene-image: url('/sharkai/scenes/network.webp'); }
+[data-scene="models"] { --scene-image: url('/sharkai/scenes/models.webp'); }
+[data-scene="monitoring"] { --scene-image: url('/sharkai/scenes/monitoring.webp'); }
+[data-scene="metrics"] { --scene-image: url('/sharkai/scenes/metrics.webp'); }
+[data-scene="tools"] { --scene-image: url('/sharkai/scenes/tools.webp'); }
+[data-scene="reminders"] { --scene-image: url('/sharkai/scenes/reminders.webp'); }
+[data-scene="attachments"] { --scene-image: url('/sharkai/scenes/attachments.webp'); }
+[data-scene="search"] { --scene-image: url('/sharkai/scenes/search.webp'); }
+[data-scene="savings"] { --scene-image: url('/sharkai/scenes/savings.webp'); }
+[data-scene="beneficiaries"] { --scene-image: url('/sharkai/scenes/beneficiaries.webp'); }
+[data-scene="currencies"] { --scene-image: url('/sharkai/scenes/currencies.webp'); }
+[data-scene="verification"] { --scene-image: url('/sharkai/scenes/verification.webp'); }
+[data-scene="estimate"] { --scene-image: url('/sharkai/scenes/estimate.webp'); }
+[data-scene="allocation"] { --scene-image: url('/sharkai/scenes/allocation.webp'); }
+[data-scene="withdrawal"] { --scene-image: url('/sharkai/scenes/withdrawal.webp'); }
+[data-scene="deposits"] { --scene-image: url('/sharkai/scenes/deposits.webp'); }
+[data-scene="forecast"] { --scene-image: url('/sharkai/scenes/forecast.webp'); }
+
+body.shark-site {
+  isolation: isolate;
+  background-color: #122341;
+}
+.site-daylight {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background: #79a3bc url('/sharkai/scenes/landscape.webp') center 45% / cover no-repeat;
+}
+.site-daylight::before, .site-daylight::after {
+  position: absolute;
+  content: '';
+  inset: 0;
+}
+.site-daylight::before {
+  inset: -12px;
+  background: inherit;
+  filter: blur(8px);
+  mask-image: linear-gradient(transparent 35%, #000 88%);
+}
+.site-daylight::after {
+  background: linear-gradient(180deg, #162a4b0f, #14365d0d 36%, #192d485c);
+}
+.shark-site:has(.zip-wallet) > .site-daylight,
+.shark-site:has(.shark-chat-shell:not(.original-chat-widget)):not(:has(.shark-public-shell, .module-workspace, .shark-admin)) > .site-daylight {
+  display: none;
+}
+.shark-site :is(.module-workspace, .shark-admin, .shark-launch-home, .shark-entry-page, .shark-public-shell, .site-missing) {
+  --shark-page-backdrop: transparent;
+  background: transparent;
+}
+
+/* Keep the scene on the right, independent of panel width or text length. The
+   first layer feathers its inner edge into the ice surface beneath it. */
+body.shark-site [data-scene] {
+  --scene-solid: #152440;
+  --scene-soft: rgba(23, 40, 69, .97);
+  --scene-feather: rgba(25, 45, 77, .78);
+  --scene-shade: rgba(12, 25, 48, .51);
+  --scene-right: rgba(20, 36, 61, .26);
+  --scene-text: #f5f9ff;
+  --scene-muted: #d1def3;
+  --scene-edge: rgba(197, 228, 255, .57);
+  --scene-focus: 67% 50%;
+  --scene-layers:
+    linear-gradient(135deg, #d7efff12, transparent 33%),
+    url('/sharkai/ice-surface.webp'),
+    linear-gradient(96deg, var(--scene-soft) 0%, var(--scene-soft) 40%, var(--scene-feather) 50%, var(--scene-shade) 66%, var(--scene-right)),
+    var(--scene-image),
+    linear-gradient(125deg, var(--scene-solid), #657f9e);
+  background-color: var(--scene-solid);
+  background-image: var(--scene-layers);
+  background-size: 100% 100%, cover, 100% 100%, cover, 100% 100%;
+  background-repeat: no-repeat;
+  background-position: center, left center, center, var(--scene-focus), center;
+  background-blend-mode: normal, soft-light, normal, normal, normal;
+  color: var(--scene-text);
+}
+body.shark-site [data-scene][data-scene-tone="light"] {
+  --scene-solid: #dcebf6;
+  --scene-soft: rgba(228, 242, 251, .99);
+  --scene-feather: rgba(221, 238, 249, .91);
+  --scene-shade: rgba(224, 238, 253, .57);
+  --scene-right: rgba(221, 238, 250, .30);
+  --scene-text: #141e43;
+  --scene-muted: #334561;
+  --scene-edge: rgba(236, 250, 255, .93);
+}
+body.shark-site .ice-section[data-scene]::before {
+  /* The shared scene replaces the earlier section illustration. */
+  background-image: none;
+}
+body.shark-site .ice-section[data-scene] {
+  border-color: var(--scene-edge);
+  box-shadow: inset 0 1px 0 #ffffffa6, inset 0 -1px 0 #bacdfb4d, 0 8px 23px #0a234637, 0 0 14px #87c7fc35;
+}
+.shark-site .site-missing {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: max(24px, 6vw);
+}
+.site-missing article {
+  width: min(100%, 680px);
+  padding: clamp(28px, 7vw, 64px);
+  border-radius: 26px;
+  border: 1px solid #d7efffbb;
+  box-shadow: 0 20px 60px #07173640;
+}
+.site-missing h1 { font-size: clamp(2rem, 5vw, 3.3rem); line-height: 1.08; margin-bottom: 1rem; }
+.site-missing p { max-width: 36ch; margin-bottom: 1.6rem; }
+.site-missing nav { display: flex; flex-wrap: wrap; gap: .75rem; }
+@media (max-width: 640px) {
+  .site-daylight::before { filter: blur(5px); }
+}
+@media (forced-colors: active) {
+  body.shark-site [data-scene] { background: Canvas; color: CanvasText; }
+  .site-daylight { display: none; }
+}

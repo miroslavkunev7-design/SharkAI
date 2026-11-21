@@ -64,11 +64,14 @@ export function InvestmentLab({ ownerKey }: { ownerKey?: string }) {
     </div>;
   }
   return <div className="portfolio-subpage">
-    <nav className="investment-account-links" aria-label="Портфейл и пазари">
-      <Link className="shark-action" href="/wallet">Отвори портфейла</Link>
-      <Link className="shark-action-secondary" href={positionsHref}>Позиции и следени активи</Link>
-      <Link className="shark-action-secondary" href={marketsHref}>Пазари</Link>
-    </nav>
+    <header className="investment-intro" data-scene="markets">
+      <h1>Инвестиции</h1>
+      <nav className="investment-account-links" aria-label="Портфейл и пазари">
+        <Link className="shark-action" href="/wallet">Отвори портфейла</Link>
+        <Link className="shark-action-secondary" href={positionsHref}>Позиции и следени активи</Link>
+        <Link className="shark-action-secondary" href={marketsHref}>Пазари</Link>
+      </nav>
+    </header>
     <WalletInvestments signInHref={signIn(portfolioHref + (tab ? '&tab=' + encodeURIComponent(tab) : ''))} />
   </div>;
 }

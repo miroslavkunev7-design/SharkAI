@@ -52,7 +52,7 @@ export function TradingConsent({readOnly=false}:{readOnly?:boolean}={}) {
       setError('Потвърждението е недостъпно. Провери статуса преди повторен опит.');
     } finally { setBusy(false); }
   }
-  return <section className={readOnly?'panel':'ice-section module-panel module-wallet-panel'} data-ice-art={readOnly?undefined:'markets'} aria-label="Разрешение за автоматизирана търговия">
+  return <section className={readOnly?'panel':'ice-section module-panel module-wallet-panel'} data-scene={readOnly ? undefined : 'verification'} data-scene-tone={readOnly ? undefined : 'light'} aria-label="Разрешение за автоматизирана търговия">
     <h2>Разрешение за автоматизирана търговия</h2>
     {error && <p role="alert">{error}</p>}
     {!view && !error && <p role="status">Проверка на разрешението…</p>}

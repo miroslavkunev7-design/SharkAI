@@ -563,3 +563,26 @@
 @media (prefers-reduced-motion: reduce) {
   .shark-entry-module-arrow { transition: none; }
 }
+
+.shark-public-shell .shark-entry-page {
+  width: var(--public-width);
+  min-height: 0;
+  margin: clamp(16px, 3vw, 38px) auto;
+  padding: 0;
+  background: transparent;
+}
+.shark-public-shell .shark-entry-feature { width: 100%; min-height: clamp(405px, 45vw, 625px); }
+.shark-public-shell .shark-entry-pricing { grid-template-columns: minmax(0, 1fr); }
+.shark-public-shell .shark-entry-feature-copy h1 { margin-top: 0; }
+.shark-public-shell .shark-entry-price-intro { display: grid; align-items: center; }
+.shark-public-shell .shark-entry-auth-panel .shark-entry-text-button { padding: 0 5px; }
+.shark-public-shell .shark-entry-plan-copy { text-shadow: 0 1px 3px #ebf4ff; }
+.shark-public-shell .shark-entry-plan-copy .shark-action { text-shadow: none; }
+.shark-public-shell .shark-entry-page [data-scene='transfer'] :is(dl,p) { max-width: 46rem; }
+@media (max-width: 760px) {
+  .shark-public-shell .shark-entry-feature { min-height: 386px; }
+  .shark-public-shell .shark-entry-auth-copy, .shark-public-shell .shark-entry-download-copy { width: min(92%, 440px); border-radius: 18px; background: linear-gradient(90deg, #eaf6ffde 48%, #eaf6ffa6 82%, transparent); }
+  .shark-public-shell .shark-entry-auth-copy { padding-right: 13%; }
+  .shark-public-shell .shark-entry-auth h1 { max-width: none; }
+  .shark-public-shell .shark-entry-plan-copy { width: min(78%, 32ch); }
+}

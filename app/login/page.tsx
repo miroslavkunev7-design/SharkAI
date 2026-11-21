@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { Logo } from '@/components/Logo';
+import { PublicShell } from '@/components/PublicShell';
 import '../entry.css';
 
 export default function LoginPage() {
@@ -39,7 +38,7 @@ export default function LoginPage() {
         return;
       }
       const next = new URLSearchParams(window.location.search).get('next');
-      const allowedReturn = next && /^\/(chat|dashboard|pricing|wallet)(\?|$)/.test(next);
+      const allowedReturn = next && /^\/(chat|dashboard|pricing|wallet|tests)(\?|$)/.test(next);
       window.location.replace(allowedReturn ? next : '/chat');
     } catch {
       setError('Връзката със SharkAI прекъсна. Опитай отново.');
@@ -54,13 +53,9 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="shark-entry-page shark-entry-auth">
-      <section className="ice-section shark-entry-feature shark-entry-auth-panel" data-ice-art="shark" aria-labelledby="login-title">
+    <PublicShell mainClassName="shark-entry-page shark-entry-auth">
+      <section className="ice-section shark-entry-feature shark-entry-auth-panel" data-scene={isRegister ? 'identity' : 'access'} data-scene-tone="light" aria-labelledby="login-title">
         <div className="shark-entry-feature-copy shark-entry-auth-copy">
-          <Link href="/" className="shark-wordmark w-fit" aria-label="SharkAI, начало">
-            <Logo size="sm" />
-            <span aria-hidden="true">SharkAI</span>
-          </Link>
           <h1 id="login-title">{isRegister ? 'Създай акаунт' : 'Вход в SharkAI'}</h1>
           <form onSubmit={handleSubmit} className="shark-entry-form" aria-busy={loading}>
             {isRegister && (
@@ -88,6 +83,6 @@ export default function LoginPage() {
           </button>
         </div>
       </section>
-    </main>
+    </PublicShell>
   );
 }

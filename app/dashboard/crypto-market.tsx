@@ -77,9 +77,9 @@ export function CryptoMarketPanel(){
   const catalog=useMarket<CryptoCatalog>('/api/markets/crypto?'+new URLSearchParams({q:query,page:String(page)}));
   const chart=useMarket<CryptoChart>('/api/markets/crypto/chart?'+new URLSearchParams({pair:selected.id,range}));
   const ticker=chart?.ticker;
-  return <section className="crypto-market" aria-labelledby={heading}>
+  return <section className="crypto-market" data-scene="crypto" aria-labelledby={heading}>
     <header><h2 id={heading}>Криптопазар</h2><p>Спот пазари на Kraken · Обновяване на 45 секунди</p></header>
-    <section className="crypto-detail" aria-label="Избран пазар">
+    <section className="crypto-detail" data-scene="markets" data-scene-tone="light" aria-label="Избран пазар">
       <div className="crypto-title"><h3>{selected.base}<span> / {selected.quote}</span></h3>
         <div className="crypto-ranges" role="group" aria-label="Период на графиката">
           {(Object.keys(cryptoRanges) as CryptoRange[]).map(r=><button type="button" key={r} aria-pressed={range===r} onClick={()=>setRange(r)}>{cryptoRanges[r].label}</button>)}

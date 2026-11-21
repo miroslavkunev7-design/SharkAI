@@ -69,11 +69,11 @@ function DateCell({ value }: { value?: string | null }) {
   return <time dateTime={value}>{dates.format(date)}</time>;
 }
 
-function AdminSection({ title, icon: Icon, art, id, count, children }: {
-  title: string; icon: LucideIcon; art: string; id?: string; count?: number; children: ReactNode;
+function AdminSection({ title, icon: Icon, scene, id, count, children }: {
+  title: string; icon: LucideIcon; scene: string; id?: string; count?: number; children: ReactNode;
 }) {
   return (
-    <section id={id} className="ice-section operator-panel shark-admin-section" data-ice-art={art}>
+    <section id={id} className="ice-section operator-panel shark-admin-section" data-scene={scene} data-scene-tone="light">
       <header className="operator-admin-panel-heading shark-admin-section-heading">
         <h2 className="operator-panel-title"><Icon size={19} aria-hidden="true" /> {title}</h2>
         {count !== undefined && <span className="shark-admin-count">{counts.format(count)}</span>}
@@ -103,7 +103,7 @@ function PlanSection({ plan, data, loading, go }: { plan: Plan; data?: BillingDa
   const title = `${plan} абонаменти и достъп`;
   const empty = data ? (data.pagination.total ? 'Няма записи на тази страница.' : `Няма потребители с активен ${plan} достъп.`) : 'Данните за достъпа са недостъпни.';
   return (
-    <AdminSection title={title} icon={plan === 'PRO' ? Crown : Zap} art={plan === 'PRO' ? 'agent' : 'team'} count={data?.pagination.total}>
+    <AdminSection title={title} id={'plan-' + plan.toLowerCase()} icon={plan === 'PRO' ? Crown : Zap} scene={plan === 'PRO' ? 'plans' : 'subscriptions'} count={data?.pagination.total}>
       {!data?.items.length ? <p className="operator-admin-panel-data">{empty}</p> : (
         <div className="operator-admin-panel-data operator-table shark-admin-table">
           <table>
@@ -124,7 +124,7 @@ function PlanSection({ plan, data, loading, go }: { plan: Plan; data?: BillingDa
 
 function UsersSection({ users, pagination, loading, go }: { users: AccountRow[]; pagination?: PageInfo; loading: boolean; go: (page: number) => void }) {
   return (
-    <AdminSection title="Всички потребители" icon={Users} art="team" count={pagination?.total}>
+    <AdminSection id="accounts" title="Всички потребители" icon={Users} scene="customers" count={pagination?.total}>
       {!users.length ? <p className="operator-admin-panel-data">{pagination?.total ? 'Няма записи на тази страница.' : 'Няма потребителски записи.'}</p> : (
         <div className="operator-admin-panel-data operator-table shark-admin-table shark-admin-users">
           <table>
@@ -184,7 +184,7 @@ function TransfersSection({ data, busy, approve }: { data?: PendingPayments; bus
   }
 
   return (
-    <AdminSection title="Чакащи банкови и мобилни плащания" icon={Landmark} art="markets" count={total}>
+    <AdminSection id="payments" title="Чакащи банкови и мобилни плащания" icon={Landmark} scene="transactions" count={total}>
       {notice && <p className="operator-admin-panel-data" role="status">{notice}</p>}
       {!available ? <p className="operator-admin-panel-data">{data?.reason || 'Няма потвърден източник за банкови и мобилни плащания.'}</p>
         : !data.items.length ? <p className="operator-admin-panel-data">Няма чакащи плащания.</p> : (
@@ -287,7 +287,7 @@ function TelegramPairingPanel() {
   }
 
   return (
-    <AdminSection id="telegram" title="Telegram" icon={MessageSquare} art="agent">
+    <AdminSection id="telegram" title="Telegram" icon={MessageSquare} scene="connections">
       <div className="operator-admin-panel-data grid gap-3" aria-busy={busy}>
         {state?.linked && <p>Свързан администраторски Telegram чат.</p>}
         {state && !state.linked && (
@@ -457,19 +457,19 @@ export default function AdminPage() {
   const collected = formatMoney(metrics?.collected);
   const mrr = formatMoney(metrics?.mrr);
   const cards = data ? [
-    { label: 'Регистрирани', value: data.stats.totalUsers, icon: Users, art: 'team' },
-    { label: 'PRO в профила', value: data.stats.proUsers, icon: Crown, art: 'agent' },
-    { label: 'ULTRA в профила', value: data.stats.ultraUsers, icon: Zap, art: 'team' },
-    { label: 'Събрани плащания', value: collected, icon: Banknote, art: 'markets' },
-    { label: 'Месечен приход (MRR)', value: mrr, icon: BarChart3, art: 'markets' },
-    { label: 'Активни абонаменти', value: metrics?.activeSubscriptions ?? null, icon: CalendarCheck, art: 'agent' },
-    { label: 'Чакащи плащания', value: transfers?.availability === 'available' ? transfers.total ?? transfers.items.length : null, icon: Landmark, art: 'markets' },
-    { label: 'Проекти', value: data.stats.totalProjects, icon: Boxes, art: 'studio' },
+    { label: 'Регистрирани', value: data.stats.totalUsers, icon: Users, scene: 'registrations' },
+    { label: 'PRO в профила', value: data.stats.proUsers, icon: Crown, scene: 'plans' },
+    { label: 'ULTRA в профила', value: data.stats.ultraUsers, icon: Zap, scene: 'roles' },
+    { label: 'Събрани плащания', value: collected, icon: Banknote, scene: 'billing' },
+    { label: 'Месечен приход (MRR)', value: mrr, icon: BarChart3, scene: 'sales' },
+    { label: 'Активни абонаменти', value: metrics?.activeSubscriptions ?? null, icon: CalendarCheck, scene: 'subscriptions' },
+    { label: 'Чакащи плащания', value: transfers?.availability === 'available' ? transfers.total ?? transfers.items.length : null, icon: Landmark, scene: 'transactions' },
+    { label: 'Проекти', value: data.stats.totalProjects, icon: Boxes, scene: 'projects' },
   ] : [];
 
   return (
     <main className="operator-workspace operator-admin shark-admin mx-auto max-w-6xl px-3 py-4 sm:px-6 sm:py-6">
-      <header className="operator-topbar shark-admin-topbar">
+      <header className="operator-topbar shark-admin-topbar" data-scene="overview">
         <div className="shark-admin-brand">
           <Link href="/dashboard?view=settings" className="shark-action-secondary operator-icon-button" aria-label="Към настройките на акаунта"><ArrowLeft size={18} aria-hidden="true" /></Link>
           <Logo size="sm" />
@@ -481,26 +481,37 @@ export default function AdminPage() {
           <RefreshCw size={17} aria-hidden="true" className={loading ? 'animate-spin' : undefined} />
         </button>
       </header>
-      {loading && !data && <div role="status" className="ice-section operator-admin-notice" data-ice-art="team"><p>Зареждане на административните данни…</p></div>}
-      {error && <div role="alert" className="ice-section operator-admin-notice" data-ice-art="agent"><p className="operator-admin-error">{error}</p></div>}
+      {loading && !data && <div role="status" className="ice-section operator-admin-notice" data-scene="health" data-scene-tone="light"><p>Зареждане на административните данни…</p></div>}
+      {error && <div role="alert" className="ice-section operator-admin-notice" data-scene="diagnostics" data-scene-tone="light"><p className="operator-admin-error">{error}</p></div>}
       {data && (
         <>
+          <nav className="shark-admin-jumps" aria-label="Раздели в администрацията">
+            <a href="#accounts">Потребители</a>
+            <a href="#plan-pro">Планове</a>
+            <a href="#payments">Плащания</a>
+            <a href="#performance-fees">Комисиони</a>
+            <a href="#settings">Интеграции</a>
+          </nav>
           <dl className="shark-admin-metrics" aria-label="Обобщение" aria-busy={loading}>
-            {cards.map(({ icon: Icon, label, value, art }) => (
-              <div key={label} className="ice-section shark-admin-metric" data-ice-art={art}>
+            {cards.map(({ icon: Icon, label, value, scene }) => (
+              <div key={label} className="ice-section shark-admin-metric" data-scene={scene} data-scene-tone="light">
                 <dt><Icon size={17} aria-hidden="true" />{label}</dt>
                 <dd data-unavailable={value === null || undefined}>{value === null ? 'Недостъпно' : typeof value === 'number' ? counts.format(value) : value}</dd>
               </div>
             ))}
           </dl>
           {(collected === null || mrr === null) && <p className="shark-admin-metrics-note">{data.billingError || data.billing?.amountsUnavailableReason || 'Липсват потвърдени данни за паричните показатели.'}</p>}
+          <UsersSection users={data.users} pagination={data.pagination?.users} loading={busy} go={(page) => go('users', page)} />
           <div className="shark-admin-columns">
             <PlanSection plan="PRO" data={data.billing?.byPlan?.PRO} loading={busy} go={(page) => go('PRO', page)} />
             <PlanSection plan="ULTRA" data={data.billing?.byPlan?.ULTRA} loading={busy} go={(page) => go('ULTRA', page)} />
           </div>
-          <UsersSection users={data.users} pagination={data.pagination?.users} loading={busy} go={(page) => go('users', page)} />
+          <TransfersSection data={transfers} busy={busy} approve={approveTransfer} />
+          <AdminSection id="performance-fees" title="Регистрации и комисиони" icon={Banknote} scene="commission">
+            <PerformanceFeesPanel />
+          </AdminSection>
           <div className="shark-admin-columns">
-            <AdminSection id="settings" title="AI настройки" icon={KeyRound} art="agent">
+            <AdminSection id="settings" title="AI настройки" icon={KeyRound} scene="models">
               <form className="operator-admin-panel-data grid gap-3" onSubmit={saveSettings} aria-busy={saving || testing}>
                 <p className="operator-muted text-sm">{data.ai.aiConfigured ? 'Има конфигуриран доставчик.' : 'Няма разрешен и конфигуриран доставчик.'}</p>
                 <label className="flex gap-3 items-center min-h-11">
@@ -525,13 +536,9 @@ export default function AdminPage() {
                 </div>
               </form>
             </AdminSection>
-            <TransfersSection data={transfers} busy={busy} approve={approveTransfer} />
+            <TelegramPairingPanel />
           </div>
-          <TelegramPairingPanel />
-          <AdminSection id="performance-fees" title="Регистрации и комисиони" icon={Banknote} art="markets">
-            <PerformanceFeesPanel />
-          </AdminSection>
-          <nav className="ice-section operator-admin-links" data-ice-art="studio" aria-label="Операторски инструменти">
+          <nav className="ice-section operator-admin-links" data-scene="tools" data-scene-tone="light" aria-label="Операторски инструменти">
             <div>
               <Link href="/chat" className="shark-action-secondary">AI чат</Link>
               <Link href="/dashboard?view=studio" className="shark-action-secondary">Студио</Link>

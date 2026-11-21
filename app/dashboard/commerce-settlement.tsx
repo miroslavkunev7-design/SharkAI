@@ -73,7 +73,7 @@ export function CommerceSettlement({currency,onAllocated}:{currency:string;onAll
   },[currency,revision]);
   const current=result?.currency===currency?result:null;
   const data=current?.data;
-  return <section className="ice-section module-panel module-wallet-panel" data-ice-art="markets">
+  return <section className="ice-section module-panel module-wallet-panel" data-scene="allocation" data-scene-tone="light">
     <h2>Седмична цел и разпределение на печалбата</h2>
     {!current ? <p role="status">Зареждане на седмичния отчет…</p> : data?.status!=='available'
       ? <p>Няма потвърден седмичен отчет за този магазин и валута.</p> : <>
@@ -94,7 +94,7 @@ export function CommerceSettlement({currency,onAllocated}:{currency:string;onAll
           done={()=>{setNotice('Седмичната цел е запазена.');setRevision(n=>n+1);}}/>
         <h3>Приключени седмици</h3>
         {data.closed.length===0 && <p>Още няма приключена седмица с проверен отчет.</p>}
-        {data.closed.map(week=><div key={week.start_date} className="commerce-candidate">
+        {data.closed.map(week=><div key={week.start_date} className="commerce-candidate" data-scene="calendar" data-scene-tone="light">
           <h4>{day(week.start_date)} – {day(week.end_date)}</h4>
           <dl className="module-wallet-metrics"><div><dt>Уреден нетен резултат</dt><dd>{displayMinor(week.profit_minor,currency)}</dd></div>
             <div><dt>Цел за тази седмица</dt><dd>{week.target_minor===null?'Не е зададена':displayMinor(week.target_minor,currency)}</dd></div>

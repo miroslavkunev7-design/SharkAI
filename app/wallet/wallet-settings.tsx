@@ -22,16 +22,16 @@ export function WalletSettings({account,update}:{account:Account;update:(next:Ac
     }catch{setMessage('Промяната не е потвърдена. Провери настройките преди повторен опит.');}
     finally{setBusy(false);}
   }
-  if(account.state==='guest')return <section className="panel"><h2>Настройки на профила</h2><p>Влез в Shark AI, за да управляваш сметката и разрешенията си.</p><Link href={walletLogin('settings')} className="button primary">Вход в Shark AI <ArrowRight/></Link></section>;
-  if(!account.data)return <section className="panel"><p role="status">{account.state==='loading'?'Зареждане на настройките…':'Настройките са временно недостъпни.'}</p></section>;
+  if(account.state==='guest')return <section className="panel" data-scene="identity" data-scene-tone="light"><h2>Настройки на профила</h2><p>Влез в Shark AI, за да управляваш сметката и разрешенията си.</p><Link href={walletLogin('settings')} className="button primary">Вход в Shark AI <ArrowRight/></Link></section>;
+  if(!account.data)return <section className="panel" data-scene="verification" data-scene-tone="light"><p role="status">{account.state==='loading'?'Зареждане на настройките…':'Настройките са временно недостъпни.'}</p></section>;
   const data=account.data;
   return <div className="stack">
-    <section className="panel"><div className="row"><h2>Връзка с доставчика</h2><ShieldCheck/></div>
+    <section className="panel" data-scene="connections" data-scene-tone="light"><div className="row"><h2>Връзка с доставчика</h2><ShieldCheck/></div>
       <p>{accountLabel(account)}. Откриването и потвърждаването на платежната сметка се извършват в Wise.</p>
       {!data.wallet_capabilities.hosted_kyc&&data.wallet.status!=='verified'&&<a className="button primary" href="https://wise.com/register" target="_blank" rel="noopener noreferrer">Открий сметка в Wise <ArrowUpRight/></a>}
       <div className="sw-provider-actions"><WalletProviderActions data={data} action={null}/></div>
     </section>
-    <details className="panel sw-disclosure"><summary>Инвестиционни настройки и AI достъп <ChevronDown/></summary>
+    <details className="panel sw-disclosure" data-scene="allocation" data-scene-tone="light"><summary>Инвестиционни настройки и AI достъп <ChevronDown/></summary>
       <WalletInvestmentsForm key={JSON.stringify(data.settings)} settings={data.settings} busy={busy} onSave={save}/>
       {(data.settings.ai_access==='analysis_only'||data.broker_activity.status==='unavailable'||data.broker_activity.accounts.some(a=>!a.halted_at))&&
         <button className="button secondary" disabled={busy} onClick={()=>void save()}>Прекрати автоматичния достъп</button>}

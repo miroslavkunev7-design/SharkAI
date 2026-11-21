@@ -143,3 +143,30 @@
 .shark-admin-members {margin:.7rem 0;}
 .shark-admin-members summary {cursor:pointer;font-weight:650;margin-bottom:.4rem;}
 .shark-admin-fee-metrics dd { margin: .2rem 0 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.shark-admin-jumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-block: 12px;
+}
+.shark-admin-jumps a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid #acbbefab;
+  border-radius: 999px;
+  background: linear-gradient(124deg,#152b50f0,#333065ee);
+  color: #f4f8ff;
+  font-size: .86rem;
+  font-weight: 640;
+}
+.shark-admin-jumps a:is(:hover,:focus-visible) { background: linear-gradient(116deg,#1e4381,#55458c); }
+.shark-admin-section[id] { scroll-margin-top: 1rem; }
+body.shark-site .shark-admin-topbar[data-scene] {
+  --scene-solid: #22215e;
+  --scene-soft: #38256cf5;
+  --scene-feather: #48459be0;
+  --scene-shade: #254d94c9;
+  --scene-right: #153f7c91;
+}

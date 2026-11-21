@@ -34,7 +34,7 @@ function StockPermission({item,refresh}:{item:StockItem;refresh:()=>void}) {
     }catch{setNotice('Разрешението не е потвърдено. Провери свободния лимит и срока на договора.');}
     finally{setBusy(false);}
   }
-  return <details className="commerce-candidate"><summary>Разрешение за автоматични покупки</summary>
+  return <details className="commerce-candidate" data-scene="verification" data-scene-tone="light"><summary>Разрешение за автоматични покупки</summary>
     <form className="commerce-form" onSubmit={submit}>
       <p>{item.product_name} · {item.supplier_name} · договорен склад. Поръчките се издават без повторно потвърждение в рамките на посочените лимити.</p>
       <label>Максимум на покупка ({item.currency})<input required inputMode="decimal" value={each} onChange={e=>setEach(e.target.value)}/></label>
@@ -60,7 +60,7 @@ function ActivePermission({mandate,refresh}:{mandate:Mandate;refresh:()=>void}) 
     }catch{setNotice('Оттеглянето не е потвърдено. Обнови разрешенията.');}
     finally{setBusy(false);}
   }
-  return <article className="commerce-candidate"><h4>{mandate.product_id} · {mandate.supplier_name}</h4>
+  return <article className="commerce-candidate" data-scene="supplier" data-scene-tone="light"><h4>{mandate.product_id} · {mandate.supplier_name}</h4>
     <p>До {displayMinor(mandate.max_per_po_minor,mandate.currency)} на поръчка, общо до {displayMinor(mandate.total_minor,mandate.currency)}.
       {' '}Валидно до {dateSofia(mandate.expires_at)} (София).</p>
     <button className="shark-action-secondary" type="button" disabled={busy} onClick={()=>void revoke()}>Оттегли разрешението за покупки</button>
@@ -91,7 +91,7 @@ function StockOffer({item,refresh}:{item:StockItem;refresh:()=>void}) {
     finally{setBusy(false);}
   }
   const canReview=item.state==='offered'||item.state==='reviewed';
-  return <details className="commerce-candidate">
+  return <details className="commerce-candidate" data-scene="shipping" data-scene-tone="light">
     <summary>{item.product_name} · {item.supplier_name} · {labels[item.state]}</summary>
     <dl className="module-wallet-metrics">
       <div><dt>Бройки за поръчка</dt><dd>{item.units}</dd></div>
@@ -127,7 +127,7 @@ export function Procurement({currency,refreshCapital}:{currency:string;refreshCa
   },[revision]);
   const items=stock?.items.filter(item=>item.currency===currency)??[];
   const mandates=stock?.mandates?.filter(row=>row.currency===currency)??[];
-  return <section className="ice-section module-panel module-wallet-panel" data-ice-art="studio">
+  return <section className="ice-section module-panel module-wallet-panel" data-scene="inventory" data-scene-tone="light">
     <h2>Покупки за склад и препродажба</h2>
     <p>Офертите показват колко струва цялата доставка. При потвърждение се издава поръчка в Zoho Inventory в рамките на свободния бюджет на магазина.</p>
     {!stock?<p role="status">Зареждане на офертите…</p>:stock.status!=='available'?<p>Данните от доставчика за склада са временно недостъпни.</p>

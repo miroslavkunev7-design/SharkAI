@@ -5,6 +5,7 @@ import { DesktopWebUpdate } from './desktop-web-update';
 import { QuickChatWidget } from './quick-chat-widget';
 import './quick-chat.css';
 import './sharkai-ultra.css';
+import './site-scenes.css';
 
 export const metadata: Metadata = {
   title: 'SharkAI — AI чат и работно пространство',
@@ -37,7 +38,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="bg">
-      <body className="font-sans min-h-screen">
+      <body className="shark-site font-sans min-h-screen">
+        <div className="site-daylight" aria-hidden="true" />
         {children}
         <div className="shark-overlay-stack">
           <DesktopWebUpdate revision={desktopWebRevision()} />

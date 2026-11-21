@@ -1,0 +1,26 @@
+.shark-public-shell .operator-tests {
+  display: grid;
+  align-content: start;
+  gap: clamp(12px, 2vw, 24px);
+  width: var(--public-width);
+  min-height: 0;
+  margin: clamp(16px, 3vw, 38px) auto;
+  padding: 0;
+  background: transparent;
+}
+.operator-tests .operator-hero .operator-hero-copy { display: grid; justify-items: start; gap: 8px; }
+.operator-tests .tests-back { display: inline-flex; align-items: center; gap: .4rem; min-height: 38px; font-size: .92rem; color: #263f73; font-weight: 650; }
+.operator-tests .tests-back:hover { text-decoration: underline; }
+.operator-tests .operator-test-status { display: grid; gap: 9px; justify-items: start; }
+.operator-tests .operator-metric { color: #173451; }
+.operator-tests .tests-group-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.operator-tests .tests-group { display: grid; gap: 7px; }
+.operator-tests .tests-group h2, .operator-tests .tests-timestamp { width: fit-content; padding: .32em .72em; border: 1px solid #adc9e092; color: #172b4a; background: #e7f3ffd9; border-radius: 10px; }
+.operator-tests .tests-group h2 { font-size: 1.12rem; font-weight: 700; }
+.operator-tests .tests-timestamp { font-size: .82rem; }
+.operator-tests .operator-result .operator-result-content { max-width: 74%; }
+@media (max-width: 700px) {
+  .operator-tests .tests-group-grid { grid-template-columns: minmax(0, 1fr); }
+  .operator-tests .operator-hero .operator-hero-copy { width: min(80%, 28rem); }
+  .operator-tests .operator-metrics { grid-template-columns: minmax(0, 1fr); }
+}
