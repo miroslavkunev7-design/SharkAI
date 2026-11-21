@@ -312,11 +312,6 @@ body.shark-site :is(.module-banner, .module-tile, .shark-launch-hero)[data-scene
   position: relative;
   z-index: 1;
 }
-body.shark-site :is(.module-banner, .module-tile, .module-panel,
-  .shark-entry-feature, .shark-entry-plan, .operator-panel)[data-scene] :is(input, textarea, select) {
-  position: relative;
-  z-index: 1;
-}
 @media (max-width: 700px) {
   body.shark-site :is(.module-panel, .module-banner, .module-tile,
     .shark-launch-hero, .shark-launch-summary > a, .shark-entry-feature,
@@ -328,7 +323,7 @@ body.shark-site :is(.module-banner, .module-tile, .module-panel,
 @media (prefers-reduced-motion: reduce) {
   body.shark-site :is(.module-panel, .module-banner, .module-tile,
     .shark-launch-summary > a, .shark-entry-feature, .shark-entry-plan)[data-scene] {
-    scroll-behavior: auto;
+    transition: none;
   }
 }
 @media (forced-colors: active) {
