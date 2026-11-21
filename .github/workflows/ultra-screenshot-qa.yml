@@ -62,6 +62,11 @@ jobs:
           npx --yes playwright@1.57.0 screenshot --browser chromium --viewport-size="1440,900" --wait-for-timeout=1300 --full-page "http://127.0.0.1:3847/dashboard?view=investments" visual-qa/investments-desktop-1440.png
           npx --yes playwright@1.57.0 screenshot --browser chromium --viewport-size="1440,900" --wait-for-timeout=1300 --full-page "http://127.0.0.1:3847/dashboard?view=commerce" visual-qa/commerce-desktop-1440.png
           npx --yes playwright@1.57.0 screenshot --browser chromium --viewport-size="393,852" --wait-for-timeout=1300 --full-page "http://127.0.0.1:3847/login" visual-qa/login-mobile-393.png
+          npx --yes playwright@1.57.0 screenshot --browser chromium --viewport-size="393,852" --wait-for-timeout=1100 --full-page http://127.0.0.1:3847/ visual-qa/home-mobile-393.png
+          npx --yes playwright@1.57.0 screenshot --browser chromium --viewport-size="393,852" --wait-for-timeout=1100 --full-page "http://127.0.0.1:3847/dashboard?view=studio" visual-qa/studio-mobile-393.png
+          npx --yes playwright@1.57.0 screenshot --browser chromium --viewport-size="393,852" --wait-for-timeout=1100 --full-page "http://127.0.0.1:3847/dashboard?view=investments" visual-qa/investments-mobile-393.png
+          npx --yes playwright@1.57.0 screenshot --browser chromium --viewport-size="393,852" --wait-for-timeout=1100 --full-page "http://127.0.0.1:3847/dashboard?view=commerce" visual-qa/commerce-mobile-393.png
+          npx --yes playwright@1.57.0 screenshot --browser chromium --viewport-size="393,852" --wait-for-timeout=1100 --full-page http://127.0.0.1:3847/pricing visual-qa/pricing-mobile-393.png
       - name: Upload screenshots for review
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
