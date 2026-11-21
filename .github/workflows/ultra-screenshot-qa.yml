@@ -1,5 +1,12 @@
 name: SharkAI Ultra Screenshot QA
 on:
+  push:
+    branches: [master]
+    paths:
+      - 'app/**'
+      - 'public/sharkai/**'
+      - 'public/wallet-original/**'
+      - '.github/workflows/ultra-screenshot-qa.yml'
   pull_request:
     branches: [master]
     paths:
