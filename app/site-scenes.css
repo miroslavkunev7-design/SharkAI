@@ -183,3 +183,214 @@ body.shark-site .ice-section[data-scene] {
   body.shark-site [data-scene] { background: Canvas; color: CanvasText; }
   .site-daylight { display: none; }
 }
+
+
+/* ULTRA 50/50 scene surfaces */
+/* The approved mobile Wallet and Chat remain the visual reference. This layer
+ * only covers existing illustrated cards, not their controls, chat messages or
+ * data. A single original scene appears on the right, gently melting into an
+ * icy sapphire glass surface on the left. Keep all rounded shapes and spacing.
+ */
+body.shark-site :is(
+  .shark-launch-hero,
+  .shark-launch-summary > a,
+  .module-overview-hero,
+  .module-banner,
+  .module-panel,
+  .module-tile,
+  .module-metric,
+  .module-disclosure,
+  .operator-panel,
+  .operator-admin-notice,
+  .operator-admin-links,
+  .shark-admin-metric,
+  .shark-entry-feature,
+  .shark-entry-plan,
+  .shark-entry-price-intro,
+  .shark-entry-price-message,
+  .pf-home-hero,
+  .pf-home-account,
+  .pf-home-history,
+  .pfm,
+  .pfm-alert,
+  .crypto-market,
+  .crypto-detail,
+  .commerce-candidate,
+  .investment-idea
+)[data-scene] {
+  --glacier-split: 50%;
+  --glacier-ice-coverage: 54%;
+  --glacier-left: rgba(7, 29, 75, .97);
+  --glacier-middle: rgba(39, 35, 128, .90);
+  --glacier-photo-glaze: rgba(45, 33, 126, .43);
+  --glacier-photo-end: rgba(7, 27, 78, .18);
+  --glacier-outline: rgba(181, 236, 255, .78);
+  position: relative;
+  isolation: isolate;
+  border-color: var(--glacier-outline);
+  background-color: #091b48;
+  background-image:
+    linear-gradient(157deg, rgba(247, 253, 255, .22), transparent 22%, transparent 74%, rgba(84, 217, 255, .10)),
+    radial-gradient(ellipse 72% 90% at 25% -12%, rgba(71, 219, 255, .26), transparent 78%),
+    url('/sharkai/ice-surface.webp'),
+    linear-gradient(99deg,
+      var(--glacier-left) 0%,
+      var(--glacier-left) calc(var(--glacier-split) - 13%),
+      var(--glacier-middle) var(--glacier-split),
+      var(--glacier-photo-glaze) calc(var(--glacier-split) + 18%),
+      var(--glacier-photo-end) 100%),
+    var(--scene-image),
+    linear-gradient(126deg, #071c46 0%, #3336a1 50%, #6928b8 78%, #073f94 100%);
+  background-size:
+    100% 100%, 100% 100%, var(--glacier-ice-coverage) 100%,
+    100% 100%, cover, 100% 100%;
+  background-position: center, center, left center, center, var(--scene-focus, 67% 50%), center;
+  background-repeat: no-repeat;
+  background-blend-mode: normal, screen, soft-light, normal, normal, normal;
+  background-clip: padding-box;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .68),
+    inset 0 -1px 0 rgba(160, 185, 255, .31),
+    inset 0 0 0 1px rgba(165, 228, 255, .18),
+    0 10px 25px rgba(4, 15, 54, .26),
+    0 0 17px rgba(52, 175, 255, .16);
+}
+
+body.shark-site :is(
+  .shark-launch-hero,
+  .shark-launch-summary > a,
+  .module-banner,
+  .module-panel,
+  .module-tile,
+  .module-metric,
+  .module-disclosure,
+  .operator-panel,
+  .operator-admin-notice,
+  .operator-admin-links,
+  .shark-admin-metric,
+  .shark-entry-feature,
+  .shark-entry-plan,
+  .shark-entry-price-intro,
+  .shark-entry-price-message,
+  .pf-home-hero,
+  .pf-home-account,
+  .pf-home-history,
+  .pfm,
+  .pfm-alert,
+  .crypto-market,
+  .crypto-detail,
+  .commerce-candidate,
+  .investment-idea
+)[data-scene][data-scene-tone="light"] {
+  --glacier-left: rgba(229, 245, 255, .97);
+  --glacier-middle: rgba(199, 224, 255, .88);
+  --glacier-photo-glaze: rgba(126, 153, 222, .42);
+  --glacier-photo-end: rgba(59, 83, 157, .15);
+  --glacier-outline: rgba(208, 245, 255, .95);
+  background-color: #c6e6fc;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .96),
+    inset 0 -1px 0 rgba(150, 158, 255, .36),
+    inset 0 0 0 1px rgba(135, 195, 255, .33),
+    0 10px 26px rgba(9, 25, 83, .25),
+    0 0 18px rgba(74, 184, 255, .22);
+}
+
+/* The Wallet screenshot already has the approved full-bleed coast and bright
+   buttons. The floating assistant / chat interior are likewise kept intact.
+   Remove only a legacy duplicate illustration from the portfolio hero, which
+   now receives the themed scene through the common background stack. */
+body.shark-site .pf-home-hero[data-scene]::before,
+body.shark-site .pf-home-hero[data-scene]::after {
+  content: none;
+}
+
+/* Keep content readable on both sides and preserve real focus/interaction. */
+body.shark-site :is(.module-banner, .module-tile, .shark-launch-hero)[data-scene] > :first-child {
+  position: relative;
+  z-index: 1;
+}
+@media (max-width: 700px) {
+  body.shark-site :is(.module-panel, .module-banner, .module-tile,
+    .shark-launch-hero, .shark-launch-summary > a, .shark-entry-feature,
+    .shark-entry-plan, .operator-panel, .pf-home-hero, .commerce-candidate)[data-scene] {
+    --glacier-ice-coverage: 53%;
+    background-position: center, center, left center, center, 72% center, center;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.shark-site :is(.module-panel, .module-banner, .module-tile,
+    .shark-launch-summary > a, .shark-entry-feature, .shark-entry-plan)[data-scene] {
+    transition: none;
+  }
+}
+@media (forced-colors: active) {
+  body.shark-site [data-scene] {
+    background: Canvas !important;
+    color: CanvasText !important;
+    border-color: ButtonText !important;
+    box-shadow: none !important;
+  }
+}
+
+
+/* ULTRA midnight shell and navigation */
+/* Reuse the scenic imagery but give all non-Wallet site pages the deep blue and
+   violet contrast of the approved mobile Wallet header and Chat. This changes
+   only decorative layers; it does not replace any section, view or action. */
+body.shark-site .site-daylight {
+  background-color: #071739;
+}
+body.shark-site .site-daylight::after {
+  background:
+    radial-gradient(ellipse 75% 66% at 83% 4%, rgba(115, 42, 205, .26), transparent 75%),
+    radial-gradient(ellipse 52% 82% at 15% 84%, rgba(15, 91, 197, .23), transparent 80%),
+    linear-gradient(125deg, rgba(5, 13, 39, .79), rgba(17, 19, 69, .72) 49%, rgba(7, 16, 52, .81));
+}
+
+body.shark-site .module-sidebar.ice-section,
+body.shark-site .module-drawer.ice-section--dark {
+  border-color: rgba(176, 232, 255, .79);
+  background-color: #081943;
+  background-image:
+    radial-gradient(ellipse at 12% 4%, rgba(52, 187, 255, .25), transparent 52%),
+    linear-gradient(138deg, rgba(7, 28, 78, .94), rgba(52, 27, 119, .86) 62%, rgba(7, 63, 145, .88)),
+    url('/sharkai/ice-surface.webp'),
+    url('/sharkai/scenes/workspace.webp');
+  background-size: cover, 100% 100%, cover, cover;
+  background-position: center, center, center, center;
+  background-blend-mode: screen, normal, soft-light, normal;
+  box-shadow:
+    inset 0 1px 0 rgba(239, 251, 255, .64),
+    inset 0 0 0 1px rgba(105, 176, 255, .27),
+    0 14px 35px rgba(3, 10, 42, .54),
+    0 0 15px rgba(81, 143, 245, .27);
+}
+
+body.shark-site .module-topbar[data-scene],
+body.shark-site .shark-admin-topbar[data-scene] {
+  background-color: #221b71;
+  background-image:
+    radial-gradient(ellipse 78% 135% at 86% -18%, rgba(70, 218, 255, .28), transparent 76%),
+    linear-gradient(110deg, rgba(37, 19, 129, .98), rgba(98, 31, 194, .96) 49%, rgba(18, 86, 191, .96)),
+    var(--scene-image);
+  background-size: 100% 100%, 100% 100%, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat;
+  background-blend-mode: screen, normal, normal;
+  border-color: rgba(204, 239, 255, .82);
+  box-shadow:
+    inset 0 1px rgba(234, 252, 255, .69),
+    0 7px 19px rgba(2, 12, 48, .4),
+    0 0 15px rgba(79, 199, 255, .32);
+}
+@media (forced-colors: active) {
+  body.shark-site .module-sidebar.ice-section,
+  body.shark-site .module-drawer.ice-section--dark,
+  body.shark-site :is(.module-topbar, .shark-admin-topbar)[data-scene] {
+    background: Canvas !important;
+    color: CanvasText !important;
+    border-color: ButtonText !important;
+    box-shadow: none !important;
+  }
+}

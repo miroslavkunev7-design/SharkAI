@@ -46,3 +46,34 @@ test('every registered section photo resolves to its own WebP asset', () => {
     assert.equal(bytes.toString('ascii', 8, 12), 'WEBP', name);
   }
 });
+
+
+test('Every premium module uses the same half-glacier and half-photo surface', () => {
+  const css = file('app/site-scenes.css');
+  const surface = css.split('/* ULTRA 50/50 scene surfaces */')[1];
+  assert.ok(surface, 'The shared 50/50 surface system must exist');
+  assert.match(surface, /--glacier-split:\s*50%/);
+  assert.match(surface, /var\(--glacier-split\)/);
+  assert.match(surface, /url\('\/sharkai\/ice-surface\.webp'\)/);
+  assert.match(surface, /var\(--scene-image\)/);
+  for (const section of [
+    '.module-banner', '.module-panel', '.module-tile', '.module-metric',
+    '.shark-launch-hero', '.shark-launch-summary > a',
+    '.shark-entry-feature', '.shark-entry-plan', '.operator-panel',
+    '.pf-home-hero', '.commerce-candidate', '.investment-idea',
+  ]) assert.ok(surface.includes(section), 'Missing glacier artwork on '+ section);
+  assert.match(surface, /\[data-scene-tone="light"\]/);
+  assert.match(surface, /prefers-reduced-motion/);
+});
+
+
+test('The app shell repeats the midnight sapphire and violet header palette', () => {
+  const css = file('app/site-scenes.css');
+  const shell = css.split('/* ULTRA midnight shell and navigation */')[1];
+  assert.ok(shell, 'A shared dark premium shell is required');
+  assert.match(shell, /site-daylight::after/);
+  assert.match(shell, /module-sidebar\.ice-section/);
+  assert.match(shell, /module-topbar\[data-scene\]/);
+  assert.match(shell, /shark-admin-topbar\[data-scene\]/);
+  assert.match(shell, /#071739/);
+});

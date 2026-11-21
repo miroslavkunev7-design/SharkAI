@@ -3,10 +3,8 @@
 import {spawn} from 'node:child_process';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {createServer} from 'node:net';
-import {tsImport} from 'tsx/esm/api';
-
 const check=(path,regex)=>({path,regex});
-const imported = await tsImport('../app/wallet/wallet-routes.ts', import.meta.url);
+const imported = await import('../app/wallet/wallet-routes.ts');
 const {walletTitles, walletUrl} = imported.default ?? imported;
 const checks=[
  ...Object.keys(walletTitles).map(route => check(walletUrl(route), new RegExp('data-wallet-route="'+route+'"'))),
