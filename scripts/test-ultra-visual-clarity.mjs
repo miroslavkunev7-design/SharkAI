@@ -46,3 +46,22 @@ test('every registered section photo resolves to its own WebP asset', () => {
     assert.equal(bytes.toString('ascii', 8, 12), 'WEBP', name);
   }
 });
+
+
+test('Every premium module uses the same half-glacier and half-photo surface', () => {
+  const css = file('app/site-scenes.css');
+  const surface = css.split('/* ULTRA 50/50 scene surfaces */')[1];
+  assert.ok(surface, 'The shared 50/50 surface system must exist');
+  assert.match(surface, /--glacier-split:\s*50%/);
+  assert.match(surface, /var\(--glacier-split\)/);
+  assert.match(surface, /url\('\/sharkai\/ice-surface\.webp'\)/);
+  assert.match(surface, /var\(--scene-image\)/);
+  for (const section of [
+    '.module-banner', '.module-panel', '.module-tile', '.module-metric',
+    '.shark-launch-hero', '.shark-launch-summary > a',
+    '.shark-entry-feature', '.shark-entry-plan', '.operator-panel',
+    '.pf-home-hero', '.commerce-candidate', '.investment-idea',
+  ]) assert.ok(surface.includes(section), 'Missing glacier artwork on '+ section);
+  assert.match(surface, /\[data-scene-tone="light"\]/);
+  assert.match(surface, /prefers-reduced-motion/);
+});
